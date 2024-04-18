@@ -4,18 +4,18 @@ version = 3
 
 [[package]]
 name = "server"
-version = "0.0.1"
+version = "0.0.2"
 dependencies = [
  "shared",
 ]
 
 [[package]]
 name = "service-worker"
-version = "0.0.1"
+version = "0.0.2"
 dependencies = [
  "shared",
 ]
 
 [[package]]
 name = "shared"
-version = "0.0.1"
+version = "0.0.2"

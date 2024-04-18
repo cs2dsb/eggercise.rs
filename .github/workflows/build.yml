@@ -1,6 +1,8 @@
 name: Build
 
 env:
+  # bin name:final name,..
+  EXECUTABLE_NAMES: "server:server"
   CARGO_TERM_COLOR: always
 
 on:
