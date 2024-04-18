@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+
+# Exit when any command fails
+set -o errexit
+
+# Exit when an undeclared variable is used
+set -o nounset
+
+# Exit when a piped command returns a non-zero exit code
+set -o pipefail
+
+# Launches cargo watch to run the main binary 
+# Set BIN to change the binary
+# Set RELEASE=true to enable release mode
+
+readonly repo_dir="$( cd $(dirname ${BASH_SOURCE}); cd ..; pwd )";
+cd $repo_dir
+
+readonly bin="${BIN:-server}";
+release="";
+
+if [ "${RELEASE:-}" == "true" ]; then
+    release="--release";
+fi
+
+cargo watch \
+    -i '*.sqlite*' \
+    -i '*.log*' \
+    -x "run ${release} --bin $bin -- $*"

@@ -1,0 +1,11 @@
+[package]
+name = "server"
+
+[package.edition]
+workspace = true
+
+[package.version]
+workspace = true
+
+[dependencies]
+shared = { path = "../shared" }

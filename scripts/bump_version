@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+
+# Exit when any command fails
+set -o errexit
+
+# Exit when an undeclared variable is used
+set -o nounset
+
+# Exit when a piped command returns a non-zero exit code
+set -o pipefail
+
+# Bumps the Cargo.toml version for the workspace
+# $1 can be major, minor or patch. Defaults to minor if omitted
+
+readonly repo_dir="$( cd $(dirname ${BASH_SOURCE}); cd ..; pwd )";
+cd $repo_dir
+
+readonly bump=${1:-minor}
+cargo set-version --bump $bump

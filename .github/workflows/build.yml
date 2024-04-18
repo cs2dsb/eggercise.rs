@@ -1,0 +1,137 @@
+name: Build
+
+env:
+  CARGO_TERM_COLOR: always
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+*"
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build release
+    runs-on: ${{ matrix.os }}
+    env:
+      # For some builds, we use cross to test on 32-bit and big-endian
+      # systems.
+      CARGO: cargo
+      # When CARGO is set to CROSS, this is set to `--target matrix.target`.
+      TARGET_FLAGS: ""
+      # When CARGO is set to CROSS, TARGET_DIR includes matrix.target.
+      TARGET_DIR: ./target
+      # Emit backtraces on panics.
+      RUST_BACKTRACE: 1
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - build: linux-gnu
+          os: ubuntu-22.04
+          rust: stable
+          target: x86_64-unknown-linux-gnu
+
+    steps:
+    - name: Get tag
+      id: tag
+      uses: dawidd6/action-get-tag@v1
+      # Because it can be kicked off manually there may not be a tag
+      continue-on-error: true
+
+    - name: Set build suffix
+      run: |
+        echo "SUFFIX=$([[ "${{ steps.tag.outputs.tag }}" = "" ]] && echo $GITHUB_SHA || echo ${{ steps.tag.outputs.tag }})" >> $GITHUB_ENV
+        DATE=$(date +'%Y-%m-%d_%H%M%S')
+        echo "DATE=$DATE" >> $GITHUB_ENV
+        echo "TAG=$([[ "${{ steps.tag.outputs.tag }}" = "" ]] && echo "main_$DATE" || echo "${{ steps.tag.outputs.tag }}")" >> $GITHUB_ENV
+
+    - name: Checkout repository
+      uses: actions/checkout@v3  
+    
+    - name: Install rust toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: ${{ matrix.rust }}
+        target: ${{ matrix.target }}
+        override: true
+    
+    - name: Use Cross
+      shell: bash
+      run: |
+        cargo install cross
+        echo "CARGO=cross" >> $GITHUB_ENV
+        echo "TARGET_FLAGS=--target ${{ matrix.target }}" >> $GITHUB_ENV
+        echo "TARGET_DIR=./target/${{ matrix.target }}" >> $GITHUB_ENV
+
+    - name: Show command used for Cargo
+      run: |
+        echo "cargo command is: ${{ env.CARGO }}"
+        echo "target flag is: ${{ env.TARGET_FLAGS }}"
+        echo "target dir is: ${{ env.TARGET_DIR }}"
+
+    - name: Build release binary
+      run: ${{ env.CARGO }} build --verbose --release ${{ env.TARGET_FLAGS }}
+
+    - name: Strip and archive release (Non-Windows)
+      if: ${{ ! contains(matrix.target, 'windows') }}
+      run: |
+        set -x
+        for i in ${EXECUTABLE_NAMES//,/ }
+        do
+          _bin_name="${i%:*}"
+          _final_name="${i#*:}"
+
+          strip target/${{ matrix.target }}/release/${_bin_name}
+          chmod +x target/${{ matrix.target }}/release/${_bin_name}
+          mv target/${{ matrix.target }}/release/${_bin_name} ./${_final_name}
+          tar -czf ${_final_name}_${{ env.SUFFIX }}_linux.tar.gz ${_final_name} README.md
+        done
+
+    - name: Strip and archive release (Windows)
+      if: ${{ contains(matrix.target, 'windows') }}
+      run: |
+        set -x
+        for i in ${EXECUTABLE_NAMES//,/ }
+        do
+          _bin_name="${i%:*}"
+          _final_name="${i#*:}"
+
+          strip target/${{ matrix.target }}/release/${_bin_name}.exe
+          chmod +x target/${{ matrix.target }}/release/${_bin_name}.exe
+          mv target/${{ matrix.target }}/release/${_bin_name}.exe ./${_final_name}.exe
+          zip ${_final_name}_${{ env.SUFFIX }}_windows.zip ${_final_name}.exe README.md
+        done
+
+    - name: Upload release (Non-Windows)
+      if: ${{ ! contains(matrix.target, 'windows') }}
+      uses: svenstaro/upload-release-action@v2
+      with:
+        repo_token: ${{ secrets.GITHUB_TOKEN }}
+        file: "*.tar.gz"
+        tag: ${{ env.TAG }}
+        overwrite: true
+        file_glob: true
+        prerelease: true
+
+    - name: Upload release (Windows)
+      if: ${{ contains(matrix.target, 'windows') }}
+      uses: svenstaro/upload-release-action@v2
+      with:
+        repo_token: ${{ secrets.GITHUB_TOKEN }}
+        file: "*.zip"
+        tag: ${{ env.TAG }}
+        overwrite: true
+        file_glob: true
+        prerelease: true
+
+    - name: Release release
+      uses: svenstaro/upload-release-action@v2
+      with:
+        repo_token: ${{ secrets.GITHUB_TOKEN }}
+        file: "README.md"
+        tag: ${{ env.TAG }}
+        overwrite: true
+        promote: true
+        prerelease: false

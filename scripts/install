@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+
+# Exit when any command fails
+set -o errexit
+
+# Exit when an undeclared variable is used
+set -o nounset
+
+# Exit when a piped command returns a non-zero exit code
+set -o pipefail
+
+# Installs the prerequisites for the project
+
+readonly repo_dir="$( cd $(dirname ${BASH_SOURCE}); cd ..; pwd )";
+cd $repo_dir
+
+readonly bindgen_version="0.2.92";
+
+# Drop cached creds if there are any
+sudo -k
+
+# Try and sudo without password
+if sudo -n whoami &>/dev/null; then
+    echo "Passwordless sudo is enabled. Running random installation scripts not recommended..." 1>&2
+    exit 1
+fi
+
+install_dep() {
+    local rc=`(eval $2 >/dev/null 2>&1); echo $?`
+    if [[ $rc -ne 0 ]]; then
+        echo "Installing $1"
+        eval $3
+    fi
+}
+
+install_dep "wasm32-unknown-unknown target" "rustup target list | grep -q 'wasm32-unknown-unknown (installed)'" "rustup target add wasm32-unknown-unknown"
+install_dep "wasm-bindgen" "wasm-bindgen -V | grep -q $bindgen_version" "cargo install wasm-bindgen-cli --force --version $bindgen_version"
+install_dep "cargo-watch" "cargo watch -V" "cargo install cargo-watch"
+install_dep "cargo set-version" "cargo set-version -V" "cargo install cargo-edit --features vendored-openssl"

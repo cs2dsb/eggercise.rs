@@ -1,0 +1,7 @@
+group_imports = "StdExternalCrate"
+normalize_doc_attributes = true
+normalize_comments = true
+imports_granularity = "Crate"
+struct_lit_single_line = false
+trailing_semicolon = true
+wrap_comments = true
