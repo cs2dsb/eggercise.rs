@@ -67,6 +67,11 @@ jobs:
         echo "TARGET_FLAGS=--target ${{ matrix.target }}" >> $GITHUB_ENV
         echo "TARGET_DIR=./target/${{ matrix.target }}" >> $GITHUB_ENV
 
+    - name: Add wasm target
+      shell: bash
+      run: |
+        rustup target add wasm32-unknown-unknown
+
     - name: Show command used for Cargo
       run: |
         echo "cargo command is: ${{ env.CARGO }}"
