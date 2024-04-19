@@ -16,3 +16,6 @@ target/
 # Log files
 *.log
 *.ansi
+
+# Env file that could contain secrets
+.env

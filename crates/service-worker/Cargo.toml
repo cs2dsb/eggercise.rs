@@ -1,6 +1,9 @@
 [package]
 name = "service-worker"
 
+[lib]
+crate-type = ["cdylib", "rlib"]
+
 [package.edition]
 workspace = true
 
@@ -9,3 +12,4 @@ workspace = true
 
 [dependencies]
 shared = { path = "../shared" }
+wasm-bindgen = "0.2.92"

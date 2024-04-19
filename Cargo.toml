@@ -7,6 +7,12 @@ edition = "2021"
 version = "0.0.2"
 
 [workspace.dependencies]
+# Logging and tracing facade
+tracing = "0.1.40"
+tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
+
+# Loading env from .env files
+dotenv = "0.15.0"
 
 [profile.release]
 opt-level = 2

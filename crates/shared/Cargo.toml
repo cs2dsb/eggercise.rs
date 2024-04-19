@@ -8,3 +8,7 @@ workspace = true
 workspace = true
 
 [dependencies]
+thiserror = "1.0.58"
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+dotenv = { workspace = true }
