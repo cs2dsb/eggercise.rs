@@ -1184,7 +1184,7 @@ dependencies = [
 
 [[package]]
 name = "server"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "anyhow",
  "axum",
@@ -1213,7 +1213,7 @@ dependencies = [
 
 [[package]]
 name = "service-worker"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "console_error_panic_hook",
  "js-sys",
@@ -1234,7 +1234,7 @@ dependencies = [
 
 [[package]]
 name = "shared"
-version = "0.0.5"
+version = "0.0.6"
 dependencies = [
  "dotenv",
  "thiserror",
