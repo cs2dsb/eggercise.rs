@@ -1194,6 +1194,7 @@ dependencies = [
  "tokio",
  "tokio-rusqlite",
  "tokio-util",
+ "tower",
  "tower-http",
  "tracing",
  "wasm-bindgen-cli-support",
@@ -1206,6 +1207,7 @@ version = "0.0.4"
 dependencies = [
  "shared",
  "wasm-bindgen",
+ "web-sys",
 ]
 
 [[package]]
@@ -1796,6 +1798,16 @@ name = "wasmparser"
 version = "0.80.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "449167e2832691a1bff24cde28d2804e90e09586a448c8e76984792c44334a6b"
+
+[[package]]
+name = "web-sys"
+version = "0.3.69"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "77afa9a11836342370f4817622a2f0f418b134426d91a82dfb48f532d2ec13ef"
+dependencies = [
+ "js-sys",
+ "wasm-bindgen",
+]
 
 [[package]]
 name = "winapi"

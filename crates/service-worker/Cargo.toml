@@ -13,3 +13,10 @@ workspace = true
 [dependencies]
 shared = { path = "../shared" }
 wasm-bindgen = "0.2.92"
+web-sys = { version = "0.3.69", features = [ 
+    "console", "FetchEvent",  "Request",  
+    "ReadableStream",  "ReadableStreamDefaultReader", 
+    "Headers",  "ResponseInit",  "Response", 
+    "ServiceWorkerGlobalScope", "WorkerGlobalScope", 
+    "WorkerLocation", "Clients",
+] }

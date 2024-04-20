@@ -1,14 +1,14 @@
 use std::{net::{IpAddr, SocketAddr}, path::PathBuf, str::FromStr};
 
-use axum::Router;
+use axum::{http::{HeaderName, HeaderValue}, Router};
 use shared::*;
 use clap::Parser;
 use tokio::net::TcpListener;
 use tracing::{debug, Level};
 use tower_http::{
-    services::ServeDir,
-    trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer},
+    services::{ServeDir, ServeFile}, set_header::SetResponseHeaderLayer, trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer}
 };
+use tower::ServiceBuilder;
 
 #[derive(Debug, Parser)]
 #[clap(name = "eggercise server")]
@@ -43,6 +43,12 @@ async fn main() -> Result<(), anyhow::Error> {
     axum::serve(
         listener, 
             Router::new()
+                // Add the header to allow service worker in non-root path to set a root scope
+                .nest_service("/wasm/service_worker.js", ServiceBuilder::new()
+                    .layer(SetResponseHeaderLayer::if_not_present(
+                        HeaderName::from_static("service-worker-allowed"), 
+                        HeaderValue::from_static("/")))
+                    .service(ServeFile::new(args.static_path.join("wasm/service_worker.js"))))
                 .nest_service("/", ServeDir::new(&args.static_path))
                 .layer(TraceLayer::new_for_http()
                     .make_span_with(DefaultMakeSpan::new().level(Level::INFO))

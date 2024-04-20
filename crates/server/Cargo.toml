@@ -63,7 +63,8 @@ tokio-rusqlite = "0.5.1"
 tokio-util = "0.7.10"
 
 # HTTP utils
-tower-http = { version = "0.5.2", features = [ "trace", "fs" ] }
+tower-http = { version = "0.5.2", features = [ "trace", "fs", "set-header" ] }
+tower = "0.4.13"
 
 # ZSTD encryption bindings
 zstd = "0.13.1"

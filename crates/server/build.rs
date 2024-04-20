@@ -1,5 +1,6 @@
-use std::{env, fs::{copy, create_dir_all}, path::{Path, PathBuf}, process::Command, time::Instant};
+use std::{env, fs::{copy, create_dir_all, read_to_string, OpenOptions}, io::Write, path::{Path, PathBuf}, process::Command, time::Instant};
 
+use anyhow::bail;
 use cargo_toml::Manifest;
 
 macro_rules! p {
@@ -33,6 +34,11 @@ fn main() -> Result<(), anyhow::Error> {
         .name
         .replace("-", "_");
 
+    let register_listeners_js = worker_dir.join("register_listeners.js");
+    if !register_listeners_js.exists() {
+        bail!("register_listeners.js missing, expected path: {:?}", register_listeners_js);
+    }
+
     let profile = match is_release_build {
         true => "release",
         false => "debug",
@@ -62,14 +68,14 @@ fn main() -> Result<(), anyhow::Error> {
     p!("Building service-worker wasm took {:.2}s", start.elapsed().as_secs_f32());
 
     if !lib_file.exists() {
-        anyhow::bail!("Wasm file doesn't exist after running cargo build for worker. Should be at {:?}", lib_file);
+        bail!("Wasm file doesn't exist after running cargo build for worker. Should be at {:?}", lib_file);
     }
 
     let start = Instant::now();
     p!("Generating bindings for service-worker wasm");
     wasm_bindgen_cli_support::Bindgen::new()
         .input_path(&lib_file)
-        .web(true)?
+        .no_modules(true)?
         .remove_name_section(is_release_build)
         .remove_producers_section(is_release_build)
         .keep_debug(!is_release_build)
@@ -81,15 +87,24 @@ fn main() -> Result<(), anyhow::Error> {
     let bg_lib_file = lib_file.with_file_name(format!("{}_bg.wasm", worker_name));
 
     if !js_file.exists() {        
-        anyhow::bail!("Bindings js file doesn't exist after running wasm-bindgen for worker. Should be at {:?}", js_file);
+        bail!("Bindings js file doesn't exist after running wasm-bindgen for worker. Should be at {:?}", js_file);
     }
     if !bg_lib_file.exists() {        
-        anyhow::bail!("Bingen lib file doesn't exist after running wasm-bindgen for worker. Should be at {:?}", bg_lib_file);
+        bail!("Bingen lib file doesn't exist after running wasm-bindgen for worker. Should be at {:?}", bg_lib_file);
     }
 
+    let js_out = server_wasm_dir.join(js_file.as_path().file_name().unwrap());
     create_dir_all(&server_wasm_dir)?;
     copy(&bg_lib_file, server_wasm_dir.join(bg_lib_file.as_path().file_name().unwrap()))?;
-    copy(&js_file, server_wasm_dir.join(js_file.as_path().file_name().unwrap()))?;
+    copy(&js_file, &js_out)?;
+
+    {
+        let snippet = read_to_string(&register_listeners_js)?;
+        let mut js_out = OpenOptions::new()
+            .append(true)
+            .open(&js_out)?;
+        js_out.write_all(snippet.as_bytes())?;
+    }
     
     Ok(())
 }

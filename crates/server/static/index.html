@@ -6,15 +6,44 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Eggercise gym planner" />
     <link rel="stylesheet" href="css/base.css" />
-    <link rel="modulepreload" src="wasm/service_worker.js" />
+    <!-- <link rel="modulepreload" src="wasm/service_worker.js" /> -->
   </head>
   <body>
     <h1>Eggercise</h1>
     <p>Hello world!</p>
 
     <script type="module">
-        import init from './wasm/service_worker.js';
-        await init();
+      const registerServiceWorker = async () => {
+        if ('serviceWorker' in navigator) {
+          const n_before = (await navigator.serviceWorker.getRegistrations()).length;
+          navigator.serviceWorker.register(
+            'wasm/service_worker.js',
+            {
+              type: 'classic',
+              scope: '/',
+            }
+          ).then(
+            (registration) => {
+              if (registration.installing) {
+                console.log('Service worker installing');
+              } else if (registration.waiting) {
+                console.log('Service worker installed');
+              } else if (registration.active) {
+                console.log('Service worker active');
+              }
+            },
+            (error) => {
+              console.error(`Service worker registration failed with error: ${error}`);
+              navigator.serviceWorker.getRegistrations().then(registrations => {
+                for (let i = n_before; i < registrations.length; i++) {
+                  registrations[i].unregister();
+                }                
+              });
+            }
+          );
+        }
+      };
+      registerServiceWorker();
     </script>
   </body>
 </html>
