@@ -25,6 +25,7 @@ fi
 if [ "${NOBUMP:-}" != "true" ]; then
     readonly bump=${BUMP:-patch};
     ${repo_dir}/scripts/bump_version $bump
+    git add -u
 fi
 
 readonly version=`cat Cargo.toml | sed -n '/^version *=* */{s///;s/^"//;s/"$//;p;}'`;

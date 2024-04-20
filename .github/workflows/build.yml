@@ -1,8 +1,8 @@
 name: Build
 
 env:
-  # bin name:final name,..
-  EXECUTABLE_NAMES: "server:server"
+  # bin name:final name:extra dir,..
+  EXECUTABLE_NAMES: "server:server:crates/server/static"
   CARGO_TERM_COLOR: always
 
 on:
@@ -87,13 +87,22 @@ jobs:
         set -x
         for i in ${EXECUTABLE_NAMES//,/ }
         do
-          _bin_name="${i%:*}"
-          _final_name="${i#*:}"
+          IFS=':'; parts=($i); unset IFS;
+          _bin_name="${parts[0]}";
+          _final_name="${parts[1]}";
+          _extra_dir="${parts[2]}";
+
+          if [ -d "${_extra_dir}" ]; then
+            mv "${_extra_dir}" ./
+            _extra_dir=`basename "${_extra_dir}"`;
+          else
+            _extra_dir="";
+          fi
 
           strip target/${{ matrix.target }}/release/${_bin_name}
           chmod +x target/${{ matrix.target }}/release/${_bin_name}
           mv target/${{ matrix.target }}/release/${_bin_name} ./${_final_name}
-          tar -czf ${_final_name}_${{ env.SUFFIX }}_linux.tar.gz ${_final_name} README.md
+          tar -czf ${_final_name}_${{ env.SUFFIX }}_linux.tar.gz ${_final_name} README.md ${_extra_dir}
         done
 
     - name: Strip and archive release (Windows)
