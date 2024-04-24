@@ -8,16 +8,18 @@ workspace = true
 workspace = true
 
 [build-dependencies]
-anyhow = "1.0.82"
-cargo_toml = "0.19.2"
+anyhow = { workspace = true }
 wasm-bindgen-cli-support = "0.2.92"
+shared = { path = "../shared" }
+base64 = "0.22.0"
+wasm-opt = "0.116.1"
 
 [dependencies]
 shared = { path = "../shared" }
 tracing = { workspace = true }
 
 # Application error helper
-anyhow = "1.0.82"
+anyhow = { workspace = true }
 
 # Web framework
 axum = "0.7.5"
@@ -47,8 +49,8 @@ rusqlite = { version = "0.31.0", features = ["bundled", "serde_json", "trace"] }
 rusqlite_migration = { version = "1.2.0", features = ["from-directory"] }
 
 # Se/deserializing 
-serde = { version = "1.0.198", features = ["derive"] }
-serde_json = "1.0.116"
+serde = { workspace = true }
+serde_json = { workspace = true }
 
 # Helpful traits and macros for working with enums and strings 
 strum = { version = "0.26.2", features = ["derive"] }

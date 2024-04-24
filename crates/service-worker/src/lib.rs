@@ -113,17 +113,23 @@ async fn try_fetch_from_cache(sw: ServiceWorkerGlobalScope, request: Request) ->
     }
 }
 
-#[wasm_bindgen]
-pub fn worker_install(sw: ServiceWorkerGlobalScope) -> Result<Promise, JsValue> {
-    set_panic_hook();
-    console_log!("worker_install called");
-
+async fn install(sw: ServiceWorkerGlobalScope) -> Result<JsValue, JsValue> {
     // Clearing is mainly for debugging   
-    let clear_cache = future_to_promise(clear_cache(sw.caches()?));
-    let add_to_cache_promise = future_to_promise(add_to_cache(sw.caches()?, &INITIAL_FILES_TO_CACHE));
-    let skip_promise = sw.skip_waiting()?;
+    //clear_cache(sw.caches()?).await?;
+    
+    add_to_cache(sw.caches()?, &INITIAL_FILES_TO_CACHE).await?;
+    
+    JsFuture::from(sw.skip_waiting()?).await?;
 
-    Ok(Promise::all(&JsValue::from(&Array::of3(&clear_cache, &add_to_cache_promise, &skip_promise))))
+    Ok(JsValue::undefined())
+}
+
+#[wasm_bindgen]
+pub fn worker_install(sw: ServiceWorkerGlobalScope, version: String) -> Result<Promise, JsValue> {
+    set_panic_hook();
+    console_log!("worker_install called. Version: {}", version);
+
+    Ok(future_to_promise(install(sw)))
 }
 
 #[wasm_bindgen]

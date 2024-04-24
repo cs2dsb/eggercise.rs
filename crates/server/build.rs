@@ -1,7 +1,9 @@
-use std::{env, fs::{copy, create_dir_all, read_to_string, OpenOptions}, io::Write, path::{Path, PathBuf}, process::Command, time::Instant};
+use std::{env, fs::{copy, create_dir_all, read_to_string, File, OpenOptions}, io::{Read, Write}, path::PathBuf, process::Command, time::Instant};
 
 use anyhow::bail;
-use cargo_toml::Manifest;
+use base64::{display::Base64Display, engine::general_purpose::STANDARD};
+use shared::{ get_service_worker_info, WorkerInfo, SERVICE_WORKER_VERSION_FILENAME };
+use wasm_opt::OptimizationOptions;
 
 macro_rules! p {
     ($($tokens: tt)*) => {
@@ -9,30 +11,22 @@ macro_rules! p {
     }
 }
 
-fn read_manifest<P: AsRef<Path>>(path: P) -> Result<Manifest, anyhow::Error> {
-    Ok(Manifest::from_path(path)?)
-}
-
 fn main() -> Result<(), anyhow::Error> {
     println!("cargo:rerun-if-changed=../service-worker");
     
     let is_release_build = !cfg!(debug_assertions);
 
-    //OUT_DIR=/home/daniel/dev/eggercise.rs/target/debug/build/server-9002832088e59b55/out
-    //CARGO_MANIFEST_DIR=/home/daniel/dev/eggercise.rs/crates/server
     let server_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR")?);
-    let worker_dir = server_dir.join("../service-worker");
     let out_dir = PathBuf::from(env::var("OUT_DIR")?);
     let wasm_dir = out_dir.join("wasm");
     let server_wasm_dir = server_dir
         .join("static")
         .join("wasm");
 
-    let worker_manifest = read_manifest(worker_dir.join("Cargo.toml"))?;
-    let worker_name = worker_manifest
-        .package.ok_or(anyhow::anyhow!("Worker manifest missing package entry"))?
-        .name
-        .replace("-", "_");
+    let (worker_dir, worker_name, worker_version) = {
+        let WorkerInfo { manifest_dir, name, version_with_timestamp, .. } = get_service_worker_info()?;
+        (manifest_dir, name, version_with_timestamp)
+    };
 
     let register_listeners_js = worker_dir.join("register_listeners.js");
     if !register_listeners_js.exists() {
@@ -47,7 +41,7 @@ fn main() -> Result<(), anyhow::Error> {
         .join("wasm32-unknown-unknown")
         .join(profile)
         .join(format!("{}.wasm", worker_name));
-
+    
     let mut cargo_cmd = Command::new("cargo");
     cargo_cmd.args([
         "rustc",
@@ -63,7 +57,7 @@ fn main() -> Result<(), anyhow::Error> {
     }
     
     let start = Instant::now();
-    p!("Building service-worker wasm");
+    p!("Building service-worker wasm version {}", worker_version);
     assert!(cargo_cmd.status()?.success());
     p!("Building service-worker wasm took {:.2}s", start.elapsed().as_secs_f32());
 
@@ -86,6 +80,7 @@ fn main() -> Result<(), anyhow::Error> {
     let js_file = lib_file.with_extension("js");
     let bg_lib_file = lib_file.with_file_name(format!("{}_bg.wasm", worker_name));
 
+    // Check the output we were expecting was created
     if !js_file.exists() {        
         bail!("Bindings js file doesn't exist after running wasm-bindgen for worker. Should be at {:?}", js_file);
     }
@@ -94,16 +89,49 @@ fn main() -> Result<(), anyhow::Error> {
     }
 
     let js_out = server_wasm_dir.join(js_file.as_path().file_name().unwrap());
+    let wasm_opt_out = lib_file.with_file_name(format!("{}_bg_opt.wasm", worker_name));
+
+    // Optimize the wasm
+    OptimizationOptions::new_optimize_for_size_aggressively()
+        .run(&bg_lib_file, &wasm_opt_out)?;
+
+    // Copy the output to the static dir
     create_dir_all(&server_wasm_dir)?;
-    copy(&bg_lib_file, server_wasm_dir.join(bg_lib_file.as_path().file_name().unwrap()))?;
+    // These aren't needed with the wasm embedded in the js (see below)
+    // copy(&bg_lib_file, server_wasm_dir.join(bg_lib_file.as_path().file_name().unwrap()))?;
+    // copy(&wasm_opt_out, server_wasm_dir.join(wasm_opt_out.as_path().file_name().unwrap()))?;
     copy(&js_file, &js_out)?;
 
     {
-        let snippet = read_to_string(&register_listeners_js)?;
+        let wasm_bytes = {
+            let mut file = File::open(&wasm_opt_out)?;
+            let mut bytes = Vec::new();
+            file.read_to_end(&mut bytes)?;
+            bytes
+        };
+        let wasm_base64 = Base64Display::new(&wasm_bytes, &STANDARD).to_string();
+        
+        let snippet = read_to_string(&register_listeners_js)?
+            // Embed the wasm as a base64 encoded string in the output js so that it is accessible
+            // from the installed service worker without having to add extra cache logic in js
+            .replace("SERVICE_WORKER_BASE64", &wasm_base64)
+            // Include the version so the worker can work out if an update is needed
+            .replace("SERVICE_WORKER_VERSION", &worker_version);
+
         let mut js_out = OpenOptions::new()
             .append(true)
             .open(&js_out)?;
         js_out.write_all(snippet.as_bytes())?;
+    }
+
+    {
+        let mut version_out = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .open(server_wasm_dir.join(SERVICE_WORKER_VERSION_FILENAME))?;
+
+        // Write the version out somewhere the server side can access it for update checks
+        version_out.write_all(worker_version.as_bytes())?;
     }
     
     Ok(())

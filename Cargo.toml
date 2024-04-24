@@ -14,5 +14,18 @@ tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 # Loading env from .env files
 dotenv = "0.15.0"
 
+# Cargo.toml manifest parsing 
+cargo_toml = "0.19.2"
+
+# Application error helper
+anyhow = "1.0.82"
+
+# Date/time util
+chrono = "0.4.38"
+
+# Se/deserializing 
+serde = { version = "1.0.198", features = ["derive"] }
+serde_json = "1.0.116"
+
 [profile.release]
 opt-level = 2

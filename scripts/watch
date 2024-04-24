@@ -27,4 +27,4 @@ cargo watch \
     -i '*.sqlite*' \
     -i '*.log*' \
     -i 'crates/server/static/wasm' \
-    -x "run ${release} --bin $bin -- --static-path crates/server/static $*"
+    -x "run ${release} --bin $bin -- --static-dir crates/server/static $*"

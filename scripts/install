@@ -37,3 +37,4 @@ install_dep "wasm32-unknown-unknown target" "rustup target list | grep -q 'wasm3
 install_dep "wasm-bindgen" "wasm-bindgen -V | grep -q $bindgen_version" "cargo install wasm-bindgen-cli --force --version $bindgen_version"
 install_dep "cargo-watch" "cargo watch -V" "cargo install cargo-watch"
 install_dep "cargo set-version" "cargo set-version -V" "cargo install cargo-edit --features vendored-openssl"
+install_dep "wasm-opt" "wasm-opt --version" "cargo install wasm-opt"

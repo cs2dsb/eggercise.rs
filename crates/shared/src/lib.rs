@@ -1,5 +1,8 @@
-use std::path::PathBuf;
+use std::{path::{Path, PathBuf}, str::FromStr};
 
+use cargo_toml::Manifest;
+use chrono::Utc;
+use serde::{Deserialize, Serialize};
 use tracing_subscriber::fmt::format::FmtSpan;
 
 pub fn configure_tracing() {
@@ -22,4 +25,47 @@ pub fn load_dotenv() -> Result<Option<PathBuf>, dotenv::Error> {
         Err(dotenv::Error::Io(ref e)) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
         r => r.map(|p| Some(p)),
     }
+}
+
+
+fn read_manifest<P: AsRef<Path>>(path: P) -> Result<Manifest, anyhow::Error> {
+    Ok(Manifest::from_path(path)?)
+}
+
+#[derive(Debug, Clone)]
+pub struct WorkerInfo {
+    pub manifest_dir: PathBuf,
+    pub name: String,
+    pub version: String,
+    pub version_with_timestamp: String,
+}
+
+pub fn get_service_worker_info() -> Result<WorkerInfo, anyhow::Error> {
+    let shared_dir = PathBuf::from_str(env!("CARGO_MANIFEST_DIR"))?;
+    let manifest_dir = shared_dir.join("../service-worker");
+    let worker_manifest = read_manifest(manifest_dir.join("Cargo.toml"))?;
+    let worker_package = worker_manifest
+        .package.ok_or(anyhow::anyhow!("Worker manifest missing package entry"))?;
+    let name = worker_package
+        .name
+        .replace("-", "_");
+    let version = worker_package.version().to_string();
+    let version_with_timestamp = format!("{}_{}",
+        version,
+        Utc::now().format("%Y%m%d%H%M%S"),
+    );
+
+    Ok(WorkerInfo {
+        manifest_dir,
+        name,
+        version,
+        version_with_timestamp,
+    })
+}
+
+pub const SERVICE_WORKER_VERSION_FILENAME: &str = "service_worker.version";
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ServiceWorkerVersionPayload {
+    pub version: String,
 }
