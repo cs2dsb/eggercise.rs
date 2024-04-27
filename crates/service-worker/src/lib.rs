@@ -31,6 +31,7 @@ async fn get_cache(caches: &CacheStorage) -> Result<Cache, JsValue> {
     Ok(cache)
 }
 
+#[allow(dead_code)]
 async fn clear_cache(caches: CacheStorage) -> Result<JsValue, JsValue> {
     let cache = get_cache(&caches).await?;
     let keys: Array = JsFuture::from(cache.keys()).await?.into();

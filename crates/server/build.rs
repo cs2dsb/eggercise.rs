@@ -1,8 +1,10 @@
-use std::{env, fs::{copy, create_dir_all, read_to_string, File, OpenOptions}, io::{Read, Write}, path::PathBuf, process::Command, time::Instant};
+use std::{env, fs::{copy, create_dir_all, read_to_string, remove_file, File, OpenOptions}, io::{self, Read, Write}, path::PathBuf, process::Command, time::Instant};
 
 use anyhow::bail;
 use base64::{display::Base64Display, engine::general_purpose::STANDARD};
-use shared::{ get_service_worker_info, WorkerInfo, SERVICE_WORKER_VERSION_FILENAME };
+use glob::glob;
+use sha2::{ Sha384, Digest };
+use shared::{ get_service_worker_info, HashedFile, ServiceWorkerPackage, WorkerInfo, SERVICE_WORKER_PACKAGE_FILENAME };
 use wasm_opt::OptimizationOptions;
 
 macro_rules! p {
@@ -19,8 +21,9 @@ fn main() -> Result<(), anyhow::Error> {
     let server_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR")?);
     let out_dir = PathBuf::from(env::var("OUT_DIR")?);
     let wasm_dir = out_dir.join("wasm");
-    let server_wasm_dir = server_dir
-        .join("static")
+    let static_dir = server_dir
+        .join("static");
+    let server_wasm_dir = static_dir
         .join("wasm");
 
     let (worker_dir, worker_name, worker_version) = {
@@ -124,15 +127,56 @@ fn main() -> Result<(), anyhow::Error> {
         js_out.write_all(snippet.as_bytes())?;
     }
 
+    // Prepare the package version info
     {
-        let mut version_out = OpenOptions::new()
+        let package_file_path = server_wasm_dir.join(SERVICE_WORKER_PACKAGE_FILENAME);
+
+        if package_file_path.exists() {
+            remove_file(&package_file_path)?;
+        }
+
+        let mut files = Vec::new();
+
+        for f in 
+            glob(&format!("{}/**/*", static_dir.to_str().expect("Invalid static_dir path")))? 
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()?
+            .into_iter()
+            .filter(|f| f.is_file())
+        {
+            let mut hasher = Sha384::new();
+            let mut file = File::open(&f)?;
+
+            io::copy(&mut file, &mut hasher)?;
+
+            let hash_bytes = hasher.finalize();
+            let hash = format!("sha384-{}", Base64Display::new(&hash_bytes, &STANDARD));
+
+            let path = f
+                .strip_prefix(&static_dir)?
+                .to_str().expect(&format!("Invalid static path ({:?})", &f))
+                .to_string();
+
+            files.push(HashedFile {
+                path,
+                hash,
+            });
+        }
+
+        let mut package_out = OpenOptions::new()
             .write(true)
             .create(true)
-            .open(server_wasm_dir.join(SERVICE_WORKER_VERSION_FILENAME))?;
+            .truncate(true)
+            .open(package_file_path)?;
 
-        // Write the version out somewhere the server side can access it for update checks
-        version_out.write_all(worker_version.as_bytes())?;
+        let package = ServiceWorkerPackage {
+            version: worker_version,
+            files,
+        };
+
+        serde_json::to_writer_pretty(&mut package_out, &package)?;
     }
+
     
     Ok(())
 }

@@ -1,4 +1,4 @@
-use std::{fs::read_to_string, net::{IpAddr, SocketAddr}, path::PathBuf, str::FromStr};
+use std::{fs::File, io::Read, net::{IpAddr, SocketAddr}, path::PathBuf, str::FromStr};
 
 use axum::{extract::State, http::{HeaderName, HeaderValue, StatusCode}, response::{IntoResponse, Response}, routing::get, Json, Router};
 use shared::*;
@@ -50,7 +50,7 @@ async fn main() -> Result<(), anyhow::Error> {
     axum::serve(
         listener, 
             Router::new()
-                .route("/service-worker-version", get(service_worker_version_handler))
+                // .route("/service-worker-p", get(service_worker_version_handler))
                 // Add the header to allow service worker in non-root path to set a root scope
                 .nest_service("/wasm/service_worker.js", ServiceBuilder::new()
                     .layer(SetResponseHeaderLayer::if_not_present(
@@ -70,13 +70,20 @@ async fn main() -> Result<(), anyhow::Error> {
 }
 
 
-async fn service_worker_version_handler(State(state): State<AppState>) -> Result<Json<ServiceWorkerVersionPayload>, AppError> {
-    let version = read_to_string(state
+async fn service_worker_version_handler(State(state): State<AppState>) -> Result<Json<ServiceWorkerPackage>, AppError> {
+    let package_path = state
         .static_dir
         .join("wasm")
-        .join(SERVICE_WORKER_VERSION_FILENAME))?;
+        .join(SERVICE_WORKER_PACKAGE_FILENAME);
 
-    Ok(Json(ServiceWorkerVersionPayload { version }))
+    let bytes = {
+        let mut file = File::open(package_path)?;
+        let mut bytes = Vec::new();
+        file.read_to_end(&mut bytes)?;
+        bytes
+    };
+
+    Ok(Json::from_bytes(&bytes)?)
 }
 
 impl<E> From<E> for AppError

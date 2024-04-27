@@ -63,9 +63,16 @@ pub fn get_service_worker_info() -> Result<WorkerInfo, anyhow::Error> {
     })
 }
 
-pub const SERVICE_WORKER_VERSION_FILENAME: &str = "service_worker.version";
+pub const SERVICE_WORKER_PACKAGE_FILENAME: &str = "service_worker_package.json";
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct ServiceWorkerVersionPayload {
+pub struct HashedFile {
+    pub path: String,
+    pub hash: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ServiceWorkerPackage {
     pub version: String,
+    pub files: Vec<HashedFile>,
 }
