@@ -1,6 +1,6 @@
-use std::{fs::File, io::Read, net::{IpAddr, SocketAddr}, path::PathBuf, str::FromStr};
+use std::{ net::{IpAddr, SocketAddr}, path::PathBuf, str::FromStr };
 
-use axum::{extract::State, http::{HeaderName, HeaderValue, StatusCode}, response::{IntoResponse, Response}, routing::get, Json, Router};
+use axum::{ http::{HeaderName, HeaderValue }, Router};
 use shared::*;
 use clap::Parser;
 use tokio::net::TcpListener;
@@ -25,13 +25,6 @@ struct Cli {
     bind_addr: String,
 }
 
-#[derive(Debug, Clone)]
-struct AppState {
-    static_dir: PathBuf,
-}
-
-struct AppError(anyhow::Error);
-
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
     load_dotenv()?;
@@ -50,8 +43,6 @@ async fn main() -> Result<(), anyhow::Error> {
     axum::serve(
         listener, 
             Router::new()
-                // .route("/service-worker-p", get(service_worker_version_handler))
-                // Add the header to allow service worker in non-root path to set a root scope
                 .nest_service("/wasm/service_worker.js", ServiceBuilder::new()
                     .layer(SetResponseHeaderLayer::if_not_present(
                         HeaderName::from_static("service-worker-allowed"), 
@@ -61,46 +52,8 @@ async fn main() -> Result<(), anyhow::Error> {
                 .layer(TraceLayer::new_for_http()
                     .make_span_with(DefaultMakeSpan::new().level(Level::INFO))
                     .on_response(DefaultOnResponse::new().level(Level::INFO)))
-                .with_state(AppState { static_dir: args.static_dir.clone()})
         )
-        .await
-        .unwrap();
+        .await?;
 
     Ok(())
-}
-
-
-async fn service_worker_version_handler(State(state): State<AppState>) -> Result<Json<ServiceWorkerPackage>, AppError> {
-    let package_path = state
-        .static_dir
-        .join("wasm")
-        .join(SERVICE_WORKER_PACKAGE_FILENAME);
-
-    let bytes = {
-        let mut file = File::open(package_path)?;
-        let mut bytes = Vec::new();
-        file.read_to_end(&mut bytes)?;
-        bytes
-    };
-
-    Ok(Json::from_bytes(&bytes)?)
-}
-
-impl<E> From<E> for AppError
-where
-    E: Into<anyhow::Error>,
-{
-    fn from(err: E) -> Self {
-        Self(err.into())
-    }
-}
-
-impl IntoResponse for AppError {
-    fn into_response(self) -> Response {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Something went wrong: {}", self.0),
-        )
-            .into_response()
-    }
 }

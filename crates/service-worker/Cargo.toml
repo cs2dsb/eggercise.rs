@@ -22,5 +22,7 @@ web-sys = { version = "0.3.69", features = [
     "Headers",  "ResponseInit",  "Response", 
     "ServiceWorkerGlobalScope", "WorkerGlobalScope", 
     "WorkerLocation", "Clients", "CacheStorage",
-    "Cache",
+    "Cache", "RequestInit", "MessageEvent"
 ] }
+gloo-utils = "0.2.0"
+serde = { workspace = true }

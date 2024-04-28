@@ -14,7 +14,12 @@ self.addEventListener('activate', event => {
 });
 
 self.addEventListener('fetch', event => {
-    event.waitUntil(wasm_bindgen.worker_fetch(self, event));
+    event.waitUntil(wasm_bindgen.worker_fetch(self, self.version, event));
+});
+
+
+self.addEventListener('message', event => {
+    wasm_bindgen.worker_message(self, event);
 });
 
 // Done like this because the JS part of the service worker is always available but the wasm part, if

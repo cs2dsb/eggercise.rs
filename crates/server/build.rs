@@ -15,6 +15,7 @@ macro_rules! p {
 
 fn main() -> Result<(), anyhow::Error> {
     println!("cargo:rerun-if-changed=../service-worker");
+    println!("cargo:rerun-if-changed=static");
     
     let is_release_build = !cfg!(debug_assertions);
 
@@ -152,10 +153,9 @@ fn main() -> Result<(), anyhow::Error> {
             let hash_bytes = hasher.finalize();
             let hash = format!("sha384-{}", Base64Display::new(&hash_bytes, &STANDARD));
 
-            let path = f
+            let path = format!("/{}", f
                 .strip_prefix(&static_dir)?
-                .to_str().expect(&format!("Invalid static path ({:?})", &f))
-                .to_string();
+                .to_str().expect(&format!("Invalid static path ({:?})", &f)));
 
             files.push(HashedFile {
                 path,

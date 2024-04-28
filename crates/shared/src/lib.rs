@@ -64,6 +64,7 @@ pub fn get_service_worker_info() -> Result<WorkerInfo, anyhow::Error> {
 }
 
 pub const SERVICE_WORKER_PACKAGE_FILENAME: &str = "service_worker_package.json";
+pub const SERVICE_WORKER_PACKAGE_URL: &str = "/wasm/service_worker_package.json";
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct HashedFile {

@@ -19,7 +19,7 @@ cd $repo_dir
 readonly bin="${BIN:-server}";
 release="";
 
-if [ "${RELEASE:-}" == "true" ]; then
+if [ "${RELEASE:-true}" == "true" ]; then
     release="--release";
 fi
 
