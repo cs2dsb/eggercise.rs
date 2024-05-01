@@ -2,4 +2,4 @@
 
 ## Dependencies 
 
-* C++ compiler (for wasm-opt). GCC and Clang both work. `apt install clang'
+* C++ compiler (for wasm-opt). G++ and Clang both work but the g++ version needs to be at least 17 which isn't in some OS apt repos yet. `apt install clang'
