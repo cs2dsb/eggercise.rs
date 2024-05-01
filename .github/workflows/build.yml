@@ -29,6 +29,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        c-compiler: ['clang']
+        cxx-compiler: ['clang++']
         include:
         - build: linux-gnu
           os: ubuntu-22.04
@@ -79,6 +81,9 @@ jobs:
         echo "target dir is: ${{ env.TARGET_DIR }}"
 
     - name: Build release binary
+      env:
+        CC: ${{matrix.c-compiler}}
+        CXX: ${{matrix.cxx-compiler}}
       run: ${{ env.CARGO }} build --verbose --release ${{ env.TARGET_FLAGS }}
 
     - name: Strip and archive release (Non-Windows)
