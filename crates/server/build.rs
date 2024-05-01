@@ -79,7 +79,7 @@ fn main() -> Result<(), anyhow::Error> {
         .keep_debug(!is_release_build)
         .omit_default_module_path(false)
         .generate(lib_file.as_path().parent().unwrap())?;
-    p!("Generating bindings for service-worker wasm took: {:2}s", start.elapsed().as_secs_f32());
+    p!("Generating bindings for service-worker wasm took: {:.2}s", start.elapsed().as_secs_f32());
 
     let js_file = lib_file.with_extension("js");
     let bg_lib_file = lib_file.with_file_name(format!("{}_bg.wasm", worker_name));
