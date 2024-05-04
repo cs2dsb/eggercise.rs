@@ -5,7 +5,13 @@ use base64::{display::Base64Display, engine::general_purpose::STANDARD};
 use glob::glob;
 use sha2::{ Sha384, Digest };
 use shared::{ get_service_worker_info, HashedFile, ServiceWorkerPackage, WorkerInfo, SERVICE_WORKER_PACKAGE_FILENAME };
-use wasm_opt::OptimizationOptions;
+use wasm_opt::{
+    OptimizationOptions,
+    Pass,
+};
+
+const WASM_DEV_PROFILE: &str = "dev-min-size";
+const USE_DEV_PROFILE: bool = false;
 
 macro_rules! p {
     ($($tokens: tt)*) => {
@@ -15,16 +21,16 @@ macro_rules! p {
 
 fn main() -> Result<(), anyhow::Error> {
     println!("cargo:rerun-if-changed=../service-worker");
-    println!("cargo:rerun-if-changed=static");
+    println!("cargo:rerun-if-changed=assets");
     
     let is_release_build = !cfg!(debug_assertions);
 
     let server_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR")?);
     let out_dir = PathBuf::from(env::var("OUT_DIR")?);
     let wasm_dir = out_dir.join("wasm");
-    let static_dir = server_dir
-        .join("static");
-    let server_wasm_dir = static_dir
+    let assets_dir = server_dir
+        .join("assets");
+    let server_wasm_dir = assets_dir
         .join("wasm");
 
     let (worker_dir, worker_name, worker_version) = {
@@ -39,7 +45,10 @@ fn main() -> Result<(), anyhow::Error> {
 
     let profile = match is_release_build {
         true => "release",
-        false => "debug",
+        false => match USE_DEV_PROFILE {
+            true => WASM_DEV_PROFILE,
+            false => "debug",
+        },
     };
     let lib_file = wasm_dir
         .join("wasm32-unknown-unknown")
@@ -58,6 +67,11 @@ fn main() -> Result<(), anyhow::Error> {
 
     if is_release_build {
         cargo_cmd.arg("--release");
+    } else if USE_DEV_PROFILE {
+        // Apply the custom profile to the wasm build
+        cargo_cmd.args([
+            "--profile", WASM_DEV_PROFILE,
+        ]);
     }
     
     let start = Instant::now();
@@ -96,14 +110,14 @@ fn main() -> Result<(), anyhow::Error> {
     let wasm_opt_out = lib_file.with_file_name(format!("{}_bg_opt.wasm", worker_name));
 
     // Optimize the wasm
-    OptimizationOptions::new_optimize_for_size_aggressively()
-        .run(&bg_lib_file, &wasm_opt_out)?;
+    let mut opt_options = OptimizationOptions::new_optimize_for_size_aggressively();
+    if USE_DEV_PROFILE {
+        opt_options.passes.more_passes.push(Pass::StripDwarf);
+    }
+    opt_options.run(&bg_lib_file, &wasm_opt_out)?;
 
-    // Copy the output to the static dir
+    // Copy the output to the assets dir
     create_dir_all(&server_wasm_dir)?;
-    // These aren't needed with the wasm embedded in the js (see below)
-    // copy(&bg_lib_file, server_wasm_dir.join(bg_lib_file.as_path().file_name().unwrap()))?;
-    // copy(&wasm_opt_out, server_wasm_dir.join(wasm_opt_out.as_path().file_name().unwrap()))?;
     copy(&js_file, &js_out)?;
 
     {
@@ -139,7 +153,7 @@ fn main() -> Result<(), anyhow::Error> {
         let mut files = Vec::new();
 
         for f in 
-            glob(&format!("{}/**/*", static_dir.to_str().expect("Invalid static_dir path")))? 
+            glob(&format!("{}/**/*", assets_dir.to_str().expect("Invalid assets_dir path")))? 
             .into_iter()
             .collect::<Result<Vec<_>, _>>()?
             .into_iter()
@@ -154,8 +168,8 @@ fn main() -> Result<(), anyhow::Error> {
             let hash = format!("sha384-{}", Base64Display::new(&hash_bytes, &STANDARD));
 
             let path = format!("/{}", f
-                .strip_prefix(&static_dir)?
-                .to_str().expect(&format!("Invalid static path ({:?})", &f)));
+                .strip_prefix(&assets_dir)?
+                .to_str().expect(&format!("Invalid assets path ({:?})", &f)));
 
             files.push(HashedFile {
                 path,
@@ -176,7 +190,6 @@ fn main() -> Result<(), anyhow::Error> {
 
         serde_json::to_writer_pretty(&mut package_out, &package)?;
     }
-
     
     Ok(())
 }

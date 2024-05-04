@@ -17,14 +17,15 @@ readonly repo_dir="$( cd $(dirname ${BASH_SOURCE}); cd ..; pwd )";
 cd $repo_dir
 
 readonly bin="${BIN:-server}";
+readonly assets_dir="creates/server/assets";
 release="";
 
-if [ "${RELEASE:-true}" == "true" ]; then
+if [ "${RELEASE:-}" == "true" ]; then
     release="--release";
 fi
 
 cargo watch \
-    -i '*.sqlite*' \
-    -i '*.log*' \
-    -i 'crates/server/static/wasm' \
-    -x "run ${release} --bin $bin -- --static-dir crates/server/static $*"
+    -i "*.sqlite*" \
+    -i "*.log*" \
+    -i "${assets_dir}/wasm" \
+    -x "run ${release} --bin $bin -- --assets-dir ${assets_dir} $*"

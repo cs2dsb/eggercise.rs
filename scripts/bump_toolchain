@@ -11,6 +11,9 @@ set -o pipefail
 
 # Bumps the toolchain to the latest stable release
 
+echo "Disabled since leptos currently requires nightly (Awaiting stabilization of https://github.com/rust-lang/rust/issues/29625)"
+exit 1
+
 readonly repo_dir="$( cd $(dirname ${BASH_SOURCE}); cd ..; pwd )";
 cd $repo_dir
 
@@ -20,6 +23,7 @@ readonly release_date=`curl -s ${release_url} | grep 'Version' | head -n 1 | cut
 cat >rust-toolchain.toml <<EOF
 [toolchain]
 channel = "stable-${release_date}"
+targets = [ "wasm32-unknown-unknown" ]
 EOF
 
 echo "Bumped to ${release_date}"

@@ -13,8 +13,8 @@ use tower::ServiceBuilder;
 #[derive(Debug, Parser)]
 #[clap(name = "eggercise server")]
 struct Cli {
-    #[clap(long, env, default_value = "static")]
-    static_dir: PathBuf,
+    #[clap(long, env, default_value = "assets")]
+    assets_dir: PathBuf,
     #[clap(long, env, default_value = "server.sqlite")]
     sqlite_connection_string: String,
     #[clap(long, env, default_value = "64")]
@@ -47,8 +47,8 @@ async fn main() -> Result<(), anyhow::Error> {
                     .layer(SetResponseHeaderLayer::if_not_present(
                         HeaderName::from_static("service-worker-allowed"), 
                         HeaderValue::from_static("/")))
-                    .service(ServeFile::new(args.static_dir.join("wasm/service_worker.js"))))
-                .nest_service("/", ServeDir::new(&args.static_dir))
+                    .service(ServeFile::new(args.assets_dir.join("wasm/service_worker.js"))))
+                .nest_service("/", ServeDir::new(&args.assets_dir))
                 .layer(TraceLayer::new_for_http()
                     .make_span_with(DefaultMakeSpan::new().level(Level::INFO))
                     .on_response(DefaultOnResponse::new().level(Level::INFO)))

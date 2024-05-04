@@ -6,6 +6,7 @@
 	],
 	"settings": {
 		"rust-analyzer.showUnlinkedFileNotification": false,
-		"git.ignoreLimitWarning": true
+		"git.ignoreLimitWarning": true,
+		"rust-analyzer.checkOnSave": true
 	}
 }

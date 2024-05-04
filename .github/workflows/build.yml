@@ -2,7 +2,7 @@ name: Build
 
 env:
   # bin name:final name:extra dir,..
-  EXECUTABLE_NAMES: "server:server:crates/server/static"
+  EXECUTABLE_NAMES: "server:server:crates/server/assets"
   CARGO_TERM_COLOR: always
 
 on:

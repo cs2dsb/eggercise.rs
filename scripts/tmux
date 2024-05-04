@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+
+# Exit when any command fails
+set -o errexit
+
+# Exit when an undeclared variable is used
+set -o nounset
+
+# Exit when a piped command returns a non-zero exit code
+set -o pipefail
+
+# Launches tmux session for the project
+# if $1 == "kill" kills the session 
+
+readonly repo_dir="$( cd $(dirname ${BASH_SOURCE}); cd ..; pwd )";
+cd $repo_dir
+
+readonly session_name="egg";
+
+if ! hash tmux 2>/dev/null; then
+    echo "Install tmux first..."
+    exit 1
+fi
+
+if [ "${1:-}" == "kill" ]; then
+    echo "Killing tmux session"
+    tmux kill-session -t $session_name
+    exit 0
+fi
+
+if tmux has-session -t $session_name 2>/dev/null; then
+    echo "Attaching to session"
+    tmux attach -t $session_name
+    exit 0
+fi
+
+echo "Creating new session"
+
+tmux new-session -d -s $session_name -n $session_name
+tmux split-window -v
+tmux send-keys -t $session_name.0 "./scripts/watch" Enter
+tmux attach -t $session_name
