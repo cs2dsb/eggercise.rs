@@ -33,34 +33,49 @@ fn read_manifest<P: AsRef<Path>>(path: P) -> Result<Manifest, anyhow::Error> {
 }
 
 #[derive(Debug, Clone)]
-pub struct WorkerInfo {
+pub struct CrateInfo {
     pub manifest_dir: PathBuf,
-    pub name: String,
+    pub lib_file_name: String,
+    pub package_name: String,
     pub version: String,
     pub version_with_timestamp: String,
 }
 
-pub fn get_service_worker_info() -> Result<WorkerInfo, anyhow::Error> {
+fn get_crate_info<P: AsRef<Path>>(crate_path: P) -> Result<CrateInfo, anyhow::Error> {
     let shared_dir = PathBuf::from_str(env!("CARGO_MANIFEST_DIR"))?;
-    let manifest_dir = shared_dir.join("../service-worker");
-    let worker_manifest = read_manifest(manifest_dir.join("Cargo.toml"))?;
-    let worker_package = worker_manifest
+    let manifest_dir = shared_dir.join(crate_path.as_ref());
+    let manifest = read_manifest(manifest_dir.join("Cargo.toml"))?;
+    let package = manifest
         .package.ok_or(anyhow::anyhow!("Worker manifest missing package entry"))?;
-    let name = worker_package
+    let lib_file_name = package
         .name
         .replace("-", "_");
-    let version = worker_package.version().to_string();
+    let version = package.version().to_string();
     let version_with_timestamp = format!("{}_{}",
         version,
         Utc::now().format("%Y%m%d%H%M%S"),
     );
+    let package_name = package.name;
 
-    Ok(WorkerInfo {
+    Ok(CrateInfo {
         manifest_dir,
-        name,
+        lib_file_name,
+        package_name,
         version,
         version_with_timestamp,
     })
+}
+
+pub fn get_service_worker_info() -> Result<CrateInfo, anyhow::Error> {
+    get_crate_info("../service-worker")
+}
+
+pub fn get_client_info() -> Result<CrateInfo, anyhow::Error> {
+    get_crate_info("../client")
+}
+
+pub fn get_server_info() -> Result<CrateInfo, anyhow::Error> {
+    get_crate_info("../server")
 }
 
 pub const SERVICE_WORKER_PACKAGE_FILENAME: &str = "service_worker_package.json";

@@ -1,14 +1,9 @@
 [package]
 name = "shared"
-
-[package.edition]
-workspace = true
-
-[package.version]
-workspace = true
+edition.workspace = true
+version.workspace = true
 
 [dependencies]
-thiserror = "1.0.58"
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 dotenv = { workspace = true }
@@ -16,3 +11,5 @@ cargo_toml = { workspace = true }
 anyhow = { workspace = true }
 chrono = { workspace = true }
 serde = { workspace = true }
+
+thiserror = "1.0.58"
