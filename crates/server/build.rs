@@ -2,7 +2,7 @@
 
 use std::{env, fs::{copy, create_dir_all, read_to_string, remove_dir_all, remove_file, File, OpenOptions}, io::{self, Read, Write}, path::{Path, PathBuf}, process::Command, time::Instant};
 
-use anyhow::bail;
+use anyhow::{bail, Context};
 use base64::{display::Base64Display, engine::general_purpose::STANDARD};
 use glob::glob;
 use sha2::{ Sha384, Digest };
@@ -190,46 +190,53 @@ fn main() -> Result<(), anyhow::Error> {
     };
     
     // worker can't use modules because browser support for modules in service workers is minimal
-    build_wasm(&worker_package_name, wasm_dir_str, is_release_build)?;
-    build_wasm(&client_package_name, wasm_dir_str, is_release_build)?;
+    build_wasm(&worker_package_name, wasm_dir_str, is_release_build)
+        .context("build_wasm[worker]")?;
+    build_wasm(&client_package_name, wasm_dir_str, is_release_build)
+        .context("build_wasm[client]")?;
     
     let worker_wasm_file = wasm_out_path(&worker_lib_file_name, &wasm_dir, profile);
     let client_wasm_file = wasm_out_path(&client_lib_file_name, &wasm_dir, profile);
-    let (worker_bg_file, worker_js_file) = generate_bindings(&worker_lib_file_name, &worker_wasm_file, is_release_build, false)?;
-    let (client_bg_file, client_js_file) = generate_bindings(&client_lib_file_name, &client_wasm_file, is_release_build, true)?;
+    let (worker_bg_file, worker_js_file) = generate_bindings(
+        &worker_lib_file_name, 
+        &worker_wasm_file, 
+        is_release_build, 
+        false).context("generate_bindings[worker]")?;
+    let (client_bg_file, client_js_file) = generate_bindings(
+        &client_lib_file_name, 
+        &client_wasm_file, 
+        is_release_build, 
+        true).context("generate_bindings[client]")?;
 
-    let worker_bg_opt_file = optimize_wasm(&worker_bg_file)?;
-    let client_bg_opt_file = optimize_wasm(&client_bg_file)?;
-
-    // Because the client js is a module there are two files
-    let client_js_files = [
-        client_js_file.with_file_name(format!("{}_bg.js", path_prefix_to_str(&client_js_file))),
-        client_js_file,
-    ];
+    let worker_bg_opt_file = optimize_wasm(&worker_bg_file)
+        .context("optimize_wasm[worker]")?;
+    let client_bg_opt_file = optimize_wasm(&client_bg_file)
+        .context("optimize_wasm[client]")?;
 
     // Construct the output paths
     let worker_js_out = server_wasm_dir.join(path_filename_to_str(&worker_js_file));
-    let client_js_out = [
-        server_wasm_dir.join(path_filename_to_str(&client_js_files[0])),
-        server_wasm_dir.join(path_filename_to_str(&client_js_files[1])),
-    ];
+    let client_js_out = server_wasm_dir.join(path_filename_to_str(&client_js_file));
+
     // Note this lops off the _opt which is necessary to restore the expected bind-gen filename
     let client_wasm_out = server_wasm_dir.join(path_filename_to_str(&client_bg_file));
 
     // Delete the output directory if it exists
     if server_wasm_dir.exists() {
-        remove_dir_all(&server_wasm_dir)?;
+        remove_dir_all(&server_wasm_dir)
+            .context("remove_dir_all[server_wasm_dir]")?;
     }
 
     // Recreate it
-    create_dir_all(&server_wasm_dir)?;
+    create_dir_all(&server_wasm_dir)
+        .context("create_dir_all[server_wasm_dir]")?;
 
     // Copy the output to the assets dir
-    copy(&worker_js_file, &worker_js_out)?;
-    copy(&client_bg_opt_file, &client_wasm_out)?;
-    for (src, dst) in client_js_files.iter().zip(client_js_out) {
-        copy(src, dst)?;
-    }
+    copy(&worker_js_file, &worker_js_out)
+        .context("copy[worker_js_file]")?;
+    copy(&client_bg_opt_file, &client_wasm_out)
+        .context("copy[client_bg_opt_file]")?;
+    copy(&client_js_file, &client_js_out)
+        .context("copy[client_js_file]")?;
     
     // Embed the wasm as a base64 encoded string in the output js so that it is accessible
     // from the installed service worker without having to add extra cache logic in js

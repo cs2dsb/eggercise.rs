@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+
+# Exit when any command fails
+set -o errexit
+
+# Exit when an undeclared variable is used
+set -o nounset
+
+# Exit when a piped command returns a non-zero exit code
+set -o pipefail
+
+# Script to amend the last deployed version. Deletes the current tag, amends the commit,
+# recreates the tag and force pushes
+# $1 overrides the tag message
+
+readonly repo_dir="$( cd $(dirname ${BASH_SOURCE}); cd ..; pwd )";
+cd $repo_dir
+
+readonly version=`cat Cargo.toml | sed -n '/^version *=* */{s///;s/^"//;s/"$//;p;}'`;
+if [ "$version" == "" ]; then
+    echo "Failed to extract version from Cargo.toml";
+    exit 1;
+fi
+
+readonly tag="v${version}";
+readonly tag_message="${1:-Release of ${tag}}";
+
+read -r -p "About to delete, amend and force push tag \"${tag}\" with annotation \"${tag_message}\". Continue? [Y/n]" response
+response=${response,,}    # tolower
+if [[ "$response" =~ ^(yes|y|)$ ]]; then
+    git push --delete origin "tags/${tag}"
+    git tag --delete ${tag}
+    git commit -a --amend --no-edit
+    git tag -a "${tag}" -m "${tag_message}"
+    git push --force
+    git push origin "tags/${tag}"
+else 
+    echo "Aborted"
+fi
