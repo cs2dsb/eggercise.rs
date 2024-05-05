@@ -82,21 +82,30 @@ fn wasm_out_path(lib_file_name: &str, wasm_dir: &Path, profile: &str) -> PathBuf
 }
 
 // Run bindgen on the wasm lib to create the bg version + the js  
-fn generate_bindings(package: &str, input: &Path, release: bool) -> Result<(PathBuf, PathBuf), anyhow::Error> {
+fn generate_bindings(package: &str, input: &Path, release: bool, use_modules: bool) -> Result<(PathBuf, PathBuf), anyhow::Error> {
     if !input.exists() {
         bail!("Wasm file doesn't exist after running cargo build for {package}. Should be at {:?}", input);
     }
 
     let start = Instant::now();
     p!("Generating bindings for {package} wasm");
-    wasm_bindgen_cli_support::Bindgen::new()
+    let mut bg = wasm_bindgen_cli_support::Bindgen::new();
+    
+    
+    if use_modules {
+        bg.web(true)?;
+    } else {
+        bg.no_modules(true)?;
+    }
+
+    bg
         .input_path(input)
-        .no_modules(true)?
         .remove_name_section(release)
         .remove_producers_section(release)
         .keep_debug(!release)
         .omit_default_module_path(false)
         .generate(input.parent().unwrap())?;
+
     p!("Generating bindings for {package} wasm took: {:.2}s", start.elapsed().as_secs_f32());
 
     let js_file = input.with_extension("js");
@@ -139,7 +148,7 @@ fn main() -> Result<(), anyhow::Error> {
 
     println!("cargo:rerun-if-changed={}", path_to_str(&client_info.manifest_dir));
     println!("cargo:rerun-if-changed={}", path_to_str(&worker_info.manifest_dir));
-    // println!("cargo:rerun-if-changed={}", path_to_str(&server_info.manifest_dir.join("assets")));
+    println!("cargo:rerun-if-changed={}", path_to_str(&server_info.manifest_dir.join("assets")));
     
     let is_release_build = !cfg!(debug_assertions);
 
@@ -152,6 +161,7 @@ fn main() -> Result<(), anyhow::Error> {
     let server_wasm_dir = assets_dir
         .join("wasm");
     
+    p!("Out path: {:?}", out_dir);
     let CrateInfo { 
         manifest_dir: worker_dir,
         lib_file_name: worker_lib_file_name,
@@ -159,7 +169,6 @@ fn main() -> Result<(), anyhow::Error> {
         version_with_timestamp: worker_version,
         .. 
     } = worker_info;
-    
 
     let CrateInfo { 
         lib_file_name: client_lib_file_name,
@@ -180,20 +189,30 @@ fn main() -> Result<(), anyhow::Error> {
         },
     };
     
+    // worker can't use modules because browser support for modules in service workers is minimal
     build_wasm(&worker_package_name, wasm_dir_str, is_release_build)?;
     build_wasm(&client_package_name, wasm_dir_str, is_release_build)?;
     
     let worker_wasm_file = wasm_out_path(&worker_lib_file_name, &wasm_dir, profile);
     let client_wasm_file = wasm_out_path(&client_lib_file_name, &wasm_dir, profile);
-    let (worker_bg_file, worker_js_file) = generate_bindings(&worker_lib_file_name, &worker_wasm_file, is_release_build)?;
-    let (client_bg_file, client_js_file) = generate_bindings(&client_lib_file_name, &client_wasm_file, is_release_build)?;
+    let (worker_bg_file, worker_js_file) = generate_bindings(&worker_lib_file_name, &worker_wasm_file, is_release_build, false)?;
+    let (client_bg_file, client_js_file) = generate_bindings(&client_lib_file_name, &client_wasm_file, is_release_build, true)?;
 
     let worker_bg_opt_file = optimize_wasm(&worker_bg_file)?;
     let client_bg_opt_file = optimize_wasm(&client_bg_file)?;
 
+    // Because the client js is a module there are two files
+    let client_js_files = [
+        client_js_file.with_file_name(format!("{}_bg.js", path_prefix_to_str(&client_js_file))),
+        client_js_file,
+    ];
+
     // Construct the output paths
     let worker_js_out = server_wasm_dir.join(path_filename_to_str(&worker_js_file));
-    let client_js_out = server_wasm_dir.join(path_filename_to_str(&client_js_file));
+    let client_js_out = [
+        server_wasm_dir.join(path_filename_to_str(&client_js_files[0])),
+        server_wasm_dir.join(path_filename_to_str(&client_js_files[1])),
+    ];
     // Note this lops off the _opt which is necessary to restore the expected bind-gen filename
     let client_wasm_out = server_wasm_dir.join(path_filename_to_str(&client_bg_file));
 
@@ -207,33 +226,42 @@ fn main() -> Result<(), anyhow::Error> {
 
     // Copy the output to the assets dir
     copy(&worker_js_file, &worker_js_out)?;
-    copy(&client_js_file, &client_js_out)?;
     copy(&client_bg_opt_file, &client_wasm_out)?;
-
+    for (src, dst) in client_js_files.iter().zip(client_js_out) {
+        copy(src, dst)?;
+    }
+    
     // Embed the wasm as a base64 encoded string in the output js so that it is accessible
     // from the installed service worker without having to add extra cache logic in js
     {
+        p!("Loading worker wasm bytes");
         let wasm_bytes = {
             let mut file = File::open(&worker_bg_opt_file)?;
             let mut bytes = Vec::new();
             file.read_to_end(&mut bytes)?;
             bytes
         };
+
+        p!("Encoding wasm bytes in base64");
         let wasm_base64 = Base64Display::new(&wasm_bytes, &STANDARD).to_string();
         
+
+        p!("Reading worker registration js");
         let snippet = read_to_string(&register_listeners_js)?
             .replace("SERVICE_WORKER_BASE64", &wasm_base64)
             // Include the version so the worker can work out if an update is needed
             .replace("SERVICE_WORKER_VERSION", &worker_version);
 
+        p!("Appending worker registration and base64 wasm to {}", path_filename_to_str(&worker_js_out));
         let mut js_out = OpenOptions::new()
             .append(true)
-            .open(&worker_js_file)?;
+            .open(&worker_js_out)?;
         js_out.write_all(snippet.as_bytes())?;
     }
 
     // Prepare the package version info
     {
+        p!("Generating worker package json");
         let package_file_path = server_wasm_dir.join(SERVICE_WORKER_PACKAGE_FILENAME);
 
         if package_file_path.exists() {
@@ -249,6 +277,7 @@ fn main() -> Result<(), anyhow::Error> {
             .into_iter()
             .filter(|f| f.is_file())
         {
+            p!("   Hashing {:?}", path_filename_to_str(&f));
             let mut hasher = Sha384::new();
             let mut file = File::open(&f)?;
 
@@ -267,6 +296,7 @@ fn main() -> Result<(), anyhow::Error> {
             });
         }
 
+        p!("Saving worker package json");
         let mut package_out = OpenOptions::new()
             .write(true)
             .create(true)
@@ -280,6 +310,8 @@ fn main() -> Result<(), anyhow::Error> {
 
         serde_json::to_writer_pretty(&mut package_out, &package)?;
     }
+
+    p!("Done");
     
     Ok(())
 }

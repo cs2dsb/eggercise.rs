@@ -17,7 +17,7 @@ readonly repo_dir="$( cd $(dirname ${BASH_SOURCE}); cd ..; pwd )";
 cd $repo_dir
 
 readonly bin="${BIN:-server}";
-readonly assets_dir="creates/server/assets";
+readonly assets_dir="crates/server/assets";
 release="";
 
 if [ "${RELEASE:-}" == "true" ]; then

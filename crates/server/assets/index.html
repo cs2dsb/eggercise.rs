@@ -1,18 +1,15 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang='en'>
   <head>
-    <meta charset="utf-8" />
+    <meta charset='utf-8' />
     <title>Eggercise</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Eggercise gym planner" />
-    <link rel="stylesheet" href="css/base.css" />
+    <meta name='viewport' content='width=device-width, initial-scale=1.0' />
+    <meta name='description' content='Eggercise gym planner' />
+    <link rel='stylesheet' href='/css/base.css' />
+    <link rel='modulepreload' href='/wasm/client.js' />
   </head>
   <body>
-    <h1>Eggercise</h1>
-    <p>Hello world!</p>
-    <div id="update_container"></div>
-
-    <script type="module">
+    <script type='module'>
       const registerServiceWorker = async () => {
         if ('serviceWorker' in navigator) {
           function handle_update(registration) {
@@ -21,12 +18,12 @@
             if (registration.waiting && registration.active) {
               console.log('Service worker needs update');
 
-              const button = document.createElement("button");
-              button.textContent = "Do update";
-              button.onclick = () => registration.waiting.postMessage("SKIP_WAITING");
+              const button = document.createElement('button');
+              button.textContent = 'Do update';
+              button.onclick = () => registration.waiting.postMessage('SKIP_WAITING');
 
               document
-                .getElementById("update_container")
+                .getElementById('update_container')
                 .appendChild(button);
 
             } else if (registration.installing) {
@@ -57,14 +54,20 @@
           // Once the worker updates, refresh the page
           navigator.serviceWorker.addEventListener('controllerchange', () => {
             if (!refreshing) {
-              console.log("Service worker changed, refreshing")
+              console.log('Service worker changed, refreshing')
               refreshing = true
               window.location.reload()
             }
           })
         }
       };
-      registerServiceWorker();      
+      registerServiceWorker();
+    </script>
+    <script type='module'>
+      import init from './wasm/client.js';
+      init()
+        .then(() => console.log('Client wasm initialized'))
+        .catch((e) => console.error(`Error initializing client wasm: ${e}`));
     </script>
   </body>
 </html>
