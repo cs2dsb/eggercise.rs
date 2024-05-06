@@ -1,4 +1,4 @@
-use serde::de::DeserializeOwned;
+use serde::{de::DeserializeOwned, Serialize};
 use shared::{ServiceWorkerPackage, SERVICE_WORKER_PACKAGE_URL};
 use wasm_bindgen::{
     prelude::wasm_bindgen, JsCast, JsValue
@@ -133,12 +133,18 @@ async fn fetch_json<T: DeserializeOwned>(sw: &ServiceWorkerGlobalScope, request:
 }
 
 async fn install(sw: ServiceWorkerGlobalScope, version: String) -> Result<JsValue, JsValue> {
+    #[derive(Serialize)]
+    struct CacheHeader {
+        cache: String,
+    }
+
     let package: ServiceWorkerPackage = fetch_json(&sw, Request::new_with_str(SERVICE_WORKER_PACKAGE_URL)?).await?;
     let requests = package.files
         .iter()
         .map(|f| Request::new_with_str_and_init(
             &f.path,
             &RequestInit::new()
+                .headers(&JsValue::from_serde(&CacheHeader { cache: "no-store".to_string() }).unwrap())
                 .integrity(&f.hash)))
         .collect::<Result<Vec<_>, _>>()?;
 
