@@ -17,14 +17,15 @@
             
             if (registration.waiting && registration.active) {
               console.log('Service worker needs update');
+              
+              // const button = document.createElement('button');
+              // button.textContent = 'Do update';
+              // button.onclick = () => registration.waiting.postMessage('SKIP_WAITING');
 
-              const button = document.createElement('button');
-              button.textContent = 'Do update';
-              button.onclick = () => registration.waiting.postMessage('SKIP_WAITING');
-
-              document
-                .getElementById('update_container')
-                .appendChild(button);
+              // document
+              //   .getElementById('update_container')
+              //   .appendChild(button);
+              registration.waiting.postMessage('SKIP_WAITING');
 
             } else if (registration.installing) {
               console.log('Service worker installing');

@@ -6,6 +6,13 @@
 	],
 	"settings": {
 		"rust-analyzer.showUnlinkedFileNotification": false,
+		"rust-analyzer.procMacro.ignored": {
+			"leptos_macro": [
+				// optional:
+				// "component",
+				"server"
+			],
+		},
 		"git.ignoreLimitWarning": true,
 		"rust-analyzer.checkOnSave": true
 	}
