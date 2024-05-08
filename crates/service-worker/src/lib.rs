@@ -5,7 +5,7 @@ use wasm_bindgen::{
 };
 use wasm_bindgen_futures::{future_to_promise, JsFuture};
 use web_sys::{
-    console::{error_1, log_1}, js_sys::{Array, Object, Promise}, Cache, CacheStorage, FetchEvent, MessageEvent, Request, RequestInit, Response, ResponseInit, ServiceWorkerGlobalScope
+    console::{error_1, log_1}, js_sys::{Array, Object, Promise}, Cache, CacheStorage, FetchEvent, MessageEvent, Request, RequestInit, Response, ResponseInit, ServiceWorkerGlobalScope, Url
 };
 use gloo_utils::format::JsValueSerdeExt;
 use console_error_panic_hook::set_once as set_panic_hook;
@@ -49,64 +49,36 @@ async fn add_to_cache(caches: CacheStorage, version: &str, resources: &[Request]
     Ok(JsValue::undefined())
 }
 
-async fn cache_request(caches: &CacheStorage, version: &str, request: &Request, response: &Response) -> Result<(), JsValue> {
-    let cache = get_cache(caches, version).await?;
-    
-    let uri = request.url();
-    // Need to clone before caching or the caller won't be able to use the original response
-    let clone = response.clone()?;
-    JsFuture::from(cache.put_with_request(request, &clone)).await?;
-    
-    console_log!("cache_request OK ({})", uri);
-    Ok(())
-}
-
-
-async fn try_fetch_from_cache(sw: ServiceWorkerGlobalScope, version: String, request: Request) -> Result<JsValue, JsValue> {
+async fn fetch_from_cache(sw: &ServiceWorkerGlobalScope, version: &str, request: Request) -> Result<Response, JsValue> {
     let caches = sw.caches()?;
     let cache = get_cache(&caches, &version).await?;
     
     // Check the cache first
     let cached = JsFuture::from(cache.match_with_request(&request)).await?;
-    if cached.is_instance_of::<Response>() {
+    let status_code = if cached.is_instance_of::<Response>() {
         console_log!("HIT: {}", request.url());
-        return Ok(cached);
-    } else {
+        return Ok(cached.into());
+    } else if cached.is_undefined() {
         console_log!("MISS: {}", request.url());
-    }
+        404
+    } else {
+        console_error!("match_with_request returned something other than Result or undefined!: {:?}", cached);
+        500
+    } ;
 
-    // Try and fetch it
-    match JsFuture::from(sw.fetch_with_request(&request)).await {
-        Ok(response) => {
-            if response.is_instance_of::<Response>() {
-                let response: Response = response.into();
-                cache_request(&caches, &version, &request, &response).await?;
-                Ok(JsValue::from(&response))
-            } else {
-                let e = format!("Fetch returned something other than a Response: {:?}", response);
-                console_error!("{}", e);
-                
-                // We have to construct some kind of response
-                let headers = Object::new();
-                js_sys::Reflect::set(
-                    &headers, 
-                    &JsValue::from_str("Content-Type"),
-                    &JsValue::from_str("text/plain"))?;
+    let headers = Object::new();
+    js_sys::Reflect::set(
+        &headers, 
+        &JsValue::from_str("Content-Type"),
+        &JsValue::from_str("text/plain"))?;
 
-                let mut r_init = ResponseInit::new();
-                r_init
-                    .status(500)
-                    .headers(&headers);
-                let response = Response::new_with_opt_str_and_init(
-                    Some(&e), &r_init)?;
-                Ok(JsValue::from(&response))
-            }
-        },
-        Err(e) => {
-            console_error!("Fetch error: {:?}", e);
-            Err(e)
-        }
-    }
+    let mut r_init = ResponseInit::new();
+    r_init
+        .status(status_code)
+        .headers(&headers);
+    let response = Response::new_with_opt_str_and_init(
+        Some(&format!("Failed to retrieve {} from cache ({})", request.url(), status_code)), &r_init)?;
+    Ok(response)
 }
 
 fn log_and_err<T>(msg: &str) -> Result<T, JsValue> {
@@ -114,38 +86,57 @@ fn log_and_err<T>(msg: &str) -> Result<T, JsValue> {
     Err(JsValue::from(msg))
 }
 
-async fn fetch_response(sw: &ServiceWorkerGlobalScope, request: Request) -> Result<Response, JsValue> {
-    let response = JsFuture::from(sw.fetch_with_request(&request)).await?;
-
-    if response.is_instance_of::<Response>() {
-        Ok(response.into())
-    } else {
-        log_and_err(&format!("Fetch of ({:?}) returned something other than a Response: {:?}", request.url(), response))
-    }
-}
-
-async fn fetch_json<T: DeserializeOwned>(sw: &ServiceWorkerGlobalScope, request: Request) -> Result<T, JsValue> {
-    let response = fetch_response(sw, request).await?;
+async fn fetch_json<T: DeserializeOwned>(sw: &ServiceWorkerGlobalScope, version: &str, request: Request) -> Result<T, JsValue> {
+    let response = fetch_from_cache(sw, version, request).await?;
     let json = JsFuture::from(response.json()?).await?;
     
     json.into_serde()
         .map_err(|e| log_and_err::<()>(&format!("Error deserializing json: {}", e)).unwrap_err())
 }
 
-async fn install(sw: ServiceWorkerGlobalScope, version: String) -> Result<JsValue, JsValue> {
-    #[derive(Serialize)]
-    struct CacheHeader {
-        cache: String,
+#[derive(Serialize)]
+struct CacheHeader {
+    cache: String,
+}
+
+impl CacheHeader {
+    fn no_store() -> Self {
+        Self {
+            cache: "no-store".to_string()
+        }
+    }
+}
+
+fn construct_request(url: &str, integrity: Option<&str>) -> Result<Request, JsValue> {
+    let mut r_init = RequestInit::new();
+    // Make sure we get the live file
+    r_init.headers(&JsValue::from_serde(&CacheHeader::no_store()).unwrap());
+
+    if let Some(hash) = integrity {
+        r_init.integrity(hash);
     }
 
-    let package: ServiceWorkerPackage = fetch_json(&sw, Request::new_with_str(SERVICE_WORKER_PACKAGE_URL)?).await?;
+    Request::new_with_str_and_init(
+        url,
+        &r_init,
+    )
+}
+
+// Fetches the package. Fetches it strictly via the cache. If remote is true, fetches a new version and puts it in the cache first
+async fn fetch_package(sw: &ServiceWorkerGlobalScope, version: &str, remote: bool) -> Result<ServiceWorkerPackage, JsValue> {
+    let request = construct_request(SERVICE_WORKER_PACKAGE_URL, None)?;
+    if remote {
+        add_to_cache(sw.caches()?, version, &[request.clone()?]).await?;
+    }
+
+    Ok(fetch_json(sw, version, request).await?)
+}
+
+async fn install(sw: ServiceWorkerGlobalScope, version: String) -> Result<JsValue, JsValue> {
+    let package = fetch_package(&sw, &version, true).await?;
     let requests = package.files
         .iter()
-        .map(|f| Request::new_with_str_and_init(
-            &f.path,
-            &RequestInit::new()
-                .headers(&JsValue::from_serde(&CacheHeader { cache: "no-store".to_string() }).unwrap())
-                .integrity(&f.hash)))
+        .map(|f| construct_request(&f.path,Some(&f.hash)))
         .collect::<Result<Vec<_>, _>>()?;
 
     add_to_cache(sw.caches()?, &version, &requests).await?;
@@ -169,17 +160,30 @@ pub fn worker_activate(_sw: ServiceWorkerGlobalScope) -> Promise {
     Promise::resolve(&JsValue::undefined())
 }
 
+async fn fetch(sw: ServiceWorkerGlobalScope, version: String, request: Request) -> Result<JsValue, JsValue> {
+    console_log!("worker_fetch called: {}, {}", request.method(), request.url());
+
+    let package = fetch_package(&sw, &version, false).await?;
+
+    let uri = Url::new(&request.url())?;
+    let path = uri.pathname();
+
+    // Check if the request is a package file
+    let response = if package.file(&path).is_some() {
+        // If so, request it
+        fetch_from_cache(&sw, &version, request).await?
+    } else {
+        // If not, return the index because the SPA contains multiple URLs the package isn't aware of
+        fetch_from_cache(&sw, &version, Request::new_with_str("/index.html")?).await?
+    };
+
+    Ok(JsValue::from(&response))
+}
+
 #[wasm_bindgen]
 pub fn worker_fetch(sw: ServiceWorkerGlobalScope, version: String, event: FetchEvent) -> Result<(), JsValue> {
-    let request = event.request();
-    let method = request.method();
-    let uri = request.url();
-
-    console_log!("worker_fetch called: {}, {}", method, uri);
-
-    let fetch = future_to_promise(try_fetch_from_cache(sw, version, request));
+    let fetch = future_to_promise(fetch(sw, version, event.request()));
     event.respond_with(&fetch)?;
-
     Ok(())
 }
 

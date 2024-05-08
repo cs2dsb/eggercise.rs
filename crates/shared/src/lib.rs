@@ -92,3 +92,11 @@ pub struct ServiceWorkerPackage {
     pub version: String,
     pub files: Vec<HashedFile>,
 }
+
+impl ServiceWorkerPackage {
+    pub fn file<'a>(&'a self, path: &str) -> Option<&'a HashedFile> {
+        self.files
+            .iter()
+            .find(|f| f.path.as_str() == path)
+    }
+}
