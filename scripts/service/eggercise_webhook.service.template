@@ -1,0 +1,9 @@
+[Unit]
+Description=Small server for creating HTTP endpoints (hooks)
+Documentation=https://github.com/adnanh/webhook/
+
+[Service]
+ExecStart=${WEBHOOK_PATH} -verbose -nopanic -port 43232 -hooks "${HOOK_CONFIG}"
+
+[Install]
+WantedBy=multi-user.target

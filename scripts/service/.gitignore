@@ -1,0 +1,4 @@
+eggercise_rs.service
+eggercise_webhook.service
+hook_config.json
+releases/

@@ -1,0 +1,14 @@
+[Unit]
+Description=eggercise.rs service
+
+[Service]
+Type=simple
+Restart=on-failure
+RestartSec=5
+User=${APP_USER}
+Group=${APP_USER}
+WorkingDirectory=${WORKING_DIRECTORY}
+ExecStart=${EXEC_START}
+
+[Install]
+WantedBy=multi-user.target

@@ -98,6 +98,11 @@ jobs:
     - name: Build release binary
       run: ${{ env.CARGO }} build --verbose --release ${{ env.TARGET_FLAGS }}
 
+    - name: Archive service scripts
+      run: |
+        set -x
+        tar --transform 's/.*\///g' -czf service_scripts_linux.tar.gz README.md scripts/service
+
     - name: Strip and archive release (Non-Windows)
       if: ${{ ! contains(matrix.target, 'windows') }}
       run: |

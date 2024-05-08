@@ -27,6 +27,7 @@ fn PageB() -> impl IntoView {
 #[component]
 pub (crate) fn App() -> impl IntoView {
     view! {
+        <small>Version: { env!("CARGO_PKG_VERSION") }</small>
         <Router>
             <nav>
                 <A href="">"A"</A>

@@ -1,0 +1,20 @@
+[
+   {
+      "id": "eggercise_rs-6d587341-3197-46b4-9b53-134f8e3d6a42",
+      "execute-command": "${REDEPLOY_COMMAND}",
+      "pass-arguments-to-command": [{
+         "source": "payload",
+	      "name": "release.tag_name"
+      }],
+      "trigger-rule": {
+         "match": {
+	         "type": "value",
+	         "value": "released",
+	         "parameter": {
+               "source": "payload",
+	            "name": "action"
+	         }
+	      }
+      }
+   }
+]
