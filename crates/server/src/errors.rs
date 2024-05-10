@@ -1,6 +1,9 @@
 use std::fmt;
 
-use axum::{http::StatusCode, response::{IntoResponse, Response}};
+use axum::{
+    http::StatusCode,
+    response::{IntoResponse, Response},
+};
 
 pub struct AppError {
     pub code: StatusCode,
@@ -10,7 +13,10 @@ pub struct AppError {
 impl AppError {
     /// Return a plain text response error message
     pub fn new(code: StatusCode, message: String) -> Self {
-        AppError { code, message }
+        AppError {
+            code,
+            message,
+        }
     }
 }
 
@@ -33,8 +39,8 @@ impl IntoResponse for AppError {
     }
 }
 
-// This enables using `?` on functions that return `Result<_, Error>` to turn them into
-// `Result<_, AppError>`. That way you don't need to do that manually.
+// This enables using `?` on functions that return `Result<_, Error>` to turn
+// them into `Result<_, AppError>`. That way you don't need to do that manually.
 impl<E> From<E> for AppError
 where
     E: Into<Box<dyn std::error::Error>>,

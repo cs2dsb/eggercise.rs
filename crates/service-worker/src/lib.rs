@@ -1,14 +1,15 @@
+use console_error_panic_hook::set_once as set_panic_hook;
+use gloo_utils::format::JsValueSerdeExt;
 use serde::{de::DeserializeOwned, Serialize};
 use shared::{ServiceWorkerPackage, SERVICE_WORKER_PACKAGE_URL};
-use wasm_bindgen::{
-    prelude::wasm_bindgen, JsCast, JsValue
-};
+use wasm_bindgen::{prelude::wasm_bindgen, JsCast, JsValue};
 use wasm_bindgen_futures::{future_to_promise, JsFuture};
 use web_sys::{
-    console::{error_1, log_1}, js_sys::{Array, Object, Promise}, Cache, CacheStorage, FetchEvent, MessageEvent, Request, RequestInit, Response, ResponseInit, ServiceWorkerGlobalScope, Url
+    console::{error_1, log_1},
+    js_sys::{Array, Object, Promise},
+    Cache, CacheStorage, FetchEvent, MessageEvent, Request, RequestInit, Response, ResponseInit,
+    ServiceWorkerGlobalScope, Url,
 };
-use gloo_utils::format::JsValueSerdeExt;
-use console_error_panic_hook::set_once as set_panic_hook;
 
 const SKIP_WAITING: &str = "SKIP_WAITING";
 
@@ -21,9 +22,7 @@ macro_rules! console_error {
 }
 
 async fn get_cache(caches: &CacheStorage, version: &str) -> Result<Cache, JsValue> {
-    let cache: Cache = JsFuture::from(caches.open(version))
-        .await?
-        .into();
+    let cache: Cache = JsFuture::from(caches.open(version)).await?.into();
     Ok(cache)
 }
 
@@ -31,28 +30,43 @@ async fn get_cache(caches: &CacheStorage, version: &str) -> Result<Cache, JsValu
 async fn clear_cache(caches: CacheStorage, version: &str) -> Result<JsValue, JsValue> {
     let cache = get_cache(&caches, version).await?;
     let keys: Array = JsFuture::from(cache.keys()).await?.into();
-    
-    for k in keys.into_iter().map(|x| <JsValue as Into<Request>>::into(x)) {
+
+    for k in keys
+        .into_iter()
+        .map(|x| <JsValue as Into<Request>>::into(x))
+    {
         console_log!("Clearing {}", k.url());
         JsFuture::from(cache.delete_with_request(&k)).await?;
     }
     Ok(JsValue::undefined())
 }
 
-async fn add_to_cache(caches: CacheStorage, version: &str, resources: &[Request]) -> Result<JsValue, JsValue> {
+async fn add_to_cache(
+    caches: CacheStorage,
+    version: &str,
+    resources: &[Request],
+) -> Result<JsValue, JsValue> {
     let cache = get_cache(&caches, version).await?;
-    
-    JsFuture::from(cache.add_all_with_request_sequence(&JsValue::from(resources.into_iter()
-        .collect::<Array>()))).await?;
-    
+
+    JsFuture::from(
+        cache.add_all_with_request_sequence(&JsValue::from(
+            resources.into_iter().collect::<Array>(),
+        )),
+    )
+    .await?;
+
     console_log!("add_to_cache OK");
     Ok(JsValue::undefined())
 }
 
-async fn fetch_from_cache(sw: &ServiceWorkerGlobalScope, version: &str, request: Request) -> Result<Response, JsValue> {
+async fn fetch_from_cache(
+    sw: &ServiceWorkerGlobalScope,
+    version: &str,
+    request: Request,
+) -> Result<Response, JsValue> {
     let caches = sw.caches()?;
     let cache = get_cache(&caches, &version).await?;
-    
+
     // Check the cache first
     let cached = JsFuture::from(cache.match_with_request(&request)).await?;
     let status_code = if cached.is_instance_of::<Response>() {
@@ -62,22 +76,30 @@ async fn fetch_from_cache(sw: &ServiceWorkerGlobalScope, version: &str, request:
         console_log!("MISS: {}", request.url());
         404
     } else {
-        console_error!("match_with_request returned something other than Result or undefined!: {:?}", cached);
+        console_error!(
+            "match_with_request returned something other than Result or undefined!: {:?}",
+            cached
+        );
         500
-    } ;
+    };
 
     let headers = Object::new();
     js_sys::Reflect::set(
-        &headers, 
+        &headers,
         &JsValue::from_str("Content-Type"),
-        &JsValue::from_str("text/plain"))?;
+        &JsValue::from_str("text/plain"),
+    )?;
 
     let mut r_init = ResponseInit::new();
-    r_init
-        .status(status_code)
-        .headers(&headers);
+    r_init.status(status_code).headers(&headers);
     let response = Response::new_with_opt_str_and_init(
-        Some(&format!("Failed to retrieve {} from cache ({})", request.url(), status_code)), &r_init)?;
+        Some(&format!(
+            "Failed to retrieve {} from cache ({})",
+            request.url(),
+            status_code
+        )),
+        &r_init,
+    )?;
     Ok(response)
 }
 
@@ -86,10 +108,14 @@ fn log_and_err<T>(msg: &str) -> Result<T, JsValue> {
     Err(JsValue::from(msg))
 }
 
-async fn fetch_json<T: DeserializeOwned>(sw: &ServiceWorkerGlobalScope, version: &str, request: Request) -> Result<T, JsValue> {
+async fn fetch_json<T: DeserializeOwned>(
+    sw: &ServiceWorkerGlobalScope,
+    version: &str,
+    request: Request,
+) -> Result<T, JsValue> {
     let response = fetch_from_cache(sw, version, request).await?;
     let json = JsFuture::from(response.json()?).await?;
-    
+
     json.into_serde()
         .map_err(|e| log_and_err::<()>(&format!("Error deserializing json: {}", e)).unwrap_err())
 }
@@ -102,7 +128,7 @@ struct CacheHeader {
 impl CacheHeader {
     fn no_store() -> Self {
         Self {
-            cache: "no-store".to_string()
+            cache: "no-store".to_string(),
         }
     }
 }
@@ -116,14 +142,16 @@ fn construct_request(url: &str, integrity: Option<&str>) -> Result<Request, JsVa
         r_init.integrity(hash);
     }
 
-    Request::new_with_str_and_init(
-        url,
-        &r_init,
-    )
+    Request::new_with_str_and_init(url, &r_init)
 }
 
-// Fetches the package. Fetches it strictly via the cache. If remote is true, fetches a new version and puts it in the cache first
-async fn fetch_package(sw: &ServiceWorkerGlobalScope, version: &str, remote: bool) -> Result<ServiceWorkerPackage, JsValue> {
+// Fetches the package. Fetches it strictly via the cache. If remote is true,
+// fetches a new version and puts it in the cache first
+async fn fetch_package(
+    sw: &ServiceWorkerGlobalScope,
+    version: &str,
+    remote: bool,
+) -> Result<ServiceWorkerPackage, JsValue> {
     let request = construct_request(SERVICE_WORKER_PACKAGE_URL, None)?;
     if remote {
         add_to_cache(sw.caches()?, version, &[request.clone()?]).await?;
@@ -134,13 +162,14 @@ async fn fetch_package(sw: &ServiceWorkerGlobalScope, version: &str, remote: boo
 
 async fn install(sw: ServiceWorkerGlobalScope, version: String) -> Result<JsValue, JsValue> {
     let package = fetch_package(&sw, &version, true).await?;
-    let requests = package.files
+    let requests = package
+        .files
         .iter()
-        .map(|f| construct_request(&f.path,Some(&f.hash)))
+        .map(|f| construct_request(&f.path, Some(&f.hash)))
         .collect::<Result<Vec<_>, _>>()?;
 
     add_to_cache(sw.caches()?, &version, &requests).await?;
-    
+
     Ok(JsValue::undefined())
 }
 
@@ -160,8 +189,16 @@ pub fn worker_activate(_sw: ServiceWorkerGlobalScope) -> Promise {
     Promise::resolve(&JsValue::undefined())
 }
 
-async fn fetch(sw: ServiceWorkerGlobalScope, version: String, request: Request) -> Result<JsValue, JsValue> {
-    console_log!("worker_fetch called: {}, {}", request.method(), request.url());
+async fn fetch(
+    sw: ServiceWorkerGlobalScope,
+    version: String,
+    request: Request,
+) -> Result<JsValue, JsValue> {
+    console_log!(
+        "worker_fetch called: {}, {}",
+        request.method(),
+        request.url()
+    );
 
     let package = fetch_package(&sw, &version, false).await?;
 
@@ -173,7 +210,8 @@ async fn fetch(sw: ServiceWorkerGlobalScope, version: String, request: Request) 
         // If so, request it
         fetch_from_cache(&sw, &version, request).await?
     } else {
-        // If not, return the index because the SPA contains multiple URLs the package isn't aware of
+        // If not, return the index because the SPA contains multiple URLs the package
+        // isn't aware of
         fetch_from_cache(&sw, &version, Request::new_with_str("/index.html")?).await?
     };
 
@@ -181,7 +219,11 @@ async fn fetch(sw: ServiceWorkerGlobalScope, version: String, request: Request) 
 }
 
 #[wasm_bindgen]
-pub fn worker_fetch(sw: ServiceWorkerGlobalScope, version: String, event: FetchEvent) -> Result<(), JsValue> {
+pub fn worker_fetch(
+    sw: ServiceWorkerGlobalScope,
+    version: String,
+    event: FetchEvent,
+) -> Result<(), JsValue> {
     let fetch = future_to_promise(fetch(sw, version, event.request()));
     event.respond_with(&fetch)?;
     Ok(())
@@ -196,8 +238,8 @@ pub fn worker_message(sw: ServiceWorkerGlobalScope, event: MessageEvent) -> Resu
             // MDN states the promise returned can be safely ignored
             let _ = sw.skip_waiting()?;
 
-            return Ok(())
-        }    
+            return Ok(());
+        }
     }
 
     console_log!("worker_message got unexpected message: {:?}", event.data());

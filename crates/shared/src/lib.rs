@@ -1,4 +1,7 @@
-use std::{path::{Path, PathBuf}, str::FromStr};
+use std::{
+    path::{Path, PathBuf},
+    str::FromStr,
+};
 
 use cargo_toml::Manifest;
 use chrono::Utc;
@@ -27,7 +30,6 @@ pub fn load_dotenv() -> Result<Option<PathBuf>, dotenv::Error> {
     }
 }
 
-
 fn read_manifest<P: AsRef<Path>>(path: P) -> Result<Manifest, anyhow::Error> {
     Ok(Manifest::from_path(path)?)
 }
@@ -46,15 +48,11 @@ fn get_crate_info<P: AsRef<Path>>(crate_path: P) -> Result<CrateInfo, anyhow::Er
     let manifest_dir = shared_dir.join(crate_path.as_ref());
     let manifest = read_manifest(manifest_dir.join("Cargo.toml"))?;
     let package = manifest
-        .package.ok_or(anyhow::anyhow!("Worker manifest missing package entry"))?;
-    let lib_file_name = package
-        .name
-        .replace("-", "_");
+        .package
+        .ok_or(anyhow::anyhow!("Worker manifest missing package entry"))?;
+    let lib_file_name = package.name.replace("-", "_");
     let version = package.version().to_string();
-    let version_with_timestamp = format!("{}_{}",
-        version,
-        Utc::now().format("%Y%m%d%H%M%S"),
-    );
+    let version_with_timestamp = format!("{}_{}", version, Utc::now().format("%Y%m%d%H%M%S"),);
     let package_name = package.name;
 
     Ok(CrateInfo {
@@ -95,8 +93,6 @@ pub struct ServiceWorkerPackage {
 
 impl ServiceWorkerPackage {
     pub fn file<'a>(&'a self, path: &str) -> Option<&'a HashedFile> {
-        self.files
-            .iter()
-            .find(|f| f.path.as_str() == path)
+        self.files.iter().find(|f| f.path.as_str() == path)
     }
 }

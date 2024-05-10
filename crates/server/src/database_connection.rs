@@ -1,6 +1,10 @@
 use std::ops::{Deref, DerefMut};
 
-use axum::{ async_trait, extract::{FromRef, FromRequestParts}, http::{request::Parts, StatusCode}};
+use axum::{
+    async_trait,
+    extract::{FromRef, FromRequestParts},
+    http::{request::Parts, StatusCode},
+};
 use deadpool_sqlite::{Object, Pool};
 
 use crate::internal_error;
@@ -29,19 +33,17 @@ impl DerefMut for DatabaseConnection {
 }
 
 #[async_trait]
-impl<S> FromRequestParts<S> for DatabaseConnection 
+impl<S> FromRequestParts<S> for DatabaseConnection
 where
     S: Send + Sync,
-    Pool: FromRef<S>
+    Pool: FromRef<S>,
 {
     type Rejection = (StatusCode, String);
     async fn from_request_parts(_parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
         let pool = Pool::from_ref(state);
-        
+
         // Get connection from the pool
-        let conn = pool.get()
-            .await
-            .map_err(internal_error)?;
+        let conn = pool.get().await.map_err(internal_error)?;
 
         Ok(conn.into())
     }

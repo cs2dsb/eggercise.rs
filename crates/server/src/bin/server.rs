@@ -1,36 +1,27 @@
-use std::{ 
-    net::{IpAddr, SocketAddr}, 
-    path::PathBuf, 
+use std::{
+    net::{IpAddr, SocketAddr},
+    path::PathBuf,
     str::FromStr,
 };
 
-use axum::{ 
-    routing::get, 
-    extract::FromRef, 
-    http::{HeaderName, HeaderValue }, 
-    Json, 
-    Router,
+use axum::{
+    extract::FromRef,
+    http::{HeaderName, HeaderValue},
+    routing::get,
+    Json, Router,
 };
-use deadpool_sqlite::{Config, Pool, Runtime};
-use shared::*;
 use clap::Parser;
+use deadpool_sqlite::{Config, Pool, Runtime};
+use server::{AppError, DatabaseConnection};
+use shared::*;
 use tokio::net::TcpListener;
-use tracing::{debug, Level};
-use tower_http::{
-    services::{ServeDir, ServeFile}, 
-    set_header::SetResponseHeaderLayer, 
-    trace::{
-        DefaultMakeSpan, 
-        DefaultOnResponse, 
-        TraceLayer,
-    },
-};
 use tower::ServiceBuilder;
-
-use server::{
-    DatabaseConnection,
-    AppError,
+use tower_http::{
+    services::{ServeDir, ServeFile},
+    set_header::SetResponseHeaderLayer,
+    trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer},
 };
+use tracing::{debug, Level};
 
 #[derive(Debug, Parser)]
 #[clap(name = "eggercise server")]
@@ -71,46 +62,57 @@ async fn main() -> Result<(), anyhow::Error> {
     let cfg = Config::new(args.sqlite_connection_string);
     let pool = cfg.create_pool(Runtime::Tokio1)?;
 
-    let socket = SocketAddr::new(
-        IpAddr::from_str(&args.bind_addr)?, 
-        args.port,
-    );
+    let socket = SocketAddr::new(IpAddr::from_str(&args.bind_addr)?, args.port);
 
     let listener = TcpListener::bind(socket).await?;
     debug!("listening on {}", listener.local_addr()?);
 
-    let state = AppState { pool };
+    let state = AppState {
+        pool,
+    };
 
     axum::serve(
-        listener, 
-            Router::new()
-                .route("/db_test", get(db_test))
-                .nest_service("/wasm/service_worker.js", ServiceBuilder::new()
+        listener,
+        Router::new()
+            .route("/db_test", get(db_test))
+            .nest_service(
+                "/wasm/service_worker.js",
+                ServiceBuilder::new()
                     .layer(SetResponseHeaderLayer::if_not_present(
-                        HeaderName::from_static("service-worker-allowed"), 
-                        HeaderValue::from_static("/")))
-                    .service(ServeFile::new(args.assets_dir.join("wasm/service_worker.js"))))
-                .nest_service("/", ServeDir::new(&args.assets_dir))
-                .layer(TraceLayer::new_for_http()
+                        HeaderName::from_static("service-worker-allowed"),
+                        HeaderValue::from_static("/"),
+                    ))
+                    .service(ServeFile::new(
+                        args.assets_dir.join("wasm/service_worker.js"),
+                    )),
+            )
+            .nest_service("/", ServeDir::new(&args.assets_dir))
+            .layer(
+                TraceLayer::new_for_http()
                     .make_span_with(DefaultMakeSpan::new().level(Level::INFO))
-                    .on_response(DefaultOnResponse::new().level(Level::INFO)))
-            .with_state(state)
-        )
-        .await?;
+                    .on_response(DefaultOnResponse::new().level(Level::INFO)),
+            )
+            .with_state(state),
+    )
+    .await?;
 
     Ok(())
 }
 
-async fn db_test(DatabaseConnection(conn): DatabaseConnection) -> Result<Json<Vec<String>>, AppError> {
+async fn db_test(
+    DatabaseConnection(conn): DatabaseConnection,
+) -> Result<Json<Vec<String>>, AppError> {
     tracing::info!("Connection: {:?}", conn);
 
-    let results = conn.interact(|conn| {
-        let mut stmt = conn.prepare_cached("SELECT name FROM DBSTAT")?;
-        let r: Vec<String> = stmt.query_map((), |r| {
-            Ok(r.get::<_, String>(0)?)
-        })?.collect::<Result<_, _>>()?;
-        Ok::<_, anyhow::Error>(r)
-    }).await??;
+    let results = conn
+        .interact(|conn| {
+            let mut stmt = conn.prepare_cached("SELECT name FROM DBSTAT")?;
+            let r: Vec<String> = stmt
+                .query_map((), |r| Ok(r.get::<_, String>(0)?))?
+                .collect::<Result<_, _>>()?;
+            Ok::<_, anyhow::Error>(r)
+        })
+        .await??;
 
     Ok(Json(results))
 }
