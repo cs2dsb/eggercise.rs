@@ -19,3 +19,6 @@ target/
 
 # Env file that could contain secrets
 .env
+
+# Sqlite database files
+*.sqlite*

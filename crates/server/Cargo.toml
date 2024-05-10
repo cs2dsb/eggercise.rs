@@ -70,4 +70,9 @@ tower = "0.4.13"
 
 # ZSTD encryption bindings
 zstd = "0.13.1"
+
 walkdir = "2.5.0"
+
+# Connection pooling for rusqlite
+deadpool-sqlite = { version = "0.8.0", features = [ "tracing" ] }
+deadpool = "^0.11.0"
