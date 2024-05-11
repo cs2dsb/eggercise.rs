@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+
+# Exit when any command fails
+set -o errexit
+
+# Exit when an undeclared variable is used
+set -o nounset
+
+# Exit when a piped command returns a non-zero exit code
+set -o pipefail
+
+# Script to increment the patch version, tag it and push it
+# $1 is the tag comment. Defaults to something generic if not provided
+# Set NOBUMP=true to skip bumping the version (for when it's already been changed)
+# Set BUMP={major, minor, patch} to set the kind of bump to do. Defaults to patch
+
+readonly repo_dir="$( cd $(dirname ${BASH_SOURCE}); cd ..; pwd )";
+cd $repo_dir
+
+if [ -n "$(git status --porcelain)" ]; then
+    echo "Working directory isn't clean. Please commit or stash outstanding work";
+    exit 1;
+fi
+
+if [ "${NOBUMP:-}" != "true" ]; then
+    readonly bump=${BUMP:-patch};
+    ${repo_dir}/scripts/bump_version $bump
+    git add -u
+fi
+
+readonly version=`cat Cargo.toml | sed -n '/^version *=* */{s///;s/^"//;s/"$//;p;}'`;
+if [ "$version" == "" ]; then
+    echo "Failed to extract version from Cargo.toml";
+    exit 1;
+fi
+
+readonly tag="v${version}";
+readonly tag_message="${1:-Release of ${tag}}";
+
+git status
+
+read -r -p "About to create and push tag \"${tag}\" with annotation \"${tag_message}\". Continue? [Y/n]" response
+response=${response,,}    # tolower
+if [[ "$response" =~ ^(yes|y|)$ ]]; then
+    if [ "${NOBUMP:-}" != "true" ]; then
+        git commit -a -m "Bumped version number to ${version}"
+    fi
+    git tag -a "${tag}" -m "${tag_message}"
+    git push origin main
+    git push origin "tags/${tag}"
+else 
+    echo "Aborted"
+fi

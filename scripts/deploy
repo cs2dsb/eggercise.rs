@@ -17,37 +17,9 @@ set -o pipefail
 readonly repo_dir="$( cd $(dirname ${BASH_SOURCE}); cd ..; pwd )";
 cd $repo_dir
 
-if [ -n "$(git status --porcelain)" ]; then
-    echo "Working directory isn't clean. Please commit or stash outstanding work";
+if ! cargo test; then 
+    >&2 echo "Failing tests detected. Aborting";
     exit 1;
 fi
 
-if [ "${NOBUMP:-}" != "true" ]; then
-    readonly bump=${BUMP:-patch};
-    ${repo_dir}/scripts/bump_version $bump
-    git add -u
-fi
-
-readonly version=`cat Cargo.toml | sed -n '/^version *=* */{s///;s/^"//;s/"$//;p;}'`;
-if [ "$version" == "" ]; then
-    echo "Failed to extract version from Cargo.toml";
-    exit 1;
-fi
-
-readonly tag="v${version}";
-readonly tag_message="${1:-Release of ${tag}}";
-
-git status
-
-read -r -p "About to create and push tag \"${tag}\" with annotation \"${tag_message}\". Continue? [Y/n]" response
-response=${response,,}    # tolower
-if [[ "$response" =~ ^(yes|y|)$ ]]; then
-    if [ "${NOBUMP:-}" != "true" ]; then
-        git commit -a -m "Bumped version number to ${version}"
-    fi
-    git tag -a "${tag}" -m "${tag_message}"
-    git push origin main
-    git push origin "tags/${tag}"
-else 
-    echo "Aborted"
-fi
+./scripts/deploy_skip_tests

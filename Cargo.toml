@@ -34,7 +34,7 @@ cargo_toml = "0.19.2"
 anyhow = "1.0.82"
 
 # Date/time util
-chrono = "0.4.38"
+chrono = { version = "0.4.38", features = [ "serde" ] }
 
 # Se/deserializing 
 serde = { version = "1.0.198", features = ["derive"] }
@@ -44,4 +44,11 @@ sha2 = "0.10.8"
 
 leptos = { version = "0.6.11", features = ["nightly", "csr"] }
 leptos_router = { version = "0.6.11", features = ["nightly", "csr"] }
+
+# SQLite lib
+rusqlite = { version = "0.30.0", features = ["bundled", "serde_json", "trace"] }
+
+# SQL query builder
+sea-query = { version = "0.30.7", features = [ "derive", "attr" ] }
+sea-query-rusqlite = { version = "0.5.0", features = [ "with-chrono", "with-json", "with-uuid", "with-time" ] }
 

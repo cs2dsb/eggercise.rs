@@ -8,8 +8,6 @@ use tracing::{debug, error, info, instrument, span, trace, warn, Level};
 mod database_connection;
 pub use database_connection::*;
 
-pub mod model;
-
 static MIGRATIONS_DIR: Dir = include_dir!("$CARGO_MANIFEST_DIR/migrations");
 
 fn sqlite_connection_profiling_callback(query: &str, duration: Duration) {

@@ -1,15 +1,19 @@
-use axum::extract::connect_info;
 use chrono::{DateTime, Utc};
-use exemplar::Model;
-use rusqlite::Connection;
-use sea_query::{enum_def, Expr, Iden, Query, SqliteQueryBuilder};
-use sea_query_rusqlite::RusqliteBinder;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, PartialEq, Model, Serialize, Deserialize)]
-#[table("user")]
-#[check("../../../migrations/001-user/up.sql")]
-#[enum_def]
+#[cfg(feature="database")]
+use {
+    exemplar::Model,
+    rusqlite::Connection,
+    sea_query::{enum_def, Expr, Query, SqliteQueryBuilder},
+    sea_query_rusqlite::RusqliteBinder,
+};
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature="database", derive(Model))]
+#[cfg_attr(feature="database", table("user"))]
+#[cfg_attr(feature="database", check("../../../server/migrations/001-user/up.sql"))]
+#[cfg_attr(feature="database", enum_def)]
 pub struct User {
     id: i64,
     name: String,
@@ -17,13 +21,14 @@ pub struct User {
     latest_login: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, PartialEq, Model, Serialize, Deserialize)]
-#[table("user")]
-#[check("../../../migrations/001-user/up.sql")]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature="database", derive(Model))]
+#[cfg_attr(feature="database", table("user"))]
 pub struct NewUser {
     name: String,
 }
 
+#[cfg(feature="database")]
 impl User {
     pub fn fetch(conn: &Connection, id: i64) -> Result<User, anyhow::Error> {
         let (sql, values) = Query::select()

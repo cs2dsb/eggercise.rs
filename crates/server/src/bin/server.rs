@@ -12,8 +12,8 @@ use axum::{
 };
 use clap::Parser;
 use deadpool_sqlite::{Config, Hook, Pool, Runtime};
-use server::{db::{self, model::{NewUser, User}, DatabaseConnection}, AppError };
-use shared::*;
+use server::{db::{self, DatabaseConnection}, AppError };
+use shared::{configure_tracing, load_dotenv, model::{NewUser, User}};
 use tokio::net::TcpListener;
 use tower::ServiceBuilder;
 use tower_http::{

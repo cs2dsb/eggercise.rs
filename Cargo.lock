@@ -403,6 +403,7 @@ dependencies = [
  "console_error_panic_hook",
  "leptos",
  "leptos_router",
+ "shared",
  "wasm-bindgen",
 ]
 
@@ -2309,6 +2310,10 @@ dependencies = [
  "cargo_toml",
  "chrono",
  "dotenv",
+ "exemplar",
+ "rusqlite",
+ "sea-query",
+ "sea-query-rusqlite",
  "serde",
  "thiserror",
  "tracing",
