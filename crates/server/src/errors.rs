@@ -4,6 +4,7 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
+use deadpool_sqlite::HookError;
 
 pub struct AppError {
     pub code: StatusCode,
@@ -52,5 +53,11 @@ where
             StatusCode::INTERNAL_SERVER_ERROR,
             format!("Something went wrong: {}", error_message),
         )
+    }
+}
+
+impl From<AppError> for HookError {
+    fn from(err: AppError) -> Self {
+        Self::Message(err.to_string())
     }
 }

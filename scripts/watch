@@ -27,5 +27,6 @@ fi
 cargo watch \
     -i "*.sqlite*" \
     -i "*.log*" \
+    -i "scripts" \
     -i "${assets_dir}/wasm" \
     -x "run ${release} --bin $bin -- --assets-dir ${assets_dir} $*"

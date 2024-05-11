@@ -5,14 +5,14 @@ use std::{
 };
 
 use axum::{
-    extract::FromRef,
+    extract::{FromRef, Path},
     http::{HeaderName, HeaderValue},
-    routing::get,
+    routing::{get, post},
     Json, Router,
 };
 use clap::Parser;
-use deadpool_sqlite::{Config, Pool, Runtime};
-use server::{AppError, DatabaseConnection};
+use deadpool_sqlite::{Config, Hook, Pool, Runtime};
+use server::{db::{self, model::{NewUser, User}, DatabaseConnection}, AppError };
 use shared::*;
 use tokio::net::TcpListener;
 use tower::ServiceBuilder;
@@ -21,7 +21,7 @@ use tower_http::{
     set_header::SetResponseHeaderLayer,
     trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer},
 };
-use tracing::{debug, Level};
+use tracing::{debug, info, instrument, Level};
 
 #[derive(Debug, Parser)]
 #[clap(name = "eggercise server")]
@@ -58,9 +58,25 @@ async fn main() -> Result<(), anyhow::Error> {
     let args = Cli::parse();
     debug!(?args);
 
+    // Run the migrations synchronously before creating the pool or launching the server
+    let ran = db::run_migrations(&args.sqlite_connection_string)?;
+    info!("Ran {ran} db migrations");
+
     // Create a database pool to add into the app state
-    let cfg = Config::new(args.sqlite_connection_string);
-    let pool = cfg.create_pool(Runtime::Tokio1)?;
+    let pool = Config::new(args.sqlite_connection_string)
+        .builder(Runtime::Tokio1)?
+        .post_create(Hook::async_fn(|object, _| {
+            Box::pin(async move {
+                object.interact(|conn| {
+                    db::configure_new_connection(conn)
+                })
+                .await
+                .map_err(AppError::from)?
+                .map_err(AppError::from)?;
+                Ok(())
+            })
+        }))
+        .build()?;
 
     let socket = SocketAddr::new(IpAddr::from_str(&args.bind_addr)?, args.port);
 
@@ -74,7 +90,8 @@ async fn main() -> Result<(), anyhow::Error> {
     axum::serve(
         listener,
         Router::new()
-            .route("/db_test", get(db_test))
+        .route("/api/user/:id", get(fetch_user))
+        .route("/api/user", post(create_user))
             .nest_service(
                 "/wasm/service_worker.js",
                 ServiceBuilder::new()
@@ -99,19 +116,25 @@ async fn main() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-async fn db_test(
+#[instrument]
+async fn create_user(
     DatabaseConnection(conn): DatabaseConnection,
-) -> Result<Json<Vec<String>>, AppError> {
-    tracing::info!("Connection: {:?}", conn);
+    Json(new_user): Json<NewUser>,
+) -> Result<Json<User>, AppError> {
+    let results = conn.interact(|conn|
+        Ok::<_, anyhow::Error>(User::create(conn, new_user)?))
+        .await??;
 
-    let results = conn
-        .interact(|conn| {
-            let mut stmt = conn.prepare_cached("SELECT name FROM DBSTAT")?;
-            let r: Vec<String> = stmt
-                .query_map((), |r| Ok(r.get::<_, String>(0)?))?
-                .collect::<Result<_, _>>()?;
-            Ok::<_, anyhow::Error>(r)
-        })
+    Ok(Json(results))
+}
+
+#[instrument]
+async fn fetch_user(
+    DatabaseConnection(conn): DatabaseConnection,
+    Path(id): Path<i64>,
+) -> Result<Json<User>, AppError> {
+    let results = conn.interact(move |conn|
+        Ok::<_, anyhow::Error>(User::fetch(conn, id)?))
         .await??;
 
     Ok(Json(results))

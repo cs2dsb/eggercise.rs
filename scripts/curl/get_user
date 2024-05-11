@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+
+# Exit when any command fails
+set -o errexit
+
+# Exit when an undeclared variable is used
+set -o nounset
+
+# Exit when a piped command returns a non-zero exit code
+set -o pipefail
+
+curl \
+    --request GET \
+    http://127.0.0.1:9090/api/user/1
+
+echo
