@@ -1,7 +1,7 @@
 use leptos::{component, view, IntoView};
 use leptos_router::{Route, Routes, A};
 
-use super::{Plan, Today};
+use super::{Plan, Today, Register};
 
 macro_rules! routes {
     ($(($path:literal, $view:ident, $ui_text:literal),)+) => {
@@ -43,4 +43,8 @@ macro_rules! routes {
     };
 }
 
-routes!(("", Today, "Today"), ("plan", Plan, "Plan"),);
+routes!(
+    ("", Today, "Today"), 
+    ("plan", Plan, "Plan"),
+    ("register", Register, "Register"),
+);

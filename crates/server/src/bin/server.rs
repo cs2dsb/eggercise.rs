@@ -13,7 +13,7 @@ use axum::{
 use clap::Parser;
 use deadpool_sqlite::{Config, Hook, Pool, Runtime};
 use server::{db::{self, DatabaseConnection}, AppError };
-use shared::{configure_tracing, load_dotenv, model::{NewUser, User}};
+use shared::{api, configure_tracing, load_dotenv, model::{NewUser, User}};
 use tokio::net::TcpListener;
 use tower::ServiceBuilder;
 use tower_http::{
@@ -90,8 +90,8 @@ async fn main() -> Result<(), anyhow::Error> {
     axum::serve(
         listener,
         Router::new()
-        .route("/api/user/:id", get(fetch_user))
-        .route("/api/user", post(create_user))
+        .route(api::Object::User.id_path(), get(fetch_user))
+        .route(api::Object::User.path(), post(create_user))
             .nest_service(
                 "/wasm/service_worker.js",
                 ServiceBuilder::new()

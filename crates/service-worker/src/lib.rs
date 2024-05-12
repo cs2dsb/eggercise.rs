@@ -1,7 +1,7 @@
 use console_error_panic_hook::set_once as set_panic_hook;
 use gloo_utils::format::JsValueSerdeExt;
 use serde::{de::DeserializeOwned, Serialize};
-use shared::{ServiceWorkerPackage, SERVICE_WORKER_PACKAGE_URL};
+use shared::{api::API_BASE_PATH, ServiceWorkerPackage, SERVICE_WORKER_PACKAGE_URL};
 use wasm_bindgen::{prelude::wasm_bindgen, JsCast, JsValue};
 use wasm_bindgen_futures::{future_to_promise, JsFuture};
 use web_sys::{
@@ -189,17 +189,11 @@ pub fn worker_activate(_sw: ServiceWorkerGlobalScope) -> Promise {
     Promise::resolve(&JsValue::undefined())
 }
 
-async fn fetch(
+async fn fetch_cached(
     sw: ServiceWorkerGlobalScope,
     version: String,
     request: Request,
-) -> Result<JsValue, JsValue> {
-    console_log!(
-        "worker_fetch called: {}, {}",
-        request.method(),
-        request.url()
-    );
-
+) -> Result<Response, JsValue> {
     let package = fetch_package(&sw, &version, false).await?;
 
     let uri = Url::new(&request.url())?;
@@ -213,6 +207,61 @@ async fn fetch(
         // If not, return the index because the SPA contains multiple URLs the package
         // isn't aware of
         fetch_from_cache(&sw, &version, Request::new_with_str("/index.html")?).await?
+    };
+
+    Ok(response)
+}
+
+async fn fetch_direct(
+    sw: ServiceWorkerGlobalScope,
+    request: Request,
+) -> Result<Response, JsValue> {
+    let response = JsFuture::from(sw.fetch_with_request(&request)).await?;
+
+    if response.is_instance_of::<Response>() {
+        Ok(response.into())
+    } else {
+        let e = format!("Fetch returned something other than a Response: {:?}", response);
+        console_error!("{}", e);
+        
+        // We have to construct some kind of response
+        let headers = Object::new();
+        js_sys::Reflect::set(
+            &headers, 
+            &JsValue::from_str("Content-Type"),
+            &JsValue::from_str("text/plain"))?;
+
+        let mut r_init = ResponseInit::new();
+        r_init
+            .status(500)
+            .headers(&headers);
+        let response = Response::new_with_opt_str_and_init(
+            Some(&e), &r_init)?;
+
+        Ok(response)
+    }
+    
+}
+
+async fn fetch(
+    sw: ServiceWorkerGlobalScope,
+    version: String,
+    request: Request,
+) -> Result<JsValue, JsValue> {
+    let method = request.method();
+    let url = request.url();
+    
+    
+    let uri = Url::new(&url)?;
+    let path = uri.pathname();
+    let cache = !path.starts_with(API_BASE_PATH);
+
+    console_log!("worker_fetch called: {method}, {url}, cache: {cache}");
+
+    let response = if cache {
+        fetch_cached(sw, version, request).await?
+    } else {
+        fetch_direct(sw, request).await?
     };
 
     Ok(JsValue::from(&response))

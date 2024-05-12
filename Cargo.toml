@@ -52,3 +52,10 @@ rusqlite = { version = "0.30.0", features = ["bundled", "serde_json", "trace"] }
 sea-query = { version = "0.30.7", features = [ "derive", "attr" ] }
 sea-query-rusqlite = { version = "0.5.0", features = [ "with-chrono", "with-json", "with-uuid", "with-time" ] }
 
+thiserror = "1.0.58"
+
+# Provides HTTP requests for WASM
+gloo-net = "0.5.0"
+
+# Compile-time string formatting macros
+const_format = "0.2.32"

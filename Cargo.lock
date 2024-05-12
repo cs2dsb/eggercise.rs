@@ -401,9 +401,12 @@ name = "client"
 version = "0.0.18"
 dependencies = [
  "console_error_panic_hook",
+ "gloo-net",
  "leptos",
  "leptos_router",
+ "serde",
  "shared",
+ "thiserror",
  "wasm-bindgen",
 ]
 
@@ -2309,6 +2312,7 @@ dependencies = [
  "anyhow",
  "cargo_toml",
  "chrono",
+ "const_format",
  "dotenv",
  "exemplar",
  "rusqlite",

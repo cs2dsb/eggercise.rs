@@ -28,6 +28,14 @@ pub struct NewUser {
     name: String,
 }
 
+impl NewUser {
+    pub fn new<T: Into<String>>(name: T) -> Self {
+        Self {
+            name: name.into(),
+        }
+    }
+}
+
 #[cfg(feature="database")]
 impl User {
     pub fn fetch(conn: &Connection, id: i64) -> Result<User, anyhow::Error> {
