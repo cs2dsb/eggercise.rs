@@ -398,7 +398,7 @@ checksum = "98cc8fbded0c607b7ba9dd60cd98df59af97e84d24e49c8557331cfc26d301ce"
 
 [[package]]
 name = "client"
-version = "0.0.18"
+version = "0.0.19"
 dependencies = [
  "console_error_panic_hook",
  "gloo-net",
@@ -2182,7 +2182,7 @@ dependencies = [
 
 [[package]]
 name = "server"
-version = "0.0.18"
+version = "0.0.19"
 dependencies = [
  "anyhow",
  "axum",
@@ -2273,7 +2273,7 @@ dependencies = [
 
 [[package]]
 name = "service-worker"
-version = "0.0.18"
+version = "0.0.19"
 dependencies = [
  "console_error_panic_hook",
  "gloo-utils",
@@ -2307,7 +2307,7 @@ dependencies = [
 
 [[package]]
 name = "shared"
-version = "0.0.18"
+version = "0.0.19"
 dependencies = [
  "anyhow",
  "cargo_toml",
