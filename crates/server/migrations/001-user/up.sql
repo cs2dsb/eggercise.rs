@@ -1,6 +1,9 @@
 CREATE TABLE user (
-    id              INTEGER PRIMARY KEY,
-    name            TEXT NOT NULL,
-    first_login     TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    latest_login    TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    id                  TEXT PRIMARY KEY,
+    username            TEXT NOT NULL UNIQUE,
+    email               TEXT,
+    display_name        TEXT,
+    registration_date   TEXT DEFAULT CURRENT_TIMESTAMP,
+    last_updated_date   TEXT DEFAULT CURRENT_TIMESTAMP,
+    last_login_date     TEXT
 ) STRICT;

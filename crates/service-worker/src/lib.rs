@@ -116,7 +116,7 @@ async fn fetch_json<T: DeserializeOwned>(
     let response = fetch_from_cache(sw, version, request).await?;
     let json = JsFuture::from(response.json()?).await?;
 
-    json.into_serde()
+    JsValueSerdeExt::into_serde(&json)
         .map_err(|e| log_and_err::<()>(&format!("Error deserializing json: {}", e)).unwrap_err())
 }
 
@@ -136,7 +136,8 @@ impl CacheHeader {
 fn construct_request(url: &str, integrity: Option<&str>) -> Result<Request, JsValue> {
     let mut r_init = RequestInit::new();
     // Make sure we get the live file
-    r_init.headers(&JsValue::from_serde(&CacheHeader::no_store()).unwrap());
+    let value = <JsValue as JsValueSerdeExt>::from_serde(&CacheHeader::no_store()).unwrap();
+    r_init.headers(&value);
 
     if let Some(hash) = integrity {
         r_init.integrity(hash);

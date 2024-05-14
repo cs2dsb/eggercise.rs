@@ -48,10 +48,9 @@ where
 {
     #[track_caller]
     fn from(err: E) -> Self {
-        let error_message = err.into().to_string();
         AppError::new(
             StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Something went wrong: {}", error_message),
+            format!("Something went wrong: {:?}", err.into()),
         )
     }
 }

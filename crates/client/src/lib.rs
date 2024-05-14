@@ -1,3 +1,4 @@
+#![feature(error_generic_member_access)]
 mod components;
 use components::App;
 

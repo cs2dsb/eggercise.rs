@@ -14,6 +14,10 @@ fn sqlite_connection_profiling_callback(query: &str, duration: Duration) {
     trace!(target: "sqlite_profiling", ?duration, query);
 }
 
+fn sqlite_connection_trace_callback(query: &str) {
+    trace!(target: "sqlite_tracing", query);
+}
+
 fn sqlite_log_callback(sqlite_code: c_int, msg: &str) {
     use rusqlite::ffi;
     let err_code = ffi::Error::new(sqlite_code);
@@ -33,8 +37,12 @@ pub fn get_migrations() -> Result<Migrations<'static>, anyhow::Error> {
 pub fn configure_new_connection(conn: &mut Connection) -> Result<(), anyhow::Error> {
     run_pragmas(conn)?;
 
-    // Hook up the profiling callback
-    conn.profile(Some(sqlite_connection_profiling_callback));
+    if cfg!(debug_assertions) {
+        conn.trace(Some(sqlite_connection_trace_callback));
+    } else {
+        // Hook up the profiling callback
+        conn.profile(Some(sqlite_connection_profiling_callback));
+    }
 
     Ok(())
 }

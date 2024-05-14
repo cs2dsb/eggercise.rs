@@ -22,3 +22,21 @@ impl Object {
         }
     }
 }
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Auth {
+    RegisterStart,
+    RegisterFinish,
+    Login,
+}
+
+impl Auth {
+    pub const fn path(&self) -> &str {
+        use Auth::*;
+        match self {
+            RegisterStart => concatcp!(API_BASE_PATH, "auth/register/start"),
+            RegisterFinish => concatcp!(API_BASE_PATH, "auth/register/finish"),
+            Login => concatcp!(API_BASE_PATH, "auth/login"),
+        }
+    }
+}

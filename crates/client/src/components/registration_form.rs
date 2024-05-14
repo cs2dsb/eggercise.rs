@@ -25,7 +25,7 @@ pub(crate) fn RegistrationForm(
             <input 
                 type="text"
                 required
-                placeholder="Name"
+                placeholder="Username"
                 prop:disabled=move || disabled.get()
                 // TODO: Is it possible to dedupe these?
                 on:keyup=move |ev: KeyboardEvent| {

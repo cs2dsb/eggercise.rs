@@ -8,8 +8,9 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use tracing_subscriber::fmt::format::FmtSpan;
 
-pub mod model;
 pub mod api;
+pub mod model;
+pub mod types;
 
 pub fn configure_tracing() {
     tracing::subscriber::set_global_default(

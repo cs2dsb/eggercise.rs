@@ -1,12 +1,16 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use crate::types::Uuid;
 
 #[cfg(feature="database")]
 use {
+    anyhow::Context,
+    super::{ Credential, NewCredential },
     exemplar::Model,
-    rusqlite::Connection,
+    rusqlite::{Connection, OptionalExtension},
     sea_query::{enum_def, Expr, Query, SqliteQueryBuilder},
     sea_query_rusqlite::RusqliteBinder,
+    webauthn_rs::prelude::Passkey,
 };
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -15,36 +19,27 @@ use {
 #[cfg_attr(feature="database", check("../../../server/migrations/001-user/up.sql"))]
 #[cfg_attr(feature="database", enum_def)]
 pub struct User {
-    id: i64,
-    name: String,
-    first_login: DateTime<Utc>,
-    latest_login: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature="database", derive(Model))]
-#[cfg_attr(feature="database", table("user"))]
-pub struct NewUser {
-    name: String,
-}
-
-impl NewUser {
-    pub fn new<T: Into<String>>(name: T) -> Self {
-        Self {
-            name: name.into(),
-        }
-    }
+    pub id: Uuid,
+    pub username: String,
+    pub email: Option<String>,
+    pub display_name: Option<String>,
+    pub registration_date: DateTime<Utc>,
+    pub last_updated_date: DateTime<Utc>,
+    pub last_login_date: Option<DateTime<Utc>>,
 }
 
 #[cfg(feature="database")]
 impl User {
-    pub fn fetch(conn: &Connection, id: i64) -> Result<User, anyhow::Error> {
+    pub fn fetch_by_id(conn: &Connection, id: &Uuid) -> Result<User, anyhow::Error> {
         let (sql, values) = Query::select()
             .columns([
                 UserIden::Id,
-                UserIden::Name,
-                UserIden::FirstLogin,
-                UserIden::LatestLogin
+                UserIden::Username,
+                UserIden::Email,
+                UserIden::DisplayName,
+                UserIden::RegistrationDate,
+                UserIden::LastUpdatedDate,
+                UserIden::LastLoginDate,
             ])
             .from(UserIden::Table)
             .and_where(Expr::col(UserIden::Id).eq(id))
@@ -56,14 +51,124 @@ impl User {
         Ok(user)
     }
 
+    pub fn fetch_by_username<T: AsRef<str>>(conn: &Connection, username: T) -> Result<Option<User>, anyhow::Error> {
+        let (sql, values) = Query::select()
+            .columns([
+                UserIden::Id,
+                UserIden::Username,
+                UserIden::Email,
+                UserIden::DisplayName,
+                UserIden::RegistrationDate,
+                UserIden::LastUpdatedDate,
+                UserIden::LastLoginDate,
+            ])
+            .from(UserIden::Table)
+            .and_where(Expr::col(UserIden::Username).eq(username.as_ref()))
+            .limit(1)
+            .build_rusqlite(SqliteQueryBuilder);
+
+        let mut stmt = conn.prepare_cached(&sql)?;
+        let user = stmt.query_row(&*values.as_params(), User::from_row).optional()?;
+        Ok(user)
+    }
+
     pub fn create(conn: &mut Connection, new_user: NewUser) -> Result<User, anyhow::Error> {
         let tx = conn.transaction()?;
         let user = {
             new_user.insert(&tx)?;
-            User::fetch(&tx, tx.last_insert_rowid())?
+            User::fetch_by_id(&tx, &new_user.id)?
         };
         tx.commit()?;
 
         Ok(user)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature="database", derive(Model))]
+#[cfg_attr(feature="database", table("user"))]
+pub struct NewUser {
+    pub id: Uuid,
+    pub username: String,
+}
+
+impl NewUser {
+    pub fn new<I: Into<Uuid>, T: Into<String>>(id: I, username: T) -> Self {
+        Self {
+            id: id.into(),
+            username: username.into(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RegistrationUser {
+    pub username: String,
+}
+
+impl RegistrationUser {
+    pub fn new<T: Into<String>>(username: T) -> Self {
+        let username = username.into();
+        Self {
+            username
+        }
+    }
+}
+
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg(feature="database")]
+pub struct NewUserWithPasskey {
+    pub id: Uuid,
+    pub username: String,
+    pub passkey: Passkey,
+}
+
+#[cfg(feature="database")]
+impl NewUserWithPasskey {
+    fn split(self) -> (NewUser, Passkey) {
+        let Self { id, username, passkey } = self;
+        (
+            NewUser::new(id, username),
+            passkey,
+        )
+    }
+    pub fn new<I: Into<Uuid>, T: Into<String>>(id: I, username: T, passkey: Passkey) -> Self {
+        Self {
+            id: id.into(),
+            username: username.into(),
+            passkey,
+        }
+    }
+
+    pub fn create(self, conn: &mut Connection) -> Result<(User, Credential), anyhow::Error> {
+        // let tx = conn.transaction()?;
+
+        let tx = conn;
+
+        let (new_user, passkey) = self.split();
+        let user_id = new_user.id.clone();
+        let new_credential = NewCredential::new(new_user.id.clone(), passkey.into());
+
+        let user = {
+            tracing::warn!("~~~~~~~~~A {:?}", new_user.id);
+            new_user.insert(&tx)
+                .context("NewUserWithPasskey::insert(User)")?;
+
+                tracing::warn!("~~~~~~~~~B {:?}", user_id);
+            User::fetch_by_id(&tx, &user_id)
+                .context("NewUserWithPasskey::fetch(User)")?
+        };
+
+        let credential = {
+            new_credential.insert(&tx)
+                .context("NewUserWithPasskey::insert(Credential)")?;
+            Credential::fetch(&tx, &new_credential.id)
+                .context("NewUserWithPasskey::fetch(Credential)")?
+        };
+
+        // tx.commit()?;
+
+        Ok((user, credential))
     }
 }
