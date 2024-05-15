@@ -52,13 +52,10 @@ fn build_wasm(package: &str, out_dir: &str, release: bool) -> Result<(), anyhow:
     let mut cargo_cmd = Command::new("cargo");
     cargo_cmd.args([
         "rustc",
-        "--package",
-        package,
+        "--package", package,
         "--lib",
-        "--crate-type",
-        "cdylib",
-        "--target",
-        "wasm32-unknown-unknown",
+        "--crate-type", "cdylib",
+        "--target", "wasm32-unknown-unknown",
         "--target-dir",
         out_dir,
     ]);

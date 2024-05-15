@@ -1,0 +1,82 @@
+name: Deploy
+
+env:
+  CARGO_TERM_COLOR: always
+  REGISTRY: ghcr.io
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+*"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Get tag 🔎
+        id: tag
+        uses: dawidd6/action-get-tag@v1
+        # Because it can be kicked off manually there may not be a tag
+        continue-on-error: true
+
+      - name: Set build suffix 🔍
+        run: |
+          echo "SUFFIX=$([[ "${{ steps.tag.outputs.tag }}" = "" ]] && echo $GITHUB_SHA || echo ${{ steps.tag.outputs.tag }})" >> $GITHUB_ENV
+          DATE=$(date +'%Y-%m-%d_%H%M%S')
+          REPO=${GITHUB_REPOSITORY#$GITHUB_REPOSITORY_OWNER/}
+          
+          echo "DATE=$DATE" | tee -a $GITHUB_ENV
+          echo "TAG=$([[ "${{ steps.tag.outputs.tag }}" = "" ]] && echo "main_$DATE" || echo "${{ steps.tag.outputs.tag }}")" | tee -a $GITHUB_ENV
+          echo "REPO_NAME=$REPO" | tee -a $GITHUB_ENV
+          echo "REPO_OWNER=$GITHUB_REPOSITORY_OWNER" | tee -a $GITHUB_ENV
+          echo "IMAGE_TAG=${{ env.REGISTRY }}/$GITHUB_REPOSITORY_OWNER/$REPO:latest" | tee -a $GITHUB_ENV
+          echo "IMAGE_NAME=$REPO" | tee -a $GITHUB_ENV
+      
+      - uses: actions/checkout@master
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log into registry ${{ env.REGISTRY }} 🔑
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build docker 📦
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ env.IMAGE_TAG }}
+          platforms: linux/amd64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Package output 🗜️
+        run: |
+          set -euo pipefail
+          docker pull ${{ env.IMAGE_TAG }}
+          docker save ${{ env.IMAGE_TAG }} | zstd -o "${{ env.REPO_NAME }}-${{ env.SUFFIX }}-image.tar.zstd"
+
+      - name: Upload release 📡
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: "*.tar.*"
+          tag: ${{ env.TAG }}
+          overwrite: true
+          file_glob: true
+          prerelease: true
+
+      - name: Release release 📨
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: "README.md"
+          tag: ${{ env.TAG }}
+          overwrite: true
+          promote: true
+          prerelease: false
