@@ -48,9 +48,7 @@ impl ToSql for Uuid {
 #[cfg(feature="database")]
 impl FromSql for Uuid {
     fn column_result(value: ValueRef<'_>) -> FromSqlResult<Self> {
-        let value = value.as_str()?;
-        tracing::warn!("bytes: {:?}", value);
-        uuid::Uuid::from_str(value)
+        uuid::Uuid::from_str(value.as_str()?)
             .map(Uuid::from)
             .map_err(|e| FromSqlError::Other(Box::new(e)))
     }

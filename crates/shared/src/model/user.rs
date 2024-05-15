@@ -142,20 +142,16 @@ impl NewUserWithPasskey {
     }
 
     pub fn create(self, conn: &mut Connection) -> Result<(User, Credential), anyhow::Error> {
-        // let tx = conn.transaction()?;
-
-        let tx = conn;
+        let tx = conn.transaction()?;
 
         let (new_user, passkey) = self.split();
         let user_id = new_user.id.clone();
         let new_credential = NewCredential::new(new_user.id.clone(), passkey.into());
 
         let user = {
-            tracing::warn!("~~~~~~~~~A {:?}", new_user.id);
             new_user.insert(&tx)
                 .context("NewUserWithPasskey::insert(User)")?;
 
-                tracing::warn!("~~~~~~~~~B {:?}", user_id);
             User::fetch_by_id(&tx, &user_id)
                 .context("NewUserWithPasskey::fetch(User)")?
         };
@@ -167,7 +163,7 @@ impl NewUserWithPasskey {
                 .context("NewUserWithPasskey::fetch(Credential)")?
         };
 
-        // tx.commit()?;
+        tx.commit()?;
 
         Ok((user, credential))
     }

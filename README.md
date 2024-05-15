@@ -14,3 +14,7 @@
 * Modify service setup so releases are in versioned folders rather than just the main binary (so assets are versioned too)
 * Improve client-server error situation (see api.rs)
 * The service worker mapping unknown URLs to index isn't working in FF
+
+## Docker build
+* See for cache thoughts https://github.com/rust-lang/cargo/issues/2644#issuecomment-1841005222
+* Cargo sweep

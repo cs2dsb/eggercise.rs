@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+
+# Exit when any command fails
+set -o errexit
+
+# Exit when an undeclared variable is used
+set -o nounset
+
+# Exit when a piped command returns a non-zero exit code
+set -o pipefail
+
+# Purges all failed runs
+# If $1 == "all" purges everything
+
+status="--status failure"
+if [ "${1:-}" == "all" ]; then
+    status=""
+fi
+
+repo=$(gh repo view --json nameWithOwner -q .nameWithOwner)
+gh run list \
+    --limit 1000 \
+    $status \
+    --json databaseId \
+    -q '.[].databaseId' \
+    | xargs \
+        -IID gh api \
+            "repos/${repo}/actions/runs/ID" \
+            -X DELETE
