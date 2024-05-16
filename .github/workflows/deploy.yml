@@ -64,7 +64,6 @@ jobs:
               "target": "/server/target"
             }
           skip-extraction: ${{ steps.cache.outputs.cache-hit }}
-          save-always: true
 
       - name: 🔑 Log into registry ${{ env.REGISTRY }} 
         if: github.event_name != 'pull_request'
@@ -81,8 +80,8 @@ jobs:
           push: true
           tags: ${{ env.IMAGE_TAG }}
           platforms: linux/amd64
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # cache-from: type=gha
+          # cache-to: type=gha,mode=max
       
       - name: 🪲 Cache debug after
         run: |
