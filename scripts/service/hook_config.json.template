@@ -7,14 +7,27 @@
 	      "name": "release.tag_name"
       }],
       "trigger-rule": {
-         "match": {
-	         "type": "value",
-	         "value": "released",
-	         "parameter": {
-               "source": "payload",
-	            "name": "action"
-	         }
-	      }
+         "and":
+         [
+            "match": {
+               "type": "value",
+               "value": "released",
+               "parameter": {
+                  "source": "payload",
+                  "name": "action"
+               }
+            },
+            "trigger-rule": {
+               "match": {
+                  "type": "value",
+                  "value": "refs/heads/deploy",
+                  "parameter": {
+                     "source": "payload",
+                     "name": "ref"
+                  }
+               }
+            }
+         ]
       }
    }
 ]

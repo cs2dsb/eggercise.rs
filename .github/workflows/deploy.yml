@@ -104,9 +104,15 @@ jobs:
           docker pull ${{ env.IMAGE_TAG }}
           docker save ${{ env.IMAGE_TAG }} | zstd -o "${{ env.REPO_NAME }}-${{ env.SUFFIX }}-image.tar.zstd"
 
+      - name: 🗜️ Archive service scripts
+        if: github.ref == 'refs/heads/deploy'
+        run: |
+          set -x
+          tar --transform 's/.*\///g' -czf service_scripts_linux.tar.gz README.md scripts/service
+
       - name: 📡 Upload release 
         uses: svenstaro/upload-release-action@v2
-        if: github.ref == 'refs/heads/deploy' && steps.package_image.outcome == 'success'
+        if: github.ref == 'refs/heads/deploy'
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: "*.tar.*"
