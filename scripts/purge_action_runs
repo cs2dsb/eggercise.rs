@@ -11,10 +11,15 @@ set -o pipefail
 
 # Purges all failed runs
 # If $1 == "all" purges everything
+# If FILTER is provided it replaces the existing filter (be careful!)
 
 status="--status failure"
 if [ "${1:-}" == "all" ]; then
     status=""
+fi
+
+if [ "${FILTER:-}" != "" ]; then 
+    status=$FILTER
 fi
 
 repo=$(gh repo view --json nameWithOwner -q .nameWithOwner)
@@ -24,6 +29,6 @@ gh run list \
     --json databaseId \
     -q '.[].databaseId' \
     | xargs \
-        -IID gh api \
-            "repos/${repo}/actions/runs/ID" \
-            -X DELETE
+        -IID sh -c "echo \"Deleting ID\" && gh api \
+            \"repos/${repo}/actions/runs/ID\" \
+            -X DELETE"
