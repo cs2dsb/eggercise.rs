@@ -40,7 +40,7 @@ jobs:
           echo "TAG=$([[ "${{ steps.tag.outputs.tag }}" = "" ]] && echo "main_$DATE" || echo "${{ steps.tag.outputs.tag }}")" | tee -a $GITHUB_ENV
           echo "REPO_NAME=$REPO" | tee -a $GITHUB_ENV
           echo "REPO_OWNER=$GITHUB_REPOSITORY_OWNER" | tee -a $GITHUB_ENV
-          echo "IMAGE_TAG=${{ env.REGISTRY }}/$GITHUB_REPOSITORY_OWNER/$REPO:latest" | tee -a $GITHUB_ENV
+          echo "IMAGE_TAG=${{ env.REGISTRY }}/$GITHUB_REPOSITORY_OWNER/$REPO:$([[ "${{ github.ref }}" == "refs/heads/deploy" ]] && echo "latest" || echo "main")" | tee -a $GITHUB_ENV
           echo "IMAGE_NAME=$REPO" | tee -a $GITHUB_ENV
 
       - name: 🛒 Checkout repo
@@ -97,6 +97,7 @@ jobs:
           tree
 
       - name: 🗜️ Package output 
+        if: github.ref == 'refs/heads/deploy'
         id: package_image
         if: false
         run: |
@@ -105,6 +106,7 @@ jobs:
           docker save ${{ env.IMAGE_TAG }} | zstd -o "${{ env.REPO_NAME }}-${{ env.SUFFIX }}-image.tar.zstd"
 
       - name: 📡 Upload release 
+        if: github.ref == 'refs/heads/deploy'
         uses: svenstaro/upload-release-action@v2
         if: steps.package_image.outcome == 'success'
         with:
@@ -116,6 +118,7 @@ jobs:
           prerelease: true
 
       - name: 📨 Release release 
+        if: github.ref == 'refs/heads/deploy'
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}

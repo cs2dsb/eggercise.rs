@@ -16,6 +16,8 @@ set -o pipefail
 readonly repo_dir="$( cd $(dirname ${BASH_SOURCE}); cd ..; pwd )";
 cd $repo_dir
 
+readonly deploy_branch=deploy;
+
 readonly version=`cat Cargo.toml | sed -n '/^version *=* */{s///;s/^"//;s/"$//;p;}'`;
 if [ "$version" == "" ]; then
     echo "Failed to extract version from Cargo.toml";
@@ -28,12 +30,29 @@ readonly tag_message="${1:-Release of ${tag}}";
 read -r -p "About to delete, amend and force push tag \"${tag}\" with annotation \"${tag_message}\". Continue? [Y/n]" response
 response=${response,,}    # tolower
 if [[ "$response" =~ ^(yes|y|)$ ]]; then
+    # Make sure we're on the right branch
+    git checkout main
+    # Delete the remote tag
     git push --delete origin "tags/${tag}"
+    # Delete the local tag
     git tag --delete ${tag}
+    # Update the comit
     git commit -a --amend --no-edit
+    # Re-create the tag
     git tag -a "${tag}" -m "${tag_message}"
+    # Force push this branch
     git push --force
+    # Push the new tag
     git push origin "tags/${tag}"
+    
+    # If we have a deploy branch, make sure that's up to date
+    if git show-ref --quiet refs/heads/$deploy_branch; then
+        git checkout $deploy_branch
+        # Merge main into this branch, preserving and changes here
+        git merge -s ours -m "Amend last deploy" main 
+        # Overwite the remote
+        git push --force origin deploy
+    else 
 else 
     echo "Aborted"
 fi
