@@ -12,18 +12,18 @@ set -o pipefail
 readonly repo_dir="$( cd $(dirname ${BASH_SOURCE}); pwd )"
 cd "${repo_dir}"
 
-readonly release_dir="${repo_dir}/releases"
+readonly release_dir="${repo_dir}/releases";
 
 readonly docker_image="ghcr.io/cs2dsb/eggercise.rs:latest";
 readonly app_user=web-apps;
-readonly server_name=server
-readonly service_file=eggercise_rs.service;;
+readonly server_name=server;
+readonly service_file=eggercise_rs.service;
 readonly webhook_service_file=eggercise_webhook.service;
-readonly hook_config_file=hook_config.json
+readonly hook_config_file=hook_config.json;
 
 
 # Set to false to prevent the final restart to do a sanity check
-readonly restart_services=false
+readonly restart_services=true
 
 function error_exit() {
     echo "ERROR: ${1:-}" >&2;
@@ -61,22 +61,25 @@ sudo chown -R ${app_user}:${app_user} ${repo_dir}
 sudo docker pull "$docker_image"
 
 # Stop and remove anything descended from it
-sudo docker rm \
-	$(sudo docker stop \
-		$(sudo docker ps -a -q  \
-			--filter ancestor="$docker_image" \
-			--format="{{.ID}}"))
+readonly containers=$(sudo docker ps -a -q  \
+	--filter ancestor="$docker_image" \
+	--format="{{.ID}}");
+
+if [[ "$containers" != "" ]]; then
+	sudo docker stop $containers
+	sudo docker rm $containers
+fi
 
 # Kick off the new instance
 sudo docker run -d \
 	--name=eggercise.rs \
-	-e ASSETS_DIR=/opt/server \
+	-e ASSETS_DIR=/opt/server/assets \
 	-e WEBAUTHN_ORIGIN=https://egg.ileet.co.uk \
 	-e WEBAUTHN_ID=egg.ileet.co.uk \
 	-p 9090:9090 \
 	"$docker_image"
 
-if [ "$restart_services" == "true" ] && [ "$link_latest" == "true" ]; then
+if [ "$restart_services" == "true" ]; then
 	# Restart the services
 	echo "Restarting services"
 	sudo systemctl restart ${service_file}
