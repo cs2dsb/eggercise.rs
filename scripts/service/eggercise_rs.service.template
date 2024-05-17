@@ -6,7 +6,7 @@ After=docker.service
 [Service]
 Restart=always
 ExecStart=/usr/bin/docker start -a eggercise.rs
-ExecStop=/usr/bin/docker stop -t 2 eggercise
+ExecStop=/usr/bin/docker stop -t 2 eggercise.rs
 
 [Install]
 WantedBy=multi-user.target

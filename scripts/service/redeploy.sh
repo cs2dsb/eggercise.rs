@@ -61,10 +61,12 @@ sudo chown -R ${app_user}:${app_user} ${repo_dir}
 sudo docker pull "$docker_image"
 
 # Stop and remove anything descended from it
+sudo systemctl stop $service_file
+sudo docker stop eggercise.rs
+sudo docker rm eggercise.rs
 readonly containers=$(sudo docker ps -a -q  \
 	--filter ancestor="$docker_image" \
 	--format="{{.ID}}");
-
 if [[ "$containers" != "" ]]; then
 	sudo docker stop $containers
 	sudo docker rm $containers
