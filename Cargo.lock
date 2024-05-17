@@ -482,8 +482,10 @@ version = "0.0.29"
 dependencies = [
  "console_error_panic_hook",
  "gloo-net",
+ "http 1.1.0",
  "leptos",
  "leptos_router",
+ "mime",
  "serde",
  "shared",
  "thiserror",

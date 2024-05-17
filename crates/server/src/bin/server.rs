@@ -4,7 +4,7 @@ use std::{
 
 use anyhow::Context;
 use axum::{
-    extract::{FromRef, Path}, http::{HeaderName, HeaderValue, StatusCode}, routing::{get, post}, Json, Router
+    extract::{FromRef, Path}, http::{HeaderName, HeaderValue, Method, StatusCode, Uri}, middleware, response::{IntoResponse, Response}, routing::{get, post}, Json, Router
 };
 use clap::Parser;
 use deadpool_sqlite::{Config, Hook, Pool, Runtime};
@@ -18,7 +18,7 @@ use tower_http::{
     trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer},
 };
 use tower_sessions::{MemoryStore, SessionManagerLayer};
-use tracing::{debug, info, instrument, Level};
+use tracing::{debug, info, Level};
 use webauthn_rs::{prelude::{CreationChallengeResponse, RegisterPublicKeyCredential, Url, Uuid}, WebauthnBuilder};
 
 #[derive(Debug, Parser)]
@@ -129,7 +129,7 @@ async fn main() -> Result<(), anyhow::Error> {
     axum::serve(
         listener,
         Router::new()
-            .route(api::Auth::RegisterStart.path(), post(register_start))
+            // .route(api::Auth::RegisterStart.path(), post(register_start))
             .route(api::Auth::RegisterFinish.path(),  post(register_finish))
             .route(api::Auth::Login.path(),  post(login))
             .route(api::Object::User.id_path(), get(fetch_user))
@@ -146,14 +146,13 @@ async fn main() -> Result<(), anyhow::Error> {
                     )),
             )
             .nest_service("/", ServeDir::new(&args.assets_dir))
-            .layer(
-                TraceLayer::new_for_http()
+            .layer(middleware::map_response(fallback_layer))
+            .layer(ServiceBuilder::new()
+                .layer(TraceLayer::new_for_http()
                     .make_span_with(DefaultMakeSpan::new().level(Level::INFO))
-                    .on_response(DefaultOnResponse::new().level(Level::INFO)),
-            )
-            .layer(
-                SessionManagerLayer::new(MemoryStore::default())
-                    .with_secure(args.secure_sessions)
+                    .on_response(DefaultOnResponse::new().level(Level::INFO)))
+                .layer(SessionManagerLayer::new(MemoryStore::default())
+                    .with_secure(args.secure_sessions))
             )
             .with_state(state)
     )
@@ -165,6 +164,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
 // #[axum::debug_handler]
 // Based on https://github.com/kanidm/webauthn-rs/blob/628599aa47b5c120e7f29cce8c526af532fba9ce/tutorial/server/axum/src/auth.rs#L52
+#[allow(dead_code)]
 async fn register_start(
     DatabaseConnection(conn): DatabaseConnection,
     webauthn: Webauthn,
@@ -241,9 +241,9 @@ async fn register_finish(
     Ok(StatusCode::OK)
 }
 
-#[instrument]
+#[allow(unused_variables)]
 async fn login(
-    DatabaseConnection(conn): DatabaseConnection,
+    DatabaseConnection(_conn): DatabaseConnection,
     // Json(): Json<>,
 ) -> Result<Json<()>, AppError> {
     // let results = conn.interact(|conn|
@@ -254,7 +254,8 @@ async fn login(
     todo!()
 }
 
-#[instrument]
+
+#[allow(unused_variables)]
 async fn create_user(
     DatabaseConnection(conn): DatabaseConnection,
     Json(new_user): Json<NewUser>,
@@ -266,10 +267,11 @@ async fn create_user(
     Ok(Json(results))
 }
 
-#[instrument]
+
+#[allow(unused_variables)]
 async fn fetch_user(
-    DatabaseConnection(conn): DatabaseConnection,
-    Path(id): Path<i64>,
+    DatabaseConnection(_conn): DatabaseConnection,
+    Path(_id): Path<i64>,
 ) -> Result<Json<User>, AppError> {
     todo!()
     // let results = conn.interact(move |conn|
@@ -277,4 +279,22 @@ async fn fetch_user(
     //     .await??;
 
     // Ok(Json(results))
+}
+
+
+async fn fallback_layer(
+    uri: Uri,
+    method: Method,
+    response: Response,
+) -> impl IntoResponse {
+    let code = response.status();
+
+    match code {
+        StatusCode::NOT_FOUND => 
+            Err(AppError::new(code, format!("Not found: {}", uri))),
+        StatusCode::METHOD_NOT_ALLOWED =>
+            Err(AppError::new(code, format!("Method not allowed: {}: {}", method, uri))),
+        
+        _ => Ok(response)
+    }
 }

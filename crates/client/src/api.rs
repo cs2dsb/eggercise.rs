@@ -9,12 +9,13 @@
 //     token: (),
 // }
 
-use leptos::window;
 use shared::{
     api,
     model::RegistrationUser,
 };
 
+use http::header;
+use leptos::{ logging::log, window};
 use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{js_sys::{
@@ -26,11 +27,10 @@ use web_sys::{js_sys::{
     TypeError as JsTypeError,
     UriError as JsUriError,
 }, CredentialCreationOptions, PublicKeyCredential};
-use gloo_net::http::{Request, Response};
+use gloo_net::http::{ Request, Response};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use webauthn_rs_proto::{CreationChallengeResponse, RegisterPublicKeyCredential};
 
-// TODO: move into shared?
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ApiError {
     pub message: String,
@@ -138,8 +138,14 @@ trait ResponseExt: Sized {
 impl ResponseExt for Response {
     async fn json_map_err<T: DeserializeOwned>(self) -> Result<T, Error> {
         if !self.ok() {
-            // TODO: Need to test this actually works. I don't think errors are being returned as JSON
-            Err(self.json::<ApiError>().await?)?
+            let is_json = self.headers().get(header::CONTENT_TYPE.as_str())
+                .map_or(false, |v| v == mime::APPLICATION_JSON.essence_str());
+            
+            Err(if is_json {
+                self.json::<ApiError>().await?
+            } else {
+                ApiError { message: self.text().await?}
+            })?;
         }    
 
         Ok(self.json().await?)
