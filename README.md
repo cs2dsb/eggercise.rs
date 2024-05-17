@@ -14,3 +14,4 @@
 
 ## Docker build
 * Cargo sweep
+* Mount sqlite db 
