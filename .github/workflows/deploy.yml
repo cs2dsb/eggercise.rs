@@ -5,10 +5,10 @@ env:
   REGISTRY: ghcr.io
 
 on:
-  # push:
-  #   branches:
-  #     - main
-  #     - deploy
+  push:
+    branches:
+      - main
+      - deploy
   workflow_dispatch:
 
 concurrency:
