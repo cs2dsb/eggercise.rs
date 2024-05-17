@@ -17,9 +17,13 @@ set -o pipefail
 readonly repo_dir="$( cd $(dirname ${BASH_SOURCE}); cd ..; pwd )";
 cd $repo_dir
 
+readonly deploy_branch=deploy;
+
+warn() { echo "$@" >&2; }
+die() { warn "$@"; exit 1; }
+
 if [ -n "$(git status --porcelain)" ]; then
-    echo "Working directory isn't clean. Please commit or stash outstanding work";
-    exit 1;
+    die "Working directory isn't clean. Please commit or stash outstanding work"
 fi
 
 if [ "${NOBUMP:-}" != "true" ]; then
@@ -30,8 +34,7 @@ fi
 
 readonly version=`cat Cargo.toml | sed -n '/^version *=* */{s///;s/^"//;s/"$//;p;}'`;
 if [ "$version" == "" ]; then
-    echo "Failed to extract version from Cargo.toml";
-    exit 1;
+    die "Failed to extract version from Cargo.toml"
 fi
 
 readonly tag="v${version}";
@@ -45,9 +48,31 @@ if [[ "$response" =~ ^(yes|y|)$ ]]; then
     if [ "${NOBUMP:-}" != "true" ]; then
         git commit -a -m "Bumped version number to ${version}"
     fi
-    git tag -a "${tag}" -m "${tag_message}"
+
+    # Push before doing anything else to fail early if there's some conflict
     git push origin main
+
+    # Tag and push the tag
+    git tag -a "${tag}" -m "${tag_message}"
     git push origin "tags/${tag}"
+
+    # Fetch the deploy branch in case someone else has updated it
+    git fetch -q origin $deploy_branch
+    
+    # Create it if it doesn't exist
+    if ! git show-ref --quiet refs/heads/$deploy_branch; then
+        git checkout -b $deploy_branch main
+    else 
+        # Merge to make sure we haven't diverged
+        git merge --ff-only $deploy || die "FF merge failed. Deploy branch seems to have diverged. You'll have to fix the situation manually"
+        git checkout $deploy_branch
+    fi
+
+    # Merge from main
+    git merge --no-ff main
+
+    # Push the changes
+    git push origin $deploy_branch
 else 
     echo "Aborted"
 fi
