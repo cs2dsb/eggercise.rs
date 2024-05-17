@@ -7,13 +7,8 @@ env:
 on:
   push:
     branches:
-      - main
       - deploy
   workflow_dispatch:
-
-concurrency:
-  # Prevent a second instance starting before the previous one finishes so the cache can be optimally be reused on deploy branch
-  group: ${{ github.workflow }}
 
 jobs:
   build:
