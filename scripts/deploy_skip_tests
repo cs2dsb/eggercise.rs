@@ -63,16 +63,17 @@ if [[ "$response" =~ ^(yes|y|)$ ]]; then
     if ! git show-ref --quiet refs/heads/$deploy_branch; then
         git checkout -b $deploy_branch main
     else 
-        # Merge to make sure we haven't diverged
-        git merge --ff-only $deploy || die "FF merge failed. Deploy branch seems to have diverged. You'll have to fix the situation manually"
         git checkout $deploy_branch
     fi
 
     # Merge from main
-    git merge --no-ff main
+    git merge --no-ff main --no-edit
 
     # Push the changes
     git push origin $deploy_branch
+
+    # Go back to main
+    git checkout main
 else 
     echo "Aborted"
 fi

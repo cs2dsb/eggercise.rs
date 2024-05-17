@@ -99,16 +99,14 @@ jobs:
       - name: 🗜️ Package output 
         if: github.ref == 'refs/heads/deploy'
         id: package_image
-        if: false
         run: |
           set -euo pipefail
           docker pull ${{ env.IMAGE_TAG }}
           docker save ${{ env.IMAGE_TAG }} | zstd -o "${{ env.REPO_NAME }}-${{ env.SUFFIX }}-image.tar.zstd"
 
       - name: 📡 Upload release 
-        if: github.ref == 'refs/heads/deploy'
         uses: svenstaro/upload-release-action@v2
-        if: steps.package_image.outcome == 'success'
+        if: github.ref == 'refs/heads/deploy' && steps.package_image.outcome == 'success'
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: "*.tar.*"

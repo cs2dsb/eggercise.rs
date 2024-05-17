@@ -48,11 +48,13 @@ if [[ "$response" =~ ^(yes|y|)$ ]]; then
     # If we have a deploy branch, make sure that's up to date
     if git show-ref --quiet refs/heads/$deploy_branch; then
         git checkout $deploy_branch
-        # Merge main into this branch, preserving and changes here
-        git merge -s ours -m "Amend last deploy" main 
+        # Merge main into this branch
+        git merge -X theirs -m "Amend last deploy" main 
         # Overwite the remote
         git push --force origin deploy
-    else 
+        # Go back to main
+        git checkout main
+    fi 
 else 
     echo "Aborted"
 fi
