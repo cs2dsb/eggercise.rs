@@ -14,77 +14,21 @@ cd "${repo_dir}"
 
 readonly release_dir="${repo_dir}/releases"
 
+readonly docker_image="ghcr.io/cs2dsb/eggercise.rs:latest";
 readonly app_user=web-apps;
-readonly server_name=server;
-readonly service_file=eggercise_rs.service;
+readonly server_name=server
+readonly service_file=eggercise_rs.service;;
 readonly webhook_service_file=eggercise_webhook.service;
 readonly hook_config_file=hook_config.json
 
-readonly release_url_base=https://github.com/cs2dsb/eggercise.rs/releases/tag;
-readonly api_url="https://api.github.com/repos/cs2dsb/eggercise.rs/releases";
 
 # Set to false to prevent the final restart to do a sanity check
 readonly restart_services=false
-# Set to false to prevent linking download to latest, also prevents service restart
-readonly link_latest=true
-
-# Set to the bins you want to extract
-readonly bins=(server)
-
-# Get the tag passed from the webhook
-readonly tag=${1:-};
 
 function error_exit() {
     echo "ERROR: ${1:-}" >&2;
     exit 1;
 }
-
-[[ "${tag}" == "" ]] && error_exit "First argument should be release tag name"
-
-sudo -u ${app_user} mkdir -p "${release_dir}"
-cd "${release_dir}"
-
-# Fetch the releases page. This is sorted in reverse order so we don't have to worry about pagenation
-# Saved to a file as the rate limit is very low for unauthenticated requests
-sudo -u ${app_user} curl -sL ${api_url} -o releases.json
-
-for bin in ${bins[@]}; do
-	# The pattern for the artifact we want
-	dl_file_pattern="${bin}_.*_linux.tar.gz";
-
-	# The url to for the artifact
-	dl_url=`cat releases.json | jq -r ".[] | select(.tag_name == \"${1}\") | .assets[] | select(.name|test(\"${dl_file_pattern}\")) | .browser_download_url"`;
-
-	# Check we found it
-	[[ "${dl_url}" == "" ]] && error_exit "Failed to find download url for ${dl_file_pattern} in release with tag \"${tag}\". Check ${gb_deploy_dir}/releases.json"
-
-	# The local download file name
-	gz_file="${bin}_${tag}_linux.tar.gz";
-
-	# Download it
-	sudo -u ${app_user} curl -sL ${dl_url} -o "${gz_file}";
-
-	# Extract it
-	sudo -u ${app_user} tar -xf "${gz_file}";
-
-	# Delete the archive
-	sudo -u ${app_user} rm "${gz_file}";
-
-	# Rename the binary to include the tag
-	tagged_name="${bin}_${tag}";
-	sudo -u ${app_user} mv "${bin}" "${tagged_name}";
-
-	if [ "${link_latest}" == "true" ]; then
-		# The link name for the latest version
-		ln_name="latest_${bin}";
-
-		# Delete the link
-		sudo -u ${app_user} rm -f "${ln_name}"
-
-		# Recreate it
-		sudo -u ${app_user} ln -s "${tagged_name}" "${ln_name}";
-	fi
-done
 
 cd "${repo_dir}"
 
@@ -112,6 +56,25 @@ sudo systemctl enable "${repo_dir}/${webhook_service_file}"
 
 # Fix the permissions
 sudo chown -R ${app_user}:${app_user} ${repo_dir}
+
+# Pull the new image
+sudo docker pull "$docker_image"
+
+# Stop and remove anything descended from it
+sudo docker rm \
+	$(sudo docker stop \
+		$(sudo docker ps -a -q  \
+			--filter ancestor="$docker_image" \
+			--format="{{.ID}}"))
+
+# Kick off the new instance
+sudo docker run -d \
+	--name=eggercise.rs \
+	-e ASSETS_DIR=/opt/server \
+	-e WEBAUTHN_ORIGIN=https://egg.ileet.co.uk \
+	-e WEBAUTHN_ID=egg.ileet.co.uk \
+	-p 9090:9090 \
+	"$docker_image"
 
 if [ "$restart_services" == "true" ] && [ "$link_latest" == "true" ]; then
 	# Restart the services
