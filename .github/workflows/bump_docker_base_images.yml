@@ -1,0 +1,57 @@
+name: Build docker base images
+
+env:
+  CARGO_TERM_COLOR: always
+  REGISTRY: ghcr.io
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: 🔧 Setup buildx
+        uses: docker/setup-buildx-action@v3
+
+      # We only need the rust-toolchain.toml 
+      - name: 🛒 Checkout repo
+        uses: actions/checkout@master
+      
+      - name: 🔍 Set build suffix 
+        run: |
+          DATE=$(date +'%Y-%m-%d_%H%M%S')
+          REPO=${GITHUB_REPOSITORY#$GITHUB_REPOSITORY_OWNER/}
+          
+          echo "DATE=$DATE" | tee -a $GITHUB_ENV
+          echo "REPO_NAME=$REPO" | tee -a $GITHUB_ENV
+          echo "REPO_OWNER=$GITHUB_REPOSITORY_OWNER" | tee -a $GITHUB_ENV
+          echo "BUILDER_IMAGE_TAG=${{ env.REGISTRY }}/$GITHUB_REPOSITORY_OWNER/$REPO/rust/nightly:latest" | tee -a $GITHUB_ENV
+          echo "RUNNER_IMAGE_TAG=${{ env.REGISTRY }}/$GITHUB_REPOSITORY_OWNER/$REPO/rust/nightly-slim:latest" | tee -a $GITHUB_ENV
+          
+      - name: 🔑 Log into registry ${{ env.REGISTRY }} 
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 📦 Build docker (builder)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          file: ./docker/builder/Dockerfile
+          tags: ${{ env.BUILDER_IMAGE_TAG }}
+          platforms: linux/amd64
+      
+      - name: 📦 Build docker (runner)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          file: ./docker/runner/Dockerfile
+          tags: ${{ env.RUNNER_IMAGE_TAG }}
+          platforms: linux/amd64

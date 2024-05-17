@@ -5,10 +5,11 @@ env:
   REGISTRY: ghcr.io
 
 on:
-  push:
-    branches:
-      - main
-      - deploy
+  # push:
+  #   branches:
+  #     - main
+  #     - deploy
+  workflow_dispatch:
 
 concurrency:
   # Prevent a second instance starting before the previous one finishes so the cache can be optimally be reused on deploy branch
@@ -50,23 +51,26 @@ jobs:
         uses: actions/cache@v4
         with:
           key: ${{ env.REPO_NAME }}_target_cache
-          path: target
+          path: |
+            target
+            cargo_registry
           save-always: true
 
       - name: 🪲 Cache debug
         run: |
+          mkdir -p cargo_registry
           mkdir -p target
           echo "Cache hit: ${{ steps.cache.outputs.cache-hit }}"
-          echo "ls -lh target: `ls -lh target`"
-          echo "tree:"
-          tree
+          echo "du -sh target: `du -sh target`"
+          echo "du -sh cargo_registry: `du -sh cargo_registry`"
 
       - name: 💉 Inject cache into docker
         uses: reproducible-containers/buildkit-cache-dance@v3.1.0
         with:
           cache-map: |
             {
-              "target": "/server/target"
+              "target": "/server/target",
+              "cargo_registry": "/usr/local/cargo/registry"
             }
           skip-extraction: ${{ steps.cache.outputs.cache-hit }}
 

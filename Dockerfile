@@ -1,4 +1,4 @@
-FROM rustlang/rust:nightly AS builder
+FROM ghcr.io/cs2dsb/eggercise.rs/rust/nightly:latest AS builder
 WORKDIR /server
 COPY rust-toolchain.toml .
 # Force rustup to install the toolchain specified in rust-toolchain.toml
@@ -9,10 +9,11 @@ COPY . .
 # Build application
 RUN \
     --mount=type=cache,target=/server/target,sharing=locked \
+    --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
     cargo build --release --bin server \
     && cd /server && mkdir dist && cd dist && cp ../target/release/server . && cp -r ../crates/server/assets .
 
-FROM rustlang/rust:nightly-slim AS runtime
+FROM ghcr.io/cs2dsb/eggercise.rs/rust/nightly-slim:latest AS runtime
 RUN apt-get update && apt-get install -y openssl
 WORKDIR /server
 COPY --from=builder /server/dist/server /usr/local/bin
