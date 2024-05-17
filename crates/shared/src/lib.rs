@@ -5,7 +5,7 @@ use std::{
 
 use cargo_toml::Manifest;
 use chrono::Utc;
-use serde::{Deserialize, Serialize};
+use serde::{ Deserialize, Serialize };
 use tracing_subscriber::fmt::format::FmtSpan;
 
 pub mod api;

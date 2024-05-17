@@ -80,8 +80,6 @@ jobs:
           push: true
           tags: ${{ env.IMAGE_TAG }}
           platforms: linux/amd64
-          # cache-from: type=gha
-          # cache-to: type=gha,mode=max
       
       - name: 🪲 Cache debug after
         run: |
@@ -96,29 +94,6 @@ jobs:
           set -euo pipefail
           docker pull ${{ env.IMAGE_TAG }}
           docker save ${{ env.IMAGE_TAG }} | zstd -o "${{ env.REPO_NAME }}-${{ env.SUFFIX }}-image.tar.zstd"
-
-      # - name: Bench
-      #   run: |
-      #     set -euo pipefail
-      #     cores=`nproc`
-      #     echo cores=$cores
-      #     mkdir bench
-      #     cd bench
-      #     tar -xf "../${{ env.REPO_NAME }}-${{ env.SUFFIX }}-image.tar.zstd"
-      #     find . -name \*.tar\* -exec tar -xf {} \;
-
-      #     # tree
-
-      #     target=`find . -name target -type d`
-      #     # echo target=$target
-      #     time ../scripts/ptar --threads 0 compress --in-path "$target" --out-dir ./target_0_cores/
-      #     time ../scripts/ptar --threads 1 compress --in-path "$target" --out-dir ./target_1_cores/
-      #     time ../scripts/ptar --threads 8 compress --in-path "$target" --out-dir ./target_8_cores/
-      #     time ../scripts/ptar --threads $cores compress --in-path "$target" --out-dir ./target_cores_cores/
-      #     time tar -I lz4 -cf ./target_.tar.lz4 "$target"
-      #     time tar -I zstd -cf ./target_.tar.zstd "$target"
-      #     ls -lh ./target_*
-
 
       - name: 📡 Upload release 
         uses: svenstaro/upload-release-action@v2
