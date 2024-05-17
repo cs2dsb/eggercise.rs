@@ -6,8 +6,10 @@ env:
 
 on:
   push:
-    tags:
-      - "v[0-9]+.[0-9]+.[0-9]+*"
+    branches:
+      - main
+    # tags:
+    #   - "v[0-9]+.[0-9]+.[0-9]+*"
   workflow_dispatch:
 
 jobs:
@@ -47,6 +49,7 @@ jobs:
         with:
           key: ${{ env.REPO_NAME }}_target_cache
           path: target
+          save-always: true
 
       - name: 🪲 Cache debug
         run: |
