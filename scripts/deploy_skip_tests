@@ -57,7 +57,7 @@ if [[ "$response" =~ ^(yes|y|)$ ]]; then
     git push origin "tags/${tag}"
 
     # Fetch the deploy branch in case someone else has updated it
-    git fetch -q origin $deploy_branch
+    git fetch -q origin $deploy_branch | true
     
     # Create it if it doesn't exist
     if ! git show-ref --quiet refs/heads/$deploy_branch; then
