@@ -16,6 +16,7 @@ chrono.workspace = true
 serde.workspace = true
 thiserror.workspace = true
 const_format.workspace = true
+webauthn-rs-proto.workspace = true
 
 rusqlite = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }

@@ -10,12 +10,13 @@
 // }
 
 use shared::{
-    api,
+    api::{self, RegisterStartResponse},
     model::RegistrationUser,
 };
 
 use http::header;
-use leptos::{ logging::log, window};
+use leptos_router::A;
+use leptos::{view, window, IntoView};
 use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{js_sys::{
@@ -29,7 +30,7 @@ use web_sys::{js_sys::{
 }, CredentialCreationOptions, PublicKeyCredential};
 use gloo_net::http::{ Request, Response};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use webauthn_rs_proto::{CreationChallengeResponse, RegisterPublicKeyCredential};
+use webauthn_rs_proto::RegisterPublicKeyCredential;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ApiError {
@@ -159,16 +160,52 @@ impl ResponseExt for Response {
     }
 }
 
-pub async fn register(reg_user: &RegistrationUser) -> Result<(), Error> {
+#[derive(Debug, Clone)]
+pub enum RegisterResponse {
+    Ok,
+    UsernameInvalid { message: String },
+    UsernameUnavailable,
+}
+
+impl IntoView for RegisterResponse {
+    fn into_view(self) -> leptos::View {
+        use RegisterResponse::*;
+        view! {
+            { match self {
+                Ok => view! { 
+                    <p>"Registration successful"</p>
+                    <span>"You can now "</span><A href="login">"login"</A>
+                },
+                UsernameUnavailable => view! {
+                    // TODO: Need to keep showing the registration form so this needs some re-thinking
+                    <p>"The username provided is not available"</p>
+                    <span>"If you have already registered this username you can "</span><A href="login">"login here"</A>
+                },
+                UsernameInvalid { message } => view! {
+                    <p>"The username provided is not valid"</p>
+                    <p>{ message }</p>
+                },
+            }}
+        }.into_view()
+    }
+}
+
+pub async fn register(reg_user: &RegistrationUser) -> Result<RegisterResponse, Error> {
     // TODO: username requirements
 
     // Get a challenge from the server
-    let creation_challenge_response: CreationChallengeResponse = Request::post(api::Auth::RegisterStart.path())
+    let register_start_response: RegisterStartResponse = Request::post(api::Auth::RegisterStart.path())
         .json(reg_user).context("json(RegistrationUser)")?
         .send()
         .await.context("RegisterStart::send")?
         .json_map_err()
         .await.context("RegisterStart::json_map_err")?;
+
+    let creation_challenge_response = match register_start_response {
+        RegisterStartResponse::Challenge(c) => c,
+        RegisterStartResponse::UsernameUnavailable => return Ok(RegisterResponse::UsernameUnavailable),
+        RegisterStartResponse::UsernameInvalid {message } => return Ok(RegisterResponse::UsernameInvalid { message }),
+    };
 
     // Convert to the browser type
     let credential_creation_options: CredentialCreationOptions = creation_challenge_response.into();
@@ -190,10 +227,12 @@ pub async fn register(reg_user: &RegistrationUser) -> Result<(), Error> {
     let register_public_key_credentials: RegisterPublicKeyCredential = public_key_credential.into();
 
     // Complete the registration with the server
-    Ok(Request::post(api::Auth::RegisterFinish.path())
+    Request::post(api::Auth::RegisterFinish.path())
         .json(&register_public_key_credentials).context("json(RegisterPublicKeyCredential)")?
         .send()
         .await.context("RegisterFinish::send")?
         .ok_result()
-        .await.context("RegisterFinish::ok_result")?)
+        .await.context("RegisterFinish::ok_result")?;
+    
+    Ok(RegisterResponse::Ok)
 }

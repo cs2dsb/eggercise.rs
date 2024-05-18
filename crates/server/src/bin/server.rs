@@ -9,7 +9,7 @@ use axum::{
 use clap::Parser;
 use deadpool_sqlite::{Config, Hook, Pool, Runtime};
 use server::{db::{self, DatabaseConnection}, AppError, PasskeyRegistrationState, SessionValue, Webauthn };
-use shared::{api, configure_tracing, load_dotenv, model::{Credential, NewUser, NewUserWithPasskey, RegistrationUser, User}};
+use shared::{api::{self, RegisterStartResponse}, configure_tracing, load_dotenv, model::{Credential, NewUser, NewUserWithPasskey, RegistrationUser, User}};
 use tokio::net::TcpListener;
 use tower::ServiceBuilder;
 use tower_http::{
@@ -129,7 +129,7 @@ async fn main() -> Result<(), anyhow::Error> {
     axum::serve(
         listener,
         Router::new()
-            // .route(api::Auth::RegisterStart.path(), post(register_start))
+            .route(api::Auth::RegisterStart.path(), post(register_start))
             .route(api::Auth::RegisterFinish.path(),  post(register_finish))
             .route(api::Auth::Login.path(),  post(login))
             .route(api::Object::User.id_path(), get(fetch_user))
@@ -164,41 +164,53 @@ async fn main() -> Result<(), anyhow::Error> {
 
 // #[axum::debug_handler]
 // Based on https://github.com/kanidm/webauthn-rs/blob/628599aa47b5c120e7f29cce8c526af532fba9ce/tutorial/server/axum/src/auth.rs#L52
-#[allow(dead_code)]
 async fn register_start(
     DatabaseConnection(conn): DatabaseConnection,
     webauthn: Webauthn,
     mut session: SessionValue,
     Json(reg_user): Json<RegistrationUser>,
-) -> Result<Json<CreationChallengeResponse>, AppError> {
+) -> Result<Json<RegisterStartResponse>, AppError> {
+    
     // Remove the existing challenge
     session.take_passkey_registration_state().await?;
+    
+    if reg_user.username.len() < 4 {
+        return Ok(Json(RegisterStartResponse::UsernameInvalid { message: "Username needs to be at least 4 characters long".to_string() }));
+    }
 
-    // TODO: validate username
-    let (user_id, existing_key_ids) = {
+    // let (user_id, existing_key_ids) = {
+    let (existing, user_id) = {
         let username = reg_user.username.clone(); 
         conn.interact(move |conn| {
             // First get the uuid associated with the given username, if any
             let user_id = User::fetch_by_username(conn, username)?
                 .map(|u| u.id);
 
-            // Then fetch the existing passkeys if the user exists
             Ok::<_, anyhow::Error>(match user_id {
-                None => (Uuid::new_v4().into(), Vec::new()),
-                Some(user_id) => {
-                    let passkeys = Credential::fetch_passkeys(conn, &user_id)?
-                        .into_iter()
-                        // We only want the ID
-                        .map(|p| p.cred_id().to_owned())
-                        .collect::<Vec<_>>();
-                    (
-                        user_id, 
-                        passkeys,
-                    )
-                },
+                None => (false, Uuid::new_v4().into()),
+                Some(uuid) => (true, uuid),
             })
+            // // Then fetch the existing passkeys if the user exists
+            // Ok::<_, anyhow::Error>(match user_id {
+            //     None => (Uuid::new_v4().into(), Vec::new()),
+            //     Some(user_id) => {
+            //         let passkeys = Credential::fetch_passkeys(conn, &user_id)?
+            //             .into_iter()
+            //             // We only want the ID
+            //             .map(|p| p.cred_id().to_owned())
+            //             .collect::<Vec<_>>();
+            //         (
+            //             user_id, 
+            //             passkeys,
+            //         )
+            //     },
+            // })
         }).await??
     };
+
+    if existing {
+        return Ok(Json(RegisterStartResponse::UsernameUnavailable));
+    }
 
     // Start the registration 
     let (creation_challenge_response, passkey_registration) = webauthn.start_passkey_registration(
@@ -206,7 +218,7 @@ async fn register_start(
         &reg_user.username,
         // TODO: display name
         &reg_user.username,
-        Some(existing_key_ids),
+        None, //Some(existing_key_ids),
     )?;
 
     // Stash the registration
@@ -214,7 +226,7 @@ async fn register_start(
         PasskeyRegistrationState::new(reg_user.username, *user_id, passkey_registration)).await?;
 
     // Send the challenge back to the client
-    Ok(Json(creation_challenge_response))
+    Ok(Json(creation_challenge_response.into()))
 }
 
 async fn register_finish(
