@@ -25,4 +25,8 @@ web-sys = { workspace = true, features = [
     "PublicKeyCredentialCreationOptions",
 ] }
 
+
+http = "1.1.0"
+mime = "0.3.17"
+
 shared = { path = "../shared" }

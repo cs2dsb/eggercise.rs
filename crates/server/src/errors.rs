@@ -13,10 +13,10 @@ pub struct AppError {
 
 impl AppError {
     /// Return a plain text response error message
-    pub fn new(code: StatusCode, message: String) -> Self {
+    pub fn new<S: Into<String>>(code: StatusCode, message: S) -> Self {
         AppError {
             code,
-            message,
+            message: message.into(),
         }
     }
 }

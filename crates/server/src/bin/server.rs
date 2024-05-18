@@ -4,12 +4,12 @@ use std::{
 
 use anyhow::Context;
 use axum::{
-    extract::{FromRef, Path}, http::{HeaderName, HeaderValue, StatusCode}, routing::{get, post}, Json, Router
+    extract::{FromRef, Path}, http::{HeaderName, HeaderValue, Method, StatusCode, Uri}, middleware, response::{IntoResponse, Response}, routing::{get, post}, Json, Router
 };
 use clap::Parser;
 use deadpool_sqlite::{Config, Hook, Pool, Runtime};
 use server::{db::{self, DatabaseConnection}, AppError, PasskeyRegistrationState, SessionValue, Webauthn };
-use shared::{api, configure_tracing, load_dotenv, model::{Credential, NewUser, NewUserWithPasskey, RegistrationUser, User}};
+use shared::{api::{self, RegisterStartResponse}, configure_tracing, load_dotenv, model::{Credential, NewUser, NewUserWithPasskey, RegistrationUser, User}};
 use tokio::net::TcpListener;
 use tower::ServiceBuilder;
 use tower_http::{
@@ -18,7 +18,7 @@ use tower_http::{
     trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer},
 };
 use tower_sessions::{MemoryStore, SessionManagerLayer};
-use tracing::{debug, info, instrument, Level};
+use tracing::{debug, info, Level};
 use webauthn_rs::{prelude::{CreationChallengeResponse, RegisterPublicKeyCredential, Url, Uuid}, WebauthnBuilder};
 
 #[derive(Debug, Parser)]
@@ -146,14 +146,13 @@ async fn main() -> Result<(), anyhow::Error> {
                     )),
             )
             .nest_service("/", ServeDir::new(&args.assets_dir))
-            .layer(
-                TraceLayer::new_for_http()
+            .layer(middleware::map_response(fallback_layer))
+            .layer(ServiceBuilder::new()
+                .layer(TraceLayer::new_for_http()
                     .make_span_with(DefaultMakeSpan::new().level(Level::INFO))
-                    .on_response(DefaultOnResponse::new().level(Level::INFO)),
-            )
-            .layer(
-                SessionManagerLayer::new(MemoryStore::default())
-                    .with_secure(args.secure_sessions)
+                    .on_response(DefaultOnResponse::new().level(Level::INFO)))
+                .layer(SessionManagerLayer::new(MemoryStore::default())
+                    .with_secure(args.secure_sessions))
             )
             .with_state(state)
     )
@@ -170,35 +169,48 @@ async fn register_start(
     webauthn: Webauthn,
     mut session: SessionValue,
     Json(reg_user): Json<RegistrationUser>,
-) -> Result<Json<CreationChallengeResponse>, AppError> {
+) -> Result<Json<RegisterStartResponse>, AppError> {
+    
     // Remove the existing challenge
     session.take_passkey_registration_state().await?;
+    
+    if reg_user.username.len() < 4 {
+        return Ok(Json(RegisterStartResponse::UsernameInvalid { message: "Username needs to be at least 4 characters long".to_string() }));
+    }
 
-    // TODO: validate username
-    let (user_id, existing_key_ids) = {
+    // let (user_id, existing_key_ids) = {
+    let (existing, user_id) = {
         let username = reg_user.username.clone(); 
         conn.interact(move |conn| {
             // First get the uuid associated with the given username, if any
             let user_id = User::fetch_by_username(conn, username)?
                 .map(|u| u.id);
 
-            // Then fetch the existing passkeys if the user exists
             Ok::<_, anyhow::Error>(match user_id {
-                None => (Uuid::new_v4().into(), Vec::new()),
-                Some(user_id) => {
-                    let passkeys = Credential::fetch_passkeys(conn, &user_id)?
-                        .into_iter()
-                        // We only want the ID
-                        .map(|p| p.cred_id().to_owned())
-                        .collect::<Vec<_>>();
-                    (
-                        user_id, 
-                        passkeys,
-                    )
-                },
+                None => (false, Uuid::new_v4().into()),
+                Some(uuid) => (true, uuid),
             })
+            // // Then fetch the existing passkeys if the user exists
+            // Ok::<_, anyhow::Error>(match user_id {
+            //     None => (Uuid::new_v4().into(), Vec::new()),
+            //     Some(user_id) => {
+            //         let passkeys = Credential::fetch_passkeys(conn, &user_id)?
+            //             .into_iter()
+            //             // We only want the ID
+            //             .map(|p| p.cred_id().to_owned())
+            //             .collect::<Vec<_>>();
+            //         (
+            //             user_id, 
+            //             passkeys,
+            //         )
+            //     },
+            // })
         }).await??
     };
+
+    if existing {
+        return Ok(Json(RegisterStartResponse::UsernameUnavailable));
+    }
 
     // Start the registration 
     let (creation_challenge_response, passkey_registration) = webauthn.start_passkey_registration(
@@ -206,7 +218,7 @@ async fn register_start(
         &reg_user.username,
         // TODO: display name
         &reg_user.username,
-        Some(existing_key_ids),
+        None, //Some(existing_key_ids),
     )?;
 
     // Stash the registration
@@ -214,7 +226,7 @@ async fn register_start(
         PasskeyRegistrationState::new(reg_user.username, *user_id, passkey_registration)).await?;
 
     // Send the challenge back to the client
-    Ok(Json(creation_challenge_response))
+    Ok(Json(creation_challenge_response.into()))
 }
 
 async fn register_finish(
@@ -241,9 +253,9 @@ async fn register_finish(
     Ok(StatusCode::OK)
 }
 
-#[instrument]
+#[allow(unused_variables)]
 async fn login(
-    DatabaseConnection(conn): DatabaseConnection,
+    DatabaseConnection(_conn): DatabaseConnection,
     // Json(): Json<>,
 ) -> Result<Json<()>, AppError> {
     // let results = conn.interact(|conn|
@@ -254,7 +266,8 @@ async fn login(
     todo!()
 }
 
-#[instrument]
+
+#[allow(unused_variables)]
 async fn create_user(
     DatabaseConnection(conn): DatabaseConnection,
     Json(new_user): Json<NewUser>,
@@ -266,10 +279,11 @@ async fn create_user(
     Ok(Json(results))
 }
 
-#[instrument]
+
+#[allow(unused_variables)]
 async fn fetch_user(
-    DatabaseConnection(conn): DatabaseConnection,
-    Path(id): Path<i64>,
+    DatabaseConnection(_conn): DatabaseConnection,
+    Path(_id): Path<i64>,
 ) -> Result<Json<User>, AppError> {
     todo!()
     // let results = conn.interact(move |conn|
@@ -277,4 +291,22 @@ async fn fetch_user(
     //     .await??;
 
     // Ok(Json(results))
+}
+
+
+async fn fallback_layer(
+    uri: Uri,
+    method: Method,
+    response: Response,
+) -> impl IntoResponse {
+    let code = response.status();
+
+    match code {
+        StatusCode::NOT_FOUND => 
+            Err(AppError::new(code, format!("Not found: {}", uri))),
+        StatusCode::METHOD_NOT_ALLOWED =>
+            Err(AppError::new(code, format!("Method not allowed: {}: {}", method, uri))),
+        
+        _ => Ok(response)
+    }
 }
