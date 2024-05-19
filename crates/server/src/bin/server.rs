@@ -3,14 +3,15 @@ use std::{
     fs::remove_file, net::{IpAddr, SocketAddr}, path::PathBuf, str::FromStr, sync::Arc
 };
 
-use anyhow::Context;
+use anyhow::{ensure, Context};
 use axum::{
     extract::{FromRef, Path}, http::{HeaderName, HeaderValue, Method, StatusCode, Uri}, middleware, response::{IntoResponse, Response}, routing::{get, post}, Json, Router
 };
+use chrono::Utc;
 use clap::Parser;
 use deadpool_sqlite::{Config, Hook, Pool, Runtime};
-use server::{db::{self, DatabaseConnection}, AppError, PasskeyRegistrationState, SessionValue, Webauthn };
-use shared::{api::{self, response_errors::RegisterError}, configure_tracing, load_dotenv, model::{Credential, NewUser, NewUserWithPasskey, RegistrationUser, User}};
+use server::{db::{self, DatabaseConnection}, AppError, PasskeyAuthenticationState, PasskeyRegistrationState, SessionValue, Webauthn };
+use shared::{api::{self, response_errors::{LoginError, RegisterError}}, configure_tracing, load_dotenv, model::{Credential, LoginUser, NewUser, NewUserWithPasskey, RegistrationUser, User}};
 use tokio::net::TcpListener;
 use tower::ServiceBuilder;
 use tower_http::{
@@ -20,7 +21,7 @@ use tower_http::{
 };
 use tower_sessions::{MemoryStore, SessionManagerLayer};
 use tracing::{debug, info, Level};
-use webauthn_rs::{prelude::{CreationChallengeResponse, RegisterPublicKeyCredential, Url, Uuid}, WebauthnBuilder};
+use webauthn_rs::{prelude::{CreationChallengeResponse, PasskeyAuthentication, PublicKeyCredential, RegisterPublicKeyCredential, RequestChallengeResponse, Url, Uuid}, WebauthnBuilder};
 
 #[derive(Debug, Parser)]
 #[clap(name = "eggercise server")]
@@ -132,7 +133,8 @@ async fn main() -> Result<(), anyhow::Error> {
         Router::new()
             .route(api::Auth::RegisterStart.path(), post(register_start))
             .route(api::Auth::RegisterFinish.path(),  post(register_finish))
-            .route(api::Auth::Login.path(),  post(login))
+            .route(api::Auth::LoginStart.path(),  post(login_start))
+            .route(api::Auth::LoginFinish.path(),  post(login_finish))
             .route(api::Object::User.id_path(), get(fetch_user))
             .route(api::Object::User.path(), post(create_user))
             .nest_service(
@@ -224,7 +226,7 @@ async fn register_start(
 
     // Stash the registration
     session.set_passkey_registration_state(
-        PasskeyRegistrationState::new(reg_user.username, *user_id, passkey_registration)).await?;
+        PasskeyRegistrationState::new(reg_user.username, user_id, passkey_registration)).await?;
 
     // Send the challenge back to the client
     Ok(Json(creation_challenge_response.into()))
@@ -254,17 +256,132 @@ async fn register_finish(
     Ok(Json(()))
 }
 
-#[allow(unused_variables)]
-async fn login(
-    DatabaseConnection(_conn): DatabaseConnection,
-    // Json(): Json<>,
-) -> Result<Json<()>, AppError> {
-    // let results = conn.interact(|conn|
-    //     Ok::<_, anyhow::Error>(User::create(conn, new_user)?))
-    //     .await??;
+async fn login_start(
+    DatabaseConnection(conn): DatabaseConnection,
+    webauthn: Webauthn,
+    mut session: SessionValue,
+    Json(login_user): Json<LoginUser>,
+) -> Result<Json<RequestChallengeResponse>, LoginError> {
+    // Remove the existing challenge
+    session.take_passkey_authentication_state().await?;
+    
+    if login_user.username.len() < 4 {
+        Err(LoginError::UsernameInvalid { message: "Username needs to be at least 4 characters".to_string() })?;
+    }
 
-    // Ok(Json(results))
-    todo!()
+    let (user, existing_passkeys) = {
+        let username = login_user.username.clone(); 
+        conn.interact(move |conn| {
+            // First get the user associated with the given username, if any
+            let user = User::fetch_by_username(conn, username)?;
+
+            // Then fetch the existing passkeys if the user exists
+            Ok::<_, anyhow::Error>(match user {
+                None => (None, None),
+                Some(user) => {
+                    let passkeys = Credential::fetch_passkeys(conn, &user.id)?
+                        .into_iter()
+                        .collect::<Vec<_>>();
+                    (
+                        Some(user), 
+                        Some(passkeys),
+                    )
+                },
+            })
+        }).await??
+    };
+
+    if user.is_none() {
+        Err(LoginError::UsernameDoesntExist)?;
+    }
+    let user = user.unwrap();
+
+    if existing_passkeys.as_ref().map_or(0, |v| v.len()) == 0 {
+        Err(LoginError::UserHasNoCredentials)?;
+    }
+    let existing_passkeys = existing_passkeys.unwrap();
+
+    // Start the authentication attempt
+    let (request_challenge_response, passkey_authentication) = webauthn.start_passkey_authentication(&existing_passkeys)?;
+
+    // Stash the authentication
+    session.set_passkey_authentication_state(
+        PasskeyAuthenticationState::new(user.id, passkey_authentication)).await?;
+
+    // Send the challenge back to the client
+    Ok(Json(request_challenge_response.into()))
+}
+
+async fn login_finish(
+    DatabaseConnection(conn): DatabaseConnection,
+    webauthn: Webauthn,
+    mut session: SessionValue,
+    Json(public_key_credential): Json<PublicKeyCredential>,
+) -> Result<Json<User>, AppError> {
+    // Get the challenge from the session
+    let PasskeyAuthenticationState {user_id, passkey_authentication } = session
+        .take_passkey_authentication_state()
+        .await?
+        .ok_or(anyhow::anyhow!("Current session doesn't contain a PasskeyAuthenticationState. Client error or replay attack?"))?;
+
+    // Attempt to complete the passkey authentication with the provided public key
+    let authentication_result = webauthn.finish_passkey_authentication(
+        &public_key_credential, &passkey_authentication)?;
+    
+    // At this point the autnetication has succeeded but there are a few more checks and updates we need to make
+    let user = conn.interact(move |conn| {
+        // TODO: perhaps this code should be moved into the model to avoid such low level code in the app
+        use exemplar::Model;
+
+        // Need a transaction because we're updating the credential and user and want it to rollback if either fail
+        let tx = conn.transaction()?;
+
+        let id = authentication_result.cred_id().clone().into();
+        
+        // Get the credential 
+        // If it was deleted between start & finish this might fail and we should not proceed with the login
+        let mut credential = Credential::fetch(&tx, &id)?;
+
+        let mut dirty = false;
+
+        // If the counter is non-zero, we have to check it
+        let counter = authentication_result.counter();
+        if counter > 0 {
+            ensure!(counter > credential.counter, "Stored counter >= authentication result counter. Possible credential clone or re-use");
+            credential.counter = counter;
+            dirty = true;
+        }
+
+        let backup_state = authentication_result.backup_state();
+        if backup_state != credential.backup_state {
+            credential.backup_state = backup_state;
+            dirty = true;
+        }
+
+        let backup_eligible = authentication_result.backup_eligible();
+        if backup_eligible != credential.backup_eligible {
+            credential.backup_eligible = backup_eligible;
+            dirty = true;
+        }
+
+        let now = Utc::now();
+        credential.last_used_date = Some(now);
+
+        if dirty {
+            credential.last_updated_date = now;
+        }
+
+        credential.update(&tx)?;
+
+        let mut user = User::fetch_by_id(&tx, &credential.user_id)?;
+        user.last_updated_date = now;
+        user.last_login_date = Some(now);
+        user.update(&tx)?;
+
+        Ok(user)
+    }).await??;
+
+    Ok(Json(user))
 }
 
 

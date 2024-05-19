@@ -1,11 +1,14 @@
 use leptos::{component, create_action, create_signal, logging::{log, warn}, view, IntoView, Show, Signal, SignalGet, SignalUpdate, SignalWith};
-use leptos_router::A;
 use shared::model::RegistrationUser;
 
-use crate::{api::register, components::RegistrationForm};
+use crate::{
+    api::register, 
+    components::RegistrationForm,
+    ClientRoutes,
+};
 
 #[component]
-pub(crate) fn Register() -> impl IntoView {
+pub fn Register() -> impl IntoView {
     // Signals
     let (register_response, set_register_response) = create_signal(None);
     let (register_error, set_register_error) = create_signal(None::<String>);
@@ -50,7 +53,7 @@ pub(crate) fn Register() -> impl IntoView {
             }
         > 
             <p>"Registration complete"</p>
-            <span>"You can now "</span><A href="login">login</A>
+            <span>"You can now "</span> { ClientRoutes::Login.link() }
         </Show>
     }
 }

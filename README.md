@@ -11,7 +11,7 @@
 * ~~Modify service setup so releases are in versioned folders rather than just the main binary (so assets are versioned too)~~ (Update it to docker)
 * Improve client-server error situation (see api.rs)
 * The service worker mapping unknown URLs to index isn't working in FF
+* Macro to generate `all_columns` for Iden structs. Failing that a test that checks against a hard-coded list to prevent it going out of sync
 
 ## Docker build
-* Cargo sweep
 * Mount sqlite db 
