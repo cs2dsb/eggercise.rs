@@ -15,8 +15,6 @@ jobs:
     steps:
       - name: 🛒 Checkout repo
         uses: actions/checkout@master
-        with:
-          ref: deploy
 
       - name: 🔍 Set build suffix 
         run: |
@@ -31,7 +29,7 @@ jobs:
           echo "REPO_OWNER=$GITHUB_REPOSITORY_OWNER" | tee -a $GITHUB_ENV
           echo "IMAGE_TAG=${{ env.REGISTRY }}/$GITHUB_REPOSITORY_OWNER/$REPO:$([[ "${{ github.ref }}" == "refs/heads/deploy" ]] && echo "latest" || echo "main")" | tee -a $GITHUB_ENV
           echo "IMAGE_NAME=$REPO" | tee -a $GITHUB_ENV
-          
+
       - name: 🎯 Cache target dir (restore)
         id: cache
         uses: actions/cache@v4

@@ -6,10 +6,10 @@ use leptos::{
 #[allow(unused_imports)]
 use leptos_router::{Route, Router, Routes, A};
 
-use super::{AppNav, AppRoutes};
+use crate::{AppNav, AppRoutes};
 
 #[component]
-pub(crate) fn App() -> impl IntoView {
+pub fn App() -> impl IntoView {
     view! {
         <small>Version: { env!("CARGO_PKG_VERSION") }</small>
         <Router>

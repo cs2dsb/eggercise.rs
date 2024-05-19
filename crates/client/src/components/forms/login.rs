@@ -1,7 +1,7 @@
 use leptos::{component, create_signal, ev::KeyboardEvent, event_target_value, view, Action, IntoView, Signal, SignalGet, SignalUpdate, SignalWith};
 
 #[component]
-pub(crate) fn RegistrationForm(
+pub fn LoginForm(
     action: Action<String, ()>,
     #[prop(into)]
     error: Signal<Option<String>>,
@@ -42,7 +42,7 @@ pub(crate) fn RegistrationForm(
                 prop:disabled=move || button_disabled.get()
                 on:click=move |_| dispatch_action()
             >
-                "Register"
+                "Login"
             </button>
 
         </form>

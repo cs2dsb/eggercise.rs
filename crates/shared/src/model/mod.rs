@@ -8,7 +8,7 @@ pub use credential::*;
 
 use crate::api::error::ValidationError;
 
-pub mod auth;
+pub mod constants;
 
 pub trait ValidateModel {
     fn validate(&self) -> Result<(), ValidationError>;

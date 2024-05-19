@@ -1,7 +1,8 @@
 use axum::{async_trait, extract::FromRequestParts, http::{request::Parts, StatusCode}};
 use serde::{Deserialize, Serialize};
+use shared::types::Uuid;
 use tower_sessions::Session;
-use webauthn_rs::prelude::{PasskeyRegistration, Uuid};
+use webauthn_rs::prelude::{PasskeyAuthentication, PasskeyRegistration};
 
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -21,9 +22,27 @@ impl PasskeyRegistrationState {
     }
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct PasskeyAuthenticationState {
+    pub user_id: Uuid,
+    pub passkey_authentication: PasskeyAuthentication,
+}
+
+impl PasskeyAuthenticationState {
+    pub fn new(user_id: Uuid, passkey_authentication: PasskeyAuthentication) -> Self {
+        Self {
+            user_id,
+            passkey_authentication,
+        }
+    }
+}
+
+
+
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 struct SessionData {
     passkey_registration_state: Option<PasskeyRegistrationState>,
+    passkey_authentication_state: Option<PasskeyAuthenticationState>,
 }
 
 #[derive(Debug, Clone)]
@@ -43,6 +62,18 @@ impl SessionValue {
 
     pub async fn set_passkey_registration_state(&mut self, passkey_registration: PasskeyRegistrationState) -> Result<(), anyhow::Error> {
         self.data.passkey_registration_state = Some(passkey_registration);
+        Self::update_session(&self.session, &self.data).await?;
+        Ok(())
+    }
+
+    pub async fn take_passkey_authentication_state(&mut self) -> Result<Option<PasskeyAuthenticationState>, anyhow::Error> {
+        let reg = self.data.passkey_authentication_state.take();
+        Self::update_session(&self.session, &self.data).await?;
+        Ok(reg)
+    }
+
+    pub async fn set_passkey_authentication_state(&mut self, passkey_authentication: PasskeyAuthenticationState) -> Result<(), anyhow::Error> {
+        self.data.passkey_authentication_state = Some(passkey_authentication);
         Self::update_session(&self.session, &self.data).await?;
         Ok(())
     }

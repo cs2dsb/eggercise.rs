@@ -29,7 +29,8 @@ impl Object {
 pub enum Auth {
     RegisterStart,
     RegisterFinish,
-    Login,
+    LoginStart,
+    LoginFinish,
 }
 
 impl Auth {
@@ -38,7 +39,9 @@ impl Auth {
         match self {
             RegisterStart => concatcp!(API_BASE_PATH, "auth/register/start"),
             RegisterFinish => concatcp!(API_BASE_PATH, "auth/register/finish"),
-            Login => concatcp!(API_BASE_PATH, "auth/login"),
+            LoginStart => concatcp!(API_BASE_PATH, "auth/login/start"),
+            LoginFinish => concatcp!(API_BASE_PATH, "auth/login/finish"),
+
         }
     }
 }

@@ -2,17 +2,12 @@ CREATE TABLE credential (
     id                  TEXT PRIMARY KEY,
     user_id             TEXT NOT NULL,
     passkey             TEXT NOT NULL,
-    public_key          TEXT,
-    -- attestation_type    TEXT NOT NULL,
-    aaguid              TEXT DEFAULT '00000000-0000-0000-0000-000000000000',
-    signature_count     INTEGER,
-    creation_date       TEXT DEFAULT CURRENT_TIMESTAMP,
+    counter             INTEGER NOT NULL DEFAULT 0,
+    creation_date       TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     last_used_date      TEXT,
-    last_updated_date   TEXT DEFAULT CURRENT_TIMESTAMP,
-    type_               TEXT,
-    transports          TEXT,
-    backup_eligible     INTEGER DEFAULT 0,
-    backup_state        INTEGER DEFAULT 0,
+    last_updated_date   TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    backup_eligible     INTEGER NOT NULL DEFAULT 0,
+    backup_state        INTEGER NOT NULL DEFAULT 0,
     FOREIGN KEY (user_id) REFERENCES user(id) ON DELETE CASCADE
 ) STRICT;
 

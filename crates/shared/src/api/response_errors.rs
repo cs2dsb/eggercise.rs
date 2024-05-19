@@ -92,3 +92,13 @@ response_error!(RegisterError {
     #[code(StatusCode::BAD_REQUEST)]
     UsernameInvalid { message: String },
 });
+
+response_error!(LoginError {
+    #[code(StatusCode::UNAUTHORIZED)]
+    UsernameDoesntExist,
+    #[code(StatusCode::BAD_REQUEST)]
+    UsernameInvalid { message: String },
+    #[code(StatusCode::INTERNAL_SERVER_ERROR)]
+    UserHasNoCredentials,
+});
+
