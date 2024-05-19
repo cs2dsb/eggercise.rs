@@ -15,6 +15,7 @@ gloo-net.workspace = true
 serde.workspace = true
 wasm-bindgen-futures.workspace = true
 wasm-bindgen.workspace = true
+http.workspace = true
 webauthn-rs-proto = { workspace = true, features = [ "wasm" ] }
 web-sys = { workspace = true, features = [
     "CredentialCreationOptions",
@@ -26,7 +27,6 @@ web-sys = { workspace = true, features = [
 ] }
 
 
-http = "1.1.0"
 mime = "0.3.17"
 
-shared = { path = "../shared" }
+shared = { path = "../shared", features = [ "frontend" ] }

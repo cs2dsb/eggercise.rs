@@ -20,6 +20,15 @@ opt-level = 2
 # Panic hook to make debugging wasm easier
 console_error_panic_hook = "0.1.7"
 
+http = "1.1.0"
+
+# Web framework
+axum = {version = "0.7.5", features = [ "macros" ] }
+
+# Helper attributes for serde
+serde_with = "3.8.1"
+http-serde = "2.1.0"
+
 # Logging and tracing facade
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }

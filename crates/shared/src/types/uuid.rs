@@ -1,7 +1,7 @@
 use std::ops::Deref;
 
 use serde::{Deserialize, Serialize};
-#[cfg(feature="database")]
+#[cfg(feature="backend")]
 use {
     std::str::FromStr,
     rusqlite::{
@@ -19,7 +19,7 @@ use {
 pub struct Uuid (uuid::Uuid);
 
 impl Uuid {
-    #[cfg(feature="database")]
+    #[cfg(feature="backend")]
     fn to_string(&self) -> String {
         format!("{}", &self.0)
     }
@@ -38,14 +38,14 @@ impl Deref for Uuid {
     }
 }
 
-#[cfg(feature="database")]
+#[cfg(feature="backend")]
 impl ToSql for Uuid {
     fn to_sql(&self) -> rusqlite::Result<ToSqlOutput<'_>> {
         Ok(ToSqlOutput::Owned(self.to_string().into()))
     }
 }
 
-#[cfg(feature="database")]
+#[cfg(feature="backend")]
 impl FromSql for Uuid {
     fn column_result(value: ValueRef<'_>) -> FromSqlResult<Self> {
         uuid::Uuid::from_str(value.as_str()?)
@@ -54,14 +54,14 @@ impl FromSql for Uuid {
     }
 }
 
-#[cfg(feature="database")]
+#[cfg(feature="backend")]
 impl From<&Uuid> for sea_query::Value {
     fn from(value: &Uuid) -> Self {
         value.to_string().into()
     }
 }
 
-#[cfg(feature="database")]
+#[cfg(feature="backend")]
 impl From<Uuid> for sea_query::Value {
     fn from(value: Uuid) -> Self {
         value.to_string().into()

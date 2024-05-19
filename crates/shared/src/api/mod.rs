@@ -1,6 +1,6 @@
 use const_format::concatcp;
-use serde::{Deserialize, Serialize};
-use webauthn_rs_proto::CreationChallengeResponse;
+pub mod response_errors;
+pub mod error;
 
 pub const API_BASE_PATH: &str = "/api/";
 
@@ -40,19 +40,5 @@ impl Auth {
             RegisterFinish => concatcp!(API_BASE_PATH, "auth/register/finish"),
             Login => concatcp!(API_BASE_PATH, "auth/login"),
         }
-    }
-}
-
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum RegisterStartResponse {
-    Challenge(CreationChallengeResponse),
-    UsernameUnavailable,
-    UsernameInvalid { message: String },
-}
-
-impl From<CreationChallengeResponse> for RegisterStartResponse {
-    fn from(value: CreationChallengeResponse) -> Self {
-        Self::Challenge(value)
     }
 }

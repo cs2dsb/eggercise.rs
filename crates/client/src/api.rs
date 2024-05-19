@@ -1,3 +1,4 @@
+#![allow(warnings)]
 // #[derive(Clone, Copy)]
 // pub struct UnauthorizedApi {
 //     url: &'static str,
@@ -9,14 +10,16 @@
 //     token: (),
 // }
 
+use std::{any::type_name, fmt::Debug};
+
+use mime::APPLICATION_JSON;
 use shared::{
-    api::{self, RegisterStartResponse},
-    model::RegistrationUser,
+    api::{self, error::{ ErrorContext, FrontendError, JsError, NoValidation, ResultContext, ValidationError, WrongContentTypeError }, response_errors::RegisterError},
+    model::{RegistrationUser, ValidateModel},
 };
 
 use http::header;
-use leptos_router::A;
-use leptos::{view, window, IntoView};
+use leptos::window;
 use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{js_sys::{
@@ -28,184 +31,129 @@ use web_sys::{js_sys::{
     TypeError as JsTypeError,
     UriError as JsUriError,
 }, CredentialCreationOptions, PublicKeyCredential};
-use gloo_net::http::{ Request, Response};
+use gloo_net::http::{ Request, RequestBuilder, Response, Method};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use webauthn_rs_proto::RegisterPublicKeyCredential;
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ApiError {
-    pub message: String,
-}
-
-pub trait ErrorContext<T, E>: Sized {
-    /// Add helpful context to errors
-    ///
-    /// Backtrace will be captured  if nightly feature is enabled
-    ///
-    /// `context` is provided as a closure to avoid potential formatting cost if
-    /// the result isn't an error
-    #[allow(dead_code)]
-    fn with_context<S: Into<String>, F: FnOnce() -> S>(self, context: F) -> Result<T, E>;
-    /// Add helpful context to errors
-    ///
-    /// Backtrace will be captured  if nightly feature is enabled
-    ///
-    /// `context` is provided as a closure to avoid potential formatting cost if
-    /// the result isn't an error
-    fn context<S: Into<String>>(self, context: S) -> Result<T, E>;
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum Error {
-    #[error("JS Error: {0:?}")]
-    Fetch(#[from] gloo_net::Error),
-    #[error("API Error: {0:?}")]
-    Api(ApiError),
-    
-    #[error("GenericJs Error: {0:?}")]
-    GenericJs(GenericJsError),
-    #[error("JsRange Error: {0:?}")]
-    JsRange(JsRangeError),
-    #[error("JsReference Error: {0:?}")]
-    JsReference(JsReferenceError),
-    #[error("JsSyntax Error: {0:?}")]
-    JsSyntax(JsSyntaxError),
-    // #[error("JsTryFromInt Error: {0:?}")]
-    // JsTryFromInt(JsTryFromIntError),
-    #[error("JsType Error: {0:?}")]
-    JsType(JsTypeError),
-    #[error("JsUri Error: {0:?}")]
-    JsUri(JsUriError),
-    #[error("UnknownJsValue Error: {0:?}")]
-    UnknownJsValue(String),
-
-    #[error("WithContext [{0}]: {1}")]
-    WithContext(String, Box<Self>),
-}
-
-impl<T, E: Into<Error>> ErrorContext<T, Error> for Result<T, E> {
-    fn with_context<S: Into<String>, F: FnOnce() -> S>(self, context: F) -> Result<T, Error> {
-        self.context(context())
-    }
-    fn context<S: Into<String>>(self, context: S) -> Result<T, Error> {
-        self.map_err(|e| {
-            Error::WithContext(
-                context.into(),
-                Box::new(e.into()),
-            )
-        })
-    }
-}
-
-// Tries to get the specific errors first then the generic one
-// Finally falls back to outputting a string
-fn map_js_error(err: JsValue) -> Error {
-    if err.is_instance_of::<JsRangeError>() {
-        return Error::JsRange(err.into());
-    }
-    if err.is_instance_of::<JsReferenceError>() {
-        return Error::JsReference(err.into());
-    }
-    if err.is_instance_of::<JsSyntaxError>() {
-        return Error::JsSyntax(err.into());
-    }
-    // Not supported by JsCast
-    // if err.is_instance_of::<JsTryFromIntError>() {
-    //     return Error::JsTryFromInt(err.into());
-    // }
-    if err.is_instance_of::<JsTypeError>() {
-        return Error::JsType(err.into());
-    }
-    if err.is_instance_of::<JsUriError>() {
-        return Error::JsUri(err.into());
-    }
-    if err.is_instance_of::<GenericJsError>() {
-        return Error::GenericJs(err.into());
-    }
-    Error::UnknownJsValue(format!("{:?}", err))
-}
-
-impl From<ApiError> for Error {
-    fn from(err: ApiError) -> Self {
-        Self::Api(err)
-    }
-}
+use webauthn_rs_proto::{CreationChallengeResponse, RegisterPublicKeyCredential};
 
 trait ResponseExt: Sized {
-    async fn json_map_err<T: DeserializeOwned>(self) -> Result<T, Error>; 
-    async fn ok_result(self) -> Result<(), Error>;
+    fn is_json(&self) -> bool;
+    async fn json_map_err<T: DeserializeOwned, E: DeserializeOwned>(self) -> Result<T, E>; 
+    async fn ok_result<E: DeserializeOwned>(self) -> Result<(), E>;
 }
 
 impl ResponseExt for Response {
-    async fn json_map_err<T: DeserializeOwned>(self) -> Result<T, Error> {
-        if !self.ok() {
-            let is_json = self.headers().get(header::CONTENT_TYPE.as_str())
-                .map_or(false, |v| v == mime::APPLICATION_JSON.essence_str());
-            
-            Err(if is_json {
-                self.json::<ApiError>().await?
-            } else {
-                ApiError { message: self.text().await?}
-            })?;
-        }    
-
-        Ok(self.json().await?)
+    fn is_json(&self) -> bool {
+        self.headers().get(header::CONTENT_TYPE.as_str())
+            .map_or(false, |v| v == mime::APPLICATION_JSON.essence_str())
     }
-    async fn ok_result(self) -> Result<(), Error> {
-        if !self.ok() {
-            Err(ApiError { message: self.text().await? })?
+    async fn json_map_err<T: DeserializeOwned, E: DeserializeOwned>(self) -> Result<T, E> {
+        todo!()
+        // if !self.ok() {
+        //     Err(if self.is_json() {
+        //         self.json::<ApiError>().await?
+        //     } else {
+        //         ApiError { message: self.text().await?}
+        //     })?;
+        // }    
+
+        // Ok(self.json().await?)
+    }
+
+    async fn ok_result<E: DeserializeOwned>(self) -> Result<(), E> {
+        todo!()
+        // if !self.ok() {
+        //     Err(ApiError { message: self.text().await? })?
+        // }
+
+        // Ok(())
+    }
+}
+
+trait ResponseContentType: Sized {
+    fn content_type(&self) -> Option<String>;
+}
+
+impl ResponseContentType for Response {
+    fn content_type(&self) -> Option<String> {
+        self.headers().get(header::CONTENT_TYPE.as_str())
+    }
+}
+
+async fn json_request<B, R, E>(method: Method, url: &str, body: Option<&B>) -> Result<R, FrontendError<E>> 
+where
+    B: Serialize + Debug + ValidateModel, 
+    R: DeserializeOwned, 
+    E: DeserializeOwned
+{
+    // Check the body is valid
+    if let Some(body) = body {
+        body.validate()?;
+    }
+
+    let mut builder = RequestBuilder::new(url)
+        .method(method.clone());
+
+    // Add the json body. Use json(()) when there is no body so it still sets the other relevant headers
+    let request = match body {
+            Some(body) => builder.json(body),
+            None => builder.json(&()),
         }
+        .map_err(FrontendError::from)
+        .with_context(|| format!("Converting {:?} to json body (for: {method} {url}", body))?;
 
-        Ok(())
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum RegisterResponse {
-    Ok,
-    UsernameInvalid { message: String },
-    UsernameUnavailable,
-}
-
-impl IntoView for RegisterResponse {
-    fn into_view(self) -> leptos::View {
-        use RegisterResponse::*;
-        view! {
-            { match self {
-                Ok => view! { 
-                    <p>"Registration successful"</p>
-                    <span>"You can now "</span><A href="login">"login"</A>
-                },
-                UsernameUnavailable => view! {
-                    // TODO: Need to keep showing the registration form so this needs some re-thinking
-                    <p>"The username provided is not available"</p>
-                    <span>"If you have already registered this username you can "</span><A href="login">"login here"</A>
-                },
-                UsernameInvalid { message } => view! {
-                    <p>"The username provided is not valid"</p>
-                    <p>{ message }</p>
-                },
-            }}
-        }.into_view()
-    }
-}
-
-pub async fn register(reg_user: &RegistrationUser) -> Result<RegisterResponse, Error> {
-    // TODO: username requirements
-
-    // Get a challenge from the server
-    let register_start_response: RegisterStartResponse = Request::post(api::Auth::RegisterStart.path())
-        .json(reg_user).context("json(RegistrationUser)")?
+    // Send the request and handle the network and js errors
+    let response = request
         .send()
-        .await.context("RegisterStart::send")?
-        .json_map_err()
-        .await.context("RegisterStart::json_map_err")?;
+        .await
+        .map_err(FrontendError::from)
+        .with_context(|| format!("Sending {:?} to {method} {url}", body))?;
 
-    let creation_challenge_response = match register_start_response {
-        RegisterStartResponse::Challenge(c) => c,
-        RegisterStartResponse::UsernameUnavailable => return Ok(RegisterResponse::UsernameUnavailable),
-        RegisterStartResponse::UsernameInvalid {message } => return Ok(RegisterResponse::UsernameInvalid { message }),
-    };
+    // Check the content-type is what we're expecting   
+    let content_type = response.content_type();
+    let is_json = content_type.as_ref()
+        .map_or(false, |v| v == mime::APPLICATION_JSON.essence_str());
+
+    // Handle non-json errors (this isn't to allow the api to return other things, it's only to handle errors)
+    if !is_json {
+        let body = response
+            .text()
+            .await
+            .map_err(FrontendError::from)
+            .with_context(|| format!("Extracting response body as text from {method} {url}"))?;
+
+        Err(WrongContentTypeError {
+            expected: APPLICATION_JSON.to_string(),
+            got: content_type,
+            body })
+        .map_err(FrontendError::from)
+        .with_context(|| format!("Response from {method} {url}"))?;
+    }
+
+    // Deserialize the error type 
+    if !response.ok() {
+        let err = response.json::<E>()
+            .await
+            .map_err(FrontendError::<E>::from)
+            .with_context(|| format!("Deserializing error response ({}) from {method} {url}", type_name::<E>()))?;
+        Err(FrontendError::Inner { inner: err })?;
+    }
+
+    // Deserialize the ok type
+    let payload = response.json::<R>()
+        .await
+        .map_err(FrontendError::<E>::from)
+        .with_context(|| format!("Deserializing OK response ({}) from {method} {url}", type_name::<E>()))?;
+
+    Ok(payload)
+} 
+
+
+pub async fn register(reg_user: &RegistrationUser) -> Result<(), FrontendError<RegisterError>> {
+    let creation_challenge_response: CreationChallengeResponse = json_request(
+        Method::POST, 
+        api::Auth::RegisterStart.path(),
+        Some(reg_user))
+        .await?;
 
     // Convert to the browser type
     let credential_creation_options: CredentialCreationOptions = creation_challenge_response.into();
@@ -215,24 +163,25 @@ pub async fn register(reg_user: &RegistrationUser) -> Result<RegisterResponse, E
         .navigator()
         .credentials()
         .create_with_options(&credential_creation_options)
-        .map_err(map_js_error).context("window.navigator.credentials.create::json_map_err")?;
+        .map_err(FrontendError::from)
+        .context("Creating credential request (window.navigator.credentials.create)")?;
     
     // Get the credentials
     let public_key_credential: PublicKeyCredential = JsFuture::from(cwo_fut)
         .await
-        .map_err(map_js_error).context("window.navigator.credentials.await")?
+        .map_err(FrontendError::from)
+        .context("Awaiting credential request (window.navigator.credentials.await)")?
         .into();
 
     // Convert to the rust type
     let register_public_key_credentials: RegisterPublicKeyCredential = public_key_credential.into();
 
     // Complete the registration with the server
-    Request::post(api::Auth::RegisterFinish.path())
-        .json(&register_public_key_credentials).context("json(RegisterPublicKeyCredential)")?
-        .send()
-        .await.context("RegisterFinish::send")?
-        .ok_result()
-        .await.context("RegisterFinish::ok_result")?;
-    
-    Ok(RegisterResponse::Ok)
+    json_request(
+        Method::POST, 
+        api::Auth::RegisterFinish.path(),
+        Some(&NoValidation(register_public_key_credentials)))
+        .await?;
+
+    Ok(())
 }

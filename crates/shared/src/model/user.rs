@@ -1,8 +1,10 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use crate::types::Uuid;
+use crate::{api::error::ValidationError, types::Uuid};
 
-#[cfg(feature="database")]
+use super::ValidateModel;
+
+#[cfg(feature="backend")]
 use {
     anyhow::Context,
     super::{ Credential, NewCredential },
@@ -13,11 +15,13 @@ use {
     webauthn_rs::prelude::Passkey,
 };
 
+const USERNAME_MIN_LENGTH: usize = 4;
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature="database", derive(Model))]
-#[cfg_attr(feature="database", table("user"))]
-#[cfg_attr(feature="database", check("../../../server/migrations/001-user/up.sql"))]
-#[cfg_attr(feature="database", enum_def)]
+#[cfg_attr(feature="backend", derive(Model))]
+#[cfg_attr(feature="backend", table("user"))]
+#[cfg_attr(feature="backend", check("../../../server/migrations/001-user/up.sql"))]
+#[cfg_attr(feature="backend", enum_def)]
 pub struct User {
     pub id: Uuid,
     pub username: String,
@@ -28,7 +32,7 @@ pub struct User {
     pub last_login_date: Option<DateTime<Utc>>,
 }
 
-#[cfg(feature="database")]
+#[cfg(feature="backend")]
 impl User {
     pub fn fetch_by_id(conn: &Connection, id: &Uuid) -> Result<User, anyhow::Error> {
         let (sql, values) = Query::select()
@@ -85,8 +89,8 @@ impl User {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature="database", derive(Model))]
-#[cfg_attr(feature="database", table("user"))]
+#[cfg_attr(feature="backend", derive(Model))]
+#[cfg_attr(feature="backend", table("user"))]
 pub struct NewUser {
     pub id: Uuid,
     pub username: String,
@@ -115,16 +119,28 @@ impl RegistrationUser {
     }
 }
 
+impl ValidateModel for RegistrationUser {
+    fn validate(&self) -> Result<(), ValidationError> {
+        if self.username.len() < USERNAME_MIN_LENGTH {
+            Err(ValidationError { 
+                error_messages: vec![
+                    format!("Username needs to be at least {USERNAME_MIN_LENGTH} characters long"),
+            ]})
+        } else {
+            Ok(())
+        }
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[cfg(feature="database")]
+#[cfg(feature="backend")]
 pub struct NewUserWithPasskey {
     pub id: Uuid,
     pub username: String,
     pub passkey: Passkey,
 }
 
-#[cfg(feature="database")]
+#[cfg(feature="backend")]
 impl NewUserWithPasskey {
     fn split(self) -> (NewUser, Passkey) {
         let Self { id, username, passkey } = self;
