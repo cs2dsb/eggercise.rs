@@ -1,4 +1,5 @@
 use leptos::{component, create_action, create_signal, logging::{log, warn}, view, IntoView, Show, Signal, SignalGet, SignalUpdate, SignalWith};
+use leptos_router::A;
 use shared::model::RegistrationUser;
 
 use crate::{api::register, components::RegistrationForm};
@@ -24,7 +25,7 @@ pub(crate) fn Register() -> impl IntoView {
                     set_register_error.update(|e| *e = None);
                 }, 
                 Err(err) => {   
-                    let msg = format!("{err}");
+                    let msg = format!("{:?}", err);
                     warn!("Error registering {reg_user:?}: {msg}");
                     set_register_error.update(|e| *e = Some(msg));
                 },
@@ -48,7 +49,8 @@ pub(crate) fn Register() -> impl IntoView {
                 }
             }
         > 
-            { register_response.into_view() }
+            <p>"Registration complete"</p>
+            <span>"You can now "</span><A href="login">login</A>
         </Show>
     }
 }

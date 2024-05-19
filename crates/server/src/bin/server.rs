@@ -1,3 +1,4 @@
+#![allow(unused)]
 use std::{
     fs::remove_file, net::{IpAddr, SocketAddr}, path::PathBuf, str::FromStr, sync::Arc
 };
@@ -9,7 +10,7 @@ use axum::{
 use clap::Parser;
 use deadpool_sqlite::{Config, Hook, Pool, Runtime};
 use server::{db::{self, DatabaseConnection}, AppError, PasskeyRegistrationState, SessionValue, Webauthn };
-use shared::{api::{self, RegisterStartResponse}, configure_tracing, load_dotenv, model::{Credential, NewUser, NewUserWithPasskey, RegistrationUser, User}};
+use shared::{api::{self, response_errors::RegisterError}, configure_tracing, load_dotenv, model::{Credential, NewUser, NewUserWithPasskey, RegistrationUser, User}};
 use tokio::net::TcpListener;
 use tower::ServiceBuilder;
 use tower_http::{
@@ -169,13 +170,13 @@ async fn register_start(
     webauthn: Webauthn,
     mut session: SessionValue,
     Json(reg_user): Json<RegistrationUser>,
-) -> Result<Json<RegisterStartResponse>, AppError> {
+) -> Result<Json<CreationChallengeResponse>, RegisterError> {
     
     // Remove the existing challenge
     session.take_passkey_registration_state().await?;
     
     if reg_user.username.len() < 4 {
-        return Ok(Json(RegisterStartResponse::UsernameInvalid { message: "Username needs to be at least 4 characters long".to_string() }));
+        Err(RegisterError::UsernameInvalid { message: "Username needs to be at least 4 characters".to_string() })?;
     }
 
     // let (user_id, existing_key_ids) = {
@@ -209,7 +210,7 @@ async fn register_start(
     };
 
     if existing {
-        return Ok(Json(RegisterStartResponse::UsernameUnavailable));
+        Err(RegisterError::UsernameUnavailable)?;
     }
 
     // Start the registration 
@@ -234,7 +235,7 @@ async fn register_finish(
     webauthn: Webauthn,
     mut session: SessionValue,
     Json(register_public_key_credential): Json<RegisterPublicKeyCredential>,
-) -> Result<StatusCode, AppError> {
+) -> Result<Json<()>, AppError> {
     // Get the challenge from the session
     let PasskeyRegistrationState {username, id, passkey_registration } = session
         .take_passkey_registration_state()
@@ -250,7 +251,7 @@ async fn register_finish(
         Ok::<_, anyhow::Error>(new_user.create(conn)?))
         .await??;
 
-    Ok(StatusCode::OK)
+    Ok(Json(()))
 }
 
 #[allow(unused_variables)]

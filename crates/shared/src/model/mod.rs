@@ -1,9 +1,15 @@
 mod user;
 pub use user::*;
 
-#[cfg(feature="database")]
+#[cfg(feature="backend")]
 mod credential;
-#[cfg(feature="database")]
+#[cfg(feature="backend")]
 pub use credential::*;
 
+use crate::api::error::ValidationError;
+
 pub mod auth;
+
+pub trait ValidateModel {
+    fn validate(&self) -> Result<(), ValidationError>;
+}
