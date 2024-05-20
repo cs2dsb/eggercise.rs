@@ -4,9 +4,13 @@ use super::error::{
     ErrorContext,
     ServerError,
 };
+use std::fmt;
+use thiserror::Error;
 
 #[cfg(feature="backend")]
 use axum::{ Json, response::{IntoResponse, Response}};
+
+
 
 // Generates an enum that includes a "Server" variant for generic status+message errors 
 macro_rules! response_error {
@@ -17,7 +21,7 @@ macro_rules! response_error {
             $({ $($var_struct_body_tt:tt)* })? 
         ,)* 
     }) => {
-        #[derive(Debug, Clone, Serialize, Deserialize)]
+        #[derive(Debug, Clone, Serialize, Deserialize, Error)]
         pub enum $name {
             $($variant $({
                 $($var_struct_body_tt)* 
@@ -32,27 +36,63 @@ macro_rules! response_error {
             WithContext { context: String, inner: Box<Self> },
         }
 
-        impl From<ServerError> for $name {
-            fn from(ServerError { code, message }: ServerError) -> Self {
-                Self::Server{
+        impl fmt::Display for $name {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                match &self {
+                    $(Self::$variant { .. } => write!(f, "{}::{}: {:?}", stringify!($name), stringify!($variant), self),)*
+                    Self::Server { code, message } => write!(f, "{}::Server: {code}, {message}", stringify!($name)),
+                    Self::WithContext { inner, context } => {
+                        inner.fmt(f)?;
+                        write!(f, "\nContext: {context}")
+                    },
+                }
+            }
+        }
+
+        // impl From<ServerError> for $name {
+        //     fn from(ServerError { code, message }: ServerError) -> Self {
+        //         Self::Server{
+        //             code,
+        //             message,
+        //         }
+        //     }
+        // }
+
+        impl<T> From<T> for $name 
+        where
+            T: Into<ServerError>
+        {
+            fn from(err: T) -> Self {
+                let ServerError { code, message } = err.into();
+                Self::Server {
                     code,
                     message,
                 }
             }
         }
 
-        #[cfg(feature="backend")]
-        impl<E> From<E> for $name
-        where
-            E: Into<Box<dyn std::error::Error>>,
-        {
-            fn from(err: E) -> Self {
-                ServerError::new(
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    format!("Something went wrong: {:?}", err.into()),
-                ).into()
-            }
-        }
+        // #[cfg(feature="backend")]
+        // impl<E> From<E> for $name
+        // where
+        //     E: Into<Box<dyn std::error::Error>>,
+        // {
+        //     fn from(err: E) -> Self {
+        //         ServerError::new(
+        //             StatusCode::INTERNAL_SERVER_ERROR,
+        //             format!("Something went wrong: {:?}", err.into()),
+        //         ).into()
+        //     }
+        // }
+
+        // #[cfg(feature="backend")]
+        // impl From<BackendError> for $name {
+        //     fn from(err: BackendError) -> Self {
+        //         ServerError::new(
+        //             StatusCode::INTERNAL_SERVER_ERROR,
+        //             format!("Something went wrong: {:?}", err),
+        //         ).into()
+        //     }
+        // }
 
         #[cfg(feature="backend")]
         impl $name {
@@ -102,3 +142,4 @@ response_error!(LoginError {
     UserHasNoCredentials,
 });
 
+response_error!(FetchError {});

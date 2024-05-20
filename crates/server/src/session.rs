@@ -1,7 +1,11 @@
-use axum::{async_trait, extract::FromRequestParts, http::{request::Parts, StatusCode}};
+use std::fmt::Display;
+
+use axum::{async_trait, extract::FromRequestParts, http::{header::{ACCEPT, CONTENT_TYPE}, request::Parts, StatusCode}, response::{IntoResponse, Response}, Json};
+use futures::TryFutureExt;
 use serde::{Deserialize, Serialize};
-use shared::types::Uuid;
+use shared::{model::{User, UserId}, types::Uuid};
 use tower_sessions::Session;
+use tracing::error;
 use webauthn_rs::prelude::{PasskeyAuthentication, PasskeyRegistration};
 
 
@@ -37,12 +41,24 @@ impl PasskeyAuthenticationState {
     }
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct UserState {
+    pub id: UserId,
+}
 
+impl From<&User> for UserState {
+    fn from(value: &User) -> Self {
+        Self {
+            id: value.into()
+        }
+    }
+}
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 struct SessionData {
     passkey_registration_state: Option<PasskeyRegistrationState>,
     passkey_authentication_state: Option<PasskeyAuthenticationState>,
+    user_state: Option<UserState>,
 }
 
 #[derive(Debug, Clone)]
@@ -78,6 +94,18 @@ impl SessionValue {
         Ok(())
     }
 
+    pub async fn take_user_state(&mut self) -> Result<Option<UserState>, anyhow::Error> {
+        let user_id = self.data.user_state.take();
+        Self::update_session(&self.session, &self.data).await?;
+        Ok(user_id)
+    }
+
+    pub async fn set_user_state(&mut self, user: &User) -> Result<(), anyhow::Error> {
+        self.data.user_state = Some(user.into());
+        Self::update_session(&self.session, &self.data).await?;
+        Ok(())
+    }
+
     async fn update_session(session: &Session, data: &SessionData) -> Result<(), anyhow::Error> {
         session
             .insert(Self::SESSION_DATA_KEY, data.clone())
@@ -106,5 +134,83 @@ where
             .unwrap_or_default();
 
         Ok(Self { session, data })
+    }
+}
+
+pub struct JsonOrText<T: Serialize + Display> {
+    json: bool,
+    code: StatusCode, 
+    body: T,
+}
+
+impl<T: Serialize + Display> JsonOrText<T> {
+    pub fn new(json: bool, code: StatusCode, body: T) -> Self {
+        Self { json, code, body }
+    }
+}
+
+impl<T: Serialize + Display> IntoResponse for JsonOrText<T> {
+    fn into_response(self) -> Response {
+        let Self { json, code, body } = self;
+
+        if json {
+            (code, Json(body)).into_response()
+        } else {
+            (code, format!("{}", body)).into_response()
+        }
+    }
+}
+
+#[async_trait]
+impl<S> FromRequestParts<S> for UserState
+where 
+    S: Send + Sync
+{
+    type Rejection = JsonOrText<&'static str>;
+
+    async fn from_request_parts(req: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
+        let accept_json = req.headers
+            .get(ACCEPT)
+            .map(|v| v
+                .to_str()
+                .map(|v| {
+                    v.contains(mime::APPLICATION_JSON.essence_str())
+                })
+                .unwrap_or(false));
+
+        let content_type_is_json = req.headers
+            .get(CONTENT_TYPE)
+            .map(|v| v
+                .to_str()
+                .map(|v| {
+                    v == mime::APPLICATION_JSON.essence_str()
+                })
+                .unwrap_or(false));
+
+        let json_reply = match (accept_json, content_type_is_json) {
+            (Some(false), _) => false,
+            (None, Some(false)) => false,
+            (Some(true), _) => true,
+            (None, Some(true)) => true,
+            (None, None) => true,
+        };
+
+        macro_rules! not_logged_in {
+            // TODO: need to return a sensible struct that the client can deserialize
+            () => { JsonOrText::new(json_reply, StatusCode::UNAUTHORIZED, "Not logged in") };
+        } 
+
+        let session_value = SessionValue::from_request_parts(req, state)
+            .map_err(|e| {
+                error!("Failed to extract SessionValue: {:?}", e);
+                not_logged_in!()
+            })
+            .await?;
+
+        if let Some(user_id) = session_value.data.user_state {
+            Ok(user_id)
+        } else {
+            Err(not_logged_in!())
+        }
     }
 }

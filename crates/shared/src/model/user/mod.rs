@@ -9,3 +9,6 @@ pub use registration::*;
 
 mod login;
 pub use login::*;
+
+mod id;
+pub use id::*;

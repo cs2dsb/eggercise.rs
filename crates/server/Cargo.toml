@@ -25,6 +25,9 @@ sea-query.workspace = true
 sea-query-rusqlite.workspace = true
 webauthn-rs = { workspace = true, features = [ "danger-allow-state-serialisation" ] }
 axum.workspace = true
+deadpool.workspace = true
+deadpool-sqlite.workspace = true
+mime.workspace = true
 
 # Session management
 tower-sessions = "0.12.2"
@@ -68,10 +71,6 @@ tower = "0.4.13"
 zstd = "0.13.1"
 
 walkdir = "2.5.0"
-
-# Connection pooling for rusqlite
-deadpool-sqlite = { version = "0.7.0", features = [ "tracing" ] }
-deadpool = "^0.11.0"
 
 # Reduce rusqlite boilerplate when se/de rusqlite stmts/rows
 exemplar = "0.9.0"

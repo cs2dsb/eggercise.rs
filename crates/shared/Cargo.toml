@@ -4,8 +4,8 @@ edition.workspace = true
 version.workspace = true
 
 [features]
-backend = [ "rusqlite/serde_json", "serde_json", "exemplar", "sea-query", "sea-query-rusqlite", "uuid/v4", "webauthn-rs", "axum" ]
-frontend = [ "web-sys", "wasm-bindgen", "gloo-net" ]
+backend = [ "rusqlite/serde_json", "serde_json", "exemplar", "sea-query", "sea-query-rusqlite", "uuid/v4", "webauthn-rs", "axum", "deadpool-sqlite" ]
+frontend = [ "web-sys", "wasm-bindgen", "gloo-net", "leptos" ]
 
 [dependencies]
 tracing.workspace = true
@@ -22,6 +22,8 @@ http.workspace = true
 serde_with.workspace = true
 http-serde.workspace = true
 
+deadpool-sqlite = { workspace = true, optional = true }
+leptos = { workspace = true, optional = true }
 wasm-bindgen = { workspace = true, optional = true }
 gloo-net = { workspace = true, optional = true }
 web-sys = { workspace = true, optional = true }
