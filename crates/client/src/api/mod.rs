@@ -1,7 +1,7 @@
-use std::{any::type_name, fmt::Debug};
+use std::{any::type_name, fmt::{Debug, Display}};
 
 use mime::APPLICATION_JSON;
-use http::header;
+use http::header::{self, ACCEPT};
 use gloo_net::http::{ RequestBuilder, Response, Method};
 use serde::{de::DeserializeOwned, Serialize};
 
@@ -15,6 +15,9 @@ pub use register::*;
 
 mod login;
 pub use login::*;
+
+mod fetch_user;
+pub use fetch_user::*;
 
 
 pub trait ResponseContentType: Sized {
@@ -31,7 +34,7 @@ pub async fn json_request<B, R, E>(method: Method, url: &str, body: Option<&B>) 
 where
     B: Serialize + Debug + ValidateModel, 
     R: DeserializeOwned, 
-    E: DeserializeOwned
+    E: DeserializeOwned + Display
 {
     // Check the body is valid
     if let Some(body) = body {
@@ -39,12 +42,13 @@ where
     }
 
     let builder = RequestBuilder::new(url)
-        .method(method.clone());
+        .method(method.clone())
+        .header(ACCEPT.as_str(), APPLICATION_JSON.essence_str());
 
-    // Add the json body. Use json(()) when there is no body so it still sets the other relevant headers
+    // Add the json body or set the releavant headers
     let request = match body {
             Some(body) => builder.json(body),
-            None => builder.json(&()),
+            None => builder.build(),
         }
         .map_err(FrontendError::from)
         .with_context(|| format!("Converting {:?} to json body (for: {method} {url}", body))?;

@@ -16,6 +16,7 @@ serde.workspace = true
 wasm-bindgen-futures.workspace = true
 wasm-bindgen.workspace = true
 http.workspace = true
+mime.workspace = true
 webauthn-rs-proto = { workspace = true, features = [ "wasm" ] }
 web-sys = { workspace = true, features = [
     "CredentialCreationOptions",
@@ -27,6 +28,5 @@ web-sys = { workspace = true, features = [
 ] }
 
 
-mime = "0.3.17"
 
 shared = { path = "../shared", features = [ "frontend" ] }

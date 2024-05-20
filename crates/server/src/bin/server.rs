@@ -10,8 +10,8 @@ use axum::{
 use chrono::Utc;
 use clap::Parser;
 use deadpool_sqlite::{Config, Hook, Pool, Runtime};
-use server::{db::{self, DatabaseConnection}, AppError, PasskeyAuthenticationState, PasskeyRegistrationState, SessionValue, Webauthn };
-use shared::{api::{self, response_errors::{LoginError, RegisterError}}, configure_tracing, load_dotenv, model::{Credential, LoginUser, NewUser, NewUserWithPasskey, RegistrationUser, User}};
+use server::{db::{self, DatabaseConnection}, AppError, PasskeyAuthenticationState, PasskeyRegistrationState, SessionValue, UserState, Webauthn };
+use shared::{api::{self, error::ServerError, response_errors::{FetchError, LoginError, RegisterError}}, configure_tracing, load_dotenv, model::{Credential, LoginUser, NewUser, NewUserWithPasskey, RegistrationUser, User}};
 use tokio::net::TcpListener;
 use tower::ServiceBuilder;
 use tower_http::{
@@ -19,7 +19,7 @@ use tower_http::{
     set_header::SetResponseHeaderLayer,
     trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer},
 };
-use tower_sessions::{MemoryStore, SessionManagerLayer};
+use tower_sessions::{cookie::time::Duration, Expiry, MemoryStore, SessionManagerLayer};
 use tracing::{debug, info, Level};
 use webauthn_rs::{prelude::{CreationChallengeResponse, PasskeyAuthentication, PublicKeyCredential, RegisterPublicKeyCredential, RequestChallengeResponse, Url, Uuid}, WebauthnBuilder};
 
@@ -42,6 +42,9 @@ struct Cli {
     webauthn_origin: String,
     #[arg(long, env, default_value = "127.0.0.1")]
     webauthn_id: String,
+    #[arg(long, env, default_value = "30")]
+    session_expiry_days: i64,
+
 
     /// Deletes the database before starting the main program for debug purposes
     #[arg(long, env, default_value = "false")]
@@ -135,8 +138,7 @@ async fn main() -> Result<(), anyhow::Error> {
             .route(api::Auth::RegisterFinish.path(),  post(register_finish))
             .route(api::Auth::LoginStart.path(),  post(login_start))
             .route(api::Auth::LoginFinish.path(),  post(login_finish))
-            .route(api::Object::User.id_path(), get(fetch_user))
-            .route(api::Object::User.path(), post(create_user))
+            .route(api::Object::User.path(), get(fetch_user))
             .nest_service(
                 "/wasm/service_worker.js",
                 ServiceBuilder::new()
@@ -155,7 +157,8 @@ async fn main() -> Result<(), anyhow::Error> {
                     .make_span_with(DefaultMakeSpan::new().level(Level::INFO))
                     .on_response(DefaultOnResponse::new().level(Level::INFO)))
                 .layer(SessionManagerLayer::new(MemoryStore::default())
-                    .with_secure(args.secure_sessions))
+                    .with_secure(args.secure_sessions)
+                    .with_expiry(Expiry::OnInactivity(Duration::days(args.session_expiry_days))))
             )
             .with_state(state)
     )
@@ -175,7 +178,10 @@ async fn register_start(
 ) -> Result<Json<CreationChallengeResponse>, RegisterError> {
     
     // Remove the existing challenge
-    session.take_passkey_registration_state().await?;
+    // session.take_passkey_registration_state().await?;
+    session.take_passkey_registration_state().await
+        .map_err(|e| ServerError::from(e))
+        .map_err(|e| RegisterError::from(e))?;
     
     if reg_user.username.len() < 4 {
         Err(RegisterError::UsernameInvalid { message: "Username needs to be at least 4 characters".to_string() })?;
@@ -378,37 +384,28 @@ async fn login_finish(
         user.last_login_date = Some(now);
         user.update(&tx)?;
 
+        tx.commit()?;
+
         Ok(user)
     }).await??;
+
+    // Update the user state in the session so the user is logged in on furture requests
+    session.set_user_state(&user).await?;
 
     Ok(Json(user))
 }
 
-
-#[allow(unused_variables)]
-async fn create_user(
-    DatabaseConnection(conn): DatabaseConnection,
-    Json(new_user): Json<NewUser>,
-) -> Result<Json<User>, AppError> {
-    let results = conn.interact(|conn|
-        Ok::<_, anyhow::Error>(User::create(conn, new_user)?))
-        .await??;
-
-    Ok(Json(results))
-}
-
-
 #[allow(unused_variables)]
 async fn fetch_user(
-    DatabaseConnection(_conn): DatabaseConnection,
-    Path(_id): Path<i64>,
-) -> Result<Json<User>, AppError> {
-    todo!()
-    // let results = conn.interact(move |conn|
-    //     Ok::<_, anyhow::Error>(User::fetch_by_id(conn, id)?))
-    //     .await??;
+    DatabaseConnection(conn): DatabaseConnection,
+    user_state: UserState,
+) -> Result<Json<User>, FetchError> 
+{
+    let user = conn.interact(move |conn| 
+        Ok::<_, anyhow::Error>(user_state.id.fetch_full_user(conn)?))
+        .await??;
 
-    // Ok(Json(results))
+    Ok(Json(user))
 }
 
 

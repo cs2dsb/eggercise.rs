@@ -1,4 +1,4 @@
-use std::ops::{Deref, DerefMut};
+use std::{fmt, ops::{Deref, DerefMut}};
 
 use http::StatusCode;
 use serde::{Deserialize, Serialize};
@@ -10,7 +10,11 @@ use crate::model::ValidateModel;
 
 #[cfg(feature="frontend")]
 mod frontend {
+    use std::{fmt::{self, Display}, ops::Deref};
+
     use super::{ErrorContext, ValidationError, WrongContentTypeError};
+    use leptos::IntoView;
+    use serde::{Deserialize, Serialize};
     use thiserror::Error;
     use wasm_bindgen::{JsCast, JsValue};
     use web_sys::js_sys::{
@@ -22,7 +26,6 @@ mod frontend {
         TypeError as JsTypeError,
         UriError as JsUriError,
     };
-
 
     #[derive(Debug, Clone, Error)]
     pub enum JsError {
@@ -72,42 +75,78 @@ mod frontend {
         }
     }
 
-    #[derive(Debug, Clone)]
-    pub enum FrontendError<T> {
+    #[derive(Debug, Clone, Error)]
+    pub enum FrontendError<T: Display> {
+        #[error("{inner}")]
         Inner { inner: T },
+        #[error("{message}")]
         Client { message: String },
-        Js { inner: JsError },
+        #[error("{inner}")]
+        Js { inner: String },
+        #[error("{inner}")]
         Validation { inner: ValidationError },
+        #[error("{inner}")]
         WrongContentType { inner: WrongContentTypeError },
-
+        #[error("{inner}\nContext: {context}")]
         WithContext { context: String, inner: Box<Self> },
     }
 
-    impl<T> From<gloo_net::Error> for FrontendError<T> {
+    #[derive(Debug, Clone, Serialize, Deserialize, Error)]
+    pub struct Nothing {}
+
+    impl fmt::Display for Nothing {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(f, "()")
+        }
+    }
+
+    #[derive(Debug, Clone, Error)]
+    pub struct FrontendErrorOnly (FrontendError<Nothing>);
+
+    impl fmt::Display for FrontendErrorOnly {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            self.0.fmt(f)
+        }
+    }
+
+    impl Deref for FrontendErrorOnly {
+        type Target = FrontendError<Nothing>;
+        fn deref(&self) -> &Self::Target {
+            &self.0
+        }
+    }
+
+    impl From<FrontendError<Nothing>> for FrontendErrorOnly {
+        fn from(value: FrontendError<Nothing>) -> Self {
+            Self(value)
+        }
+    }
+
+    impl<T: Display> From<gloo_net::Error> for FrontendError<T> {
         fn from(value: gloo_net::Error) -> Self {
             Self::Client { message: format!("gloo-net error: {}", value.to_string()) }
         }
     }
 
-    impl<T> From<ValidationError> for FrontendError<T> {
+    impl<T: Display> From<ValidationError> for FrontendError<T> {
         fn from(inner: ValidationError) -> Self {
             Self::Validation { inner }
         }
     }
 
-    impl<T> From<WrongContentTypeError> for FrontendError<T> {
+    impl<T: Display> From<WrongContentTypeError> for FrontendError<T> {
         fn from(inner: WrongContentTypeError) -> Self {
             Self::WrongContentType { inner }
         }
     }
 
-    impl <T> From<JsValue> for FrontendError<T> {
+    impl <T: Display> From<JsValue> for FrontendError<T> {
         fn from(value: JsValue) -> Self {
-            Self::Js { inner: JsError::from(value) }
+            Self::Js { inner: JsError::from(value).to_string() }
         }
     }
 
-    impl<T, E: Into<FrontendError<T>>> ErrorContext<FrontendError<T>> for E {
+    impl<T: Display, E: Into<FrontendError<T>>> ErrorContext<FrontendError<T>> for E {
         fn with_context<S: Into<String>, F: FnOnce() -> S>(self, context: F) -> FrontendError<T> {
             self.context(context())
         }
@@ -116,6 +155,18 @@ mod frontend {
                 context: context.into(),
                 inner: Box::new(self.into()),
             }
+        }
+    }
+
+    impl<T: Display> IntoView for FrontendError<T> {
+        fn into_view(self) -> leptos::View {
+            todo!()
+        }
+    }
+
+    impl IntoView for FrontendErrorOnly {
+        fn into_view(self) -> leptos::View {
+            todo!()
         }
     }
 }
@@ -128,9 +179,25 @@ pub struct WrongContentTypeError {
     pub body: String,
 }
 
+impl fmt::Display for WrongContentTypeError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Wrong content type, expected {} but got {:?}. Body: {}", self.expected, self.got, self.body)
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ValidationError {
     pub error_messages: Vec<String>,
+}
+
+impl fmt::Display for ValidationError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "Validation error(s):")?;
+        for e in self.error_messages.iter() {
+            writeln!(f, "   {e}")?;
+        }
+        Ok(())
+    }
 }
 
 
@@ -148,6 +215,7 @@ impl<T: Serialize> Serialize for NoValidation<T> {
     }
 }
 
+
 impl<T> Deref for NoValidation<T> {
     type Target = T;
     fn deref(&self) -> &Self::Target {
@@ -162,6 +230,12 @@ impl<T> DerefMut for NoValidation<T> {
 }
 
 impl<T> ValidateModel for NoValidation<T> {
+    fn validate(&self) -> Result<(), ValidationError> {
+        Ok(())
+    }
+}
+
+impl ValidateModel for () {
     fn validate(&self) -> Result<(), ValidationError> {
         Ok(())
     }
@@ -199,6 +273,7 @@ impl<T, E: ErrorContext<E>> ResultContext<T, E> for Result<T, E> {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct ServerError {
     pub code: StatusCode,
     pub message: String,
@@ -210,5 +285,46 @@ impl ServerError {
             code,
             message: message.into(),
         }
+    }
+}
+
+// impl<E> From<E> for ServerError
+// where
+//     E: Into<Box<dyn std::error::Error>>,
+// {
+//     fn from(err: E) -> Self {
+//         Self::new(
+//             StatusCode::INTERNAL_SERVER_ERROR,
+//             format!("Something went wrong: {:?}", err.into()),
+//         )
+//     }
+// }
+
+impl From<anyhow::Error> for ServerError {
+    fn from(err: anyhow::Error) -> Self {
+        Self::new(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Something went wrong: {:?}", err),
+        )
+    }
+}
+
+#[cfg(feature="backend")]
+impl From<deadpool_sqlite::InteractError> for ServerError {
+    fn from(err: deadpool_sqlite::InteractError) -> Self {
+        Self::new(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Something went wrong: {:?}", err),
+        )
+    }
+}
+
+#[cfg(feature="backend")]
+impl From<webauthn_rs::prelude::WebauthnError> for ServerError {
+    fn from(err: webauthn_rs::prelude::WebauthnError) -> Self {
+        Self::new(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Something went wrong: {:?}", err),
+        )
     }
 }

@@ -4,7 +4,7 @@ resolver = "2"
 
 [workspace.package]
 edition = "2021"
-version = "0.0.32"
+version = "0.0.33"
 
 # This is used for the service worker wasm package
 [profile.dev-min-size]
@@ -24,6 +24,12 @@ http = "1.1.0"
 
 # Web framework
 axum = {version = "0.7.5", features = [ "macros" ] }
+
+mime = "0.3.17"
+
+# Connection pooling for rusqlite
+deadpool-sqlite = { version = "0.7.0", features = [ "tracing" ] }
+deadpool = "^0.11.0"
 
 # Helper attributes for serde
 serde_with = "3.8.1"

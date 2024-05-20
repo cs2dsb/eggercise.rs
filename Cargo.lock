@@ -478,7 +478,7 @@ checksum = "98cc8fbded0c607b7ba9dd60cd98df59af97e84d24e49c8557331cfc26d301ce"
 
 [[package]]
 name = "client"
-version = "0.0.32"
+version = "0.0.33"
 dependencies = [
  "console_error_panic_hook",
  "gloo-net",
@@ -2562,7 +2562,7 @@ dependencies = [
 
 [[package]]
 name = "server"
-version = "0.0.32"
+version = "0.0.33"
 dependencies = [
  "anyhow",
  "axum",
@@ -2578,6 +2578,7 @@ dependencies = [
  "glob",
  "include_dir",
  "leptos",
+ "mime",
  "rusqlite",
  "rusqlite_migration",
  "sea-query",
@@ -2655,7 +2656,7 @@ dependencies = [
 
 [[package]]
 name = "service-worker"
-version = "0.0.32"
+version = "0.0.33"
 dependencies = [
  "console_error_panic_hook",
  "gloo-utils",
@@ -2689,18 +2690,20 @@ dependencies = [
 
 [[package]]
 name = "shared"
-version = "0.0.32"
+version = "0.0.33"
 dependencies = [
  "anyhow",
  "axum",
  "cargo_toml",
  "chrono",
  "const_format",
+ "deadpool-sqlite",
  "dotenv",
  "exemplar",
  "gloo-net",
  "http 1.1.0",
  "http-serde",
+ "leptos",
  "rusqlite",
  "sea-query",
  "sea-query-rusqlite",
