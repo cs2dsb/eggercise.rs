@@ -171,7 +171,6 @@ async fn main() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-#[allow(unused_variables)]
 async fn fetch_user(
     DatabaseConnection(conn): DatabaseConnection,
     user_state: UserState,

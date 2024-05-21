@@ -348,7 +348,6 @@ impl<T: Serialize> Serialize for NoValidation<T> {
     }
 }
 
-
 impl<T> Deref for NoValidation<T> {
     type Target = T;
     fn deref(&self) -> &Self::Target {
@@ -400,12 +399,6 @@ where
         }
     }
 }
-
-
-
-
-
-
 
 pub trait ErrorContext<E>: Sized {
     /// Add helpful context to errors
