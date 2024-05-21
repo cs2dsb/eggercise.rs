@@ -19,6 +19,11 @@
 - [x] Login
 - [x] Add Key
     - [ ] Add key with authentication given by another device (i.e. allow phone to access it from desktop login session)
+        1. Click add new device after logging in
+        2. Generate a random page /user/:id/add_key/:uuid
+        3. Encode url as QR code, show it to the user and instruct them to scan it
+        4. On the random page, perform the key dance but don't activate it yet.
+        5. Update the original page to approve the new device "Would you like to add new device blah blah with key blah blah to your account?"
 
 ## Docker build
 - Mount sqlite db 
