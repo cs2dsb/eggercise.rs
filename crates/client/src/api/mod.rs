@@ -19,6 +19,8 @@ pub use login::*;
 mod fetch_user;
 pub use fetch_user::*;
 
+mod add_key;
+pub use add_key::*;
 
 pub trait ResponseContentType: Sized {
     fn content_type(&self) -> Option<String>;

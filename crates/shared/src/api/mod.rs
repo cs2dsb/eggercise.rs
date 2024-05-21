@@ -31,6 +31,8 @@ pub enum Auth {
     RegisterFinish,
     LoginStart,
     LoginFinish,
+    RegisterNewKeyStart,
+    RegisterNewKeyFinish,
 }
 
 impl Auth {
@@ -41,7 +43,8 @@ impl Auth {
             RegisterFinish => concatcp!(API_BASE_PATH, "auth/register/finish"),
             LoginStart => concatcp!(API_BASE_PATH, "auth/login/start"),
             LoginFinish => concatcp!(API_BASE_PATH, "auth/login/finish"),
-
+            RegisterNewKeyStart => concatcp!(API_BASE_PATH, "auth/register_key/start"),
+            RegisterNewKeyFinish => concatcp!(API_BASE_PATH, "auth/register_key/finish"),
         }
     }
 }

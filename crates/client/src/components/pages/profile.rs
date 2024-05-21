@@ -1,6 +1,13 @@
-use leptos::{component, create_local_resource, view, IntoView, SignalWith, ErrorBoundary, CollectView};
+use leptos::{
+    component, create_action, create_local_resource, create_signal, 
+    logging::{log, warn}, view, CollectView, ErrorBoundary, IntoView, 
+    Signal, SignalGet, SignalUpdate, SignalWith, Show,
+};
 use shared::model::User;
-use crate::api::fetch_user;
+use crate::{
+    api::{add_key, fetch_user},
+    components::forms::AddKeyForm,
+};
 
 #[component]
 pub fn UserView(user: User) -> impl IntoView {
@@ -11,12 +18,39 @@ pub fn UserView(user: User) -> impl IntoView {
 
 #[component]
 pub fn Profile() -> impl IntoView {
-
+    // Resources
     let user = create_local_resource(move || (), |_| fetch_user());
+    
+    // Signals
+    let (add_key_response, set_add_key_response) = create_signal(None);
+    let (add_key_error, set_add_key_error) = create_signal(None::<String>);
+    let (wait_for_response, set_wait_for_response) = create_signal(false);
+    let disabled = Signal::derive(move || wait_for_response.get());
+
+    // Actions
+    let add_key_action = create_action(move |_: &()| {
+        log!("Adding new key...");
+        async move {
+            set_wait_for_response.update(|w| *w = true);
+            
+            match add_key().await {
+                Ok(res) => {
+                    set_add_key_response.update(|v| *v = Some(res));
+                    set_add_key_error.update(|e| *e = None);
+                }, 
+                Err(err) => {   
+                    let msg = format!("{:?}", err);
+                    warn!("Error adding key: {msg}");
+                    set_add_key_error.update(|e| *e = Some(msg));
+                },
+            }
+            
+            set_wait_for_response.update(|w| *w = false);
+        }
+    });
 
     view! {
         <div>
-            <p>"With EB"</p>
             <ErrorBoundary fallback=|errors| view! {
                 <div style="color:red">
                     <p>Error:</p>
@@ -34,50 +68,24 @@ pub fn Profile() -> impl IntoView {
                     <UserView 
                         user=u.clone()
                     />
+                    <Show 
+                        when=move || add_key_response.with(|r| r.is_some())
+                        fallback=move || {
+                            view! {
+                                <AddKeyForm
+                                    action=add_key_action
+                                    error=add_key_error
+                                    disabled
+                                />
+                            }
+                        }
+                    > 
+                        <p>"New key added"</p>
+                    </Show>
                 }
             })}
             </ErrorBoundary>
             
         </div>
     }
-    /*
-    // Resources
-    let user = create_local_resource(|| (), |_| async move {
-        fetch_user().await
-    });
-
-    let cats_view = move || {
-        user.and_then(|data| {
-            view! { <p> { format!("{:?}", data) } </p> }
-        })
-    };
-
-    view! {
-        <h2>"Profile"</h2>
-        <ErrorBoundary fallback=|errors| view! {
-            <div style="color:red">
-                <p>Error:</p>
-                <ul>
-                { move || errors.with(|v| 
-                    v.iter()
-                     .map(|(_, e)| view! { <li> { e.to_string() } </li>})
-                     .collect_view())
-                }
-                </ul>
-            </div>
-        }>
-            <Show 
-                when=move || user.loading().get()
-                fallback=move || {
-                    view! {
-                        <p>"Fetching user..."</p>
-                    }
-                }
-            > 
-                <p>"Current user:"</p>
-                <div>{ cats_view }</div>
-            </Show>
-        </ErrorBoundary>
-    }
-    */
 }
