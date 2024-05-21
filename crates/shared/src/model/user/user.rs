@@ -6,10 +6,20 @@ use crate::types::Uuid;
 
 #[cfg(feature="backend")]
 use {
+
+    webauthn_rs::prelude::Passkey,
+
     std::error::Error,
     crate::{
-        model::NewUser,
-        api::error::ServerError,
+        model::{
+            NewUser,
+            Credential, 
+            NewCredential,
+        },
+        api::error::{
+            ServerError,
+            ServerErrorContext,
+        }, 
     },
     exemplar::Model,
     rusqlite::{Connection, OptionalExtension},
@@ -105,5 +115,25 @@ impl User {
         stmt.execute(&*values.as_params())?;
 
         Ok(())
+    }
+
+    pub fn add_passkey<T: Error>(mut self, conn: &mut Connection, passkey: Passkey) -> Result<Credential, ServerError<T>> {
+        let tx = conn.transaction()?;
+
+        let new_credential = NewCredential::new(self.id.clone(), passkey.into());
+
+        let credential = {
+            new_credential.insert(&tx)
+                .context("User::add_passkey::insert(Credential)")?;
+            Credential::fetch(&tx, &new_credential.id)
+                .context("User::add_passkey::fetch(Credential)")?
+        };
+
+        self.last_updated_date = credential.creation_date;
+        self.update(&tx)?;
+
+        tx.commit()?;
+
+        Ok(credential)
     }
 }

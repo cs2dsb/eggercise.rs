@@ -1,3 +1,5 @@
+use std::ops::Deref;
+
 use serde::{Deserialize, Serialize};
 use crate::{ model::User, types::Uuid };
 
@@ -7,6 +9,13 @@ use rusqlite::Connection;
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct UserId {
     pub id: Uuid,
+}
+
+impl Deref for UserId {
+    type Target = Uuid;
+    fn deref(&self) -> &Self::Target {
+        &self.id
+    }
 }
 
 impl From<&User> for UserId {
