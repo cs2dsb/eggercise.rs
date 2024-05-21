@@ -1,14 +1,32 @@
 use std::{
-    fs::remove_file, net::{IpAddr, SocketAddr}, path::PathBuf, str::FromStr, sync::Arc
+    fs::remove_file,
+    net::{IpAddr, SocketAddr},
+    path::PathBuf,
+    str::FromStr,
+    sync::Arc,
 };
 
 use anyhow::Context;
 use axum::{
-    extract::FromRef, http::{HeaderName, HeaderValue, Method, StatusCode, Uri}, middleware, response::{IntoResponse, Response}, routing::{get, post}, Json, Router
+    extract::FromRef,
+    http::{HeaderName, HeaderValue, Method, StatusCode, Uri},
+    middleware,
+    response::{IntoResponse, Response},
+    routing::{get, post},
+    Json, Router,
 };
 use clap::Parser;
 use deadpool_sqlite::{Config, Hook, Pool, Runtime};
-use shared::{api::{self, error::ServerError, response_errors::FetchError}, configure_tracing, load_dotenv, model::User};
+use server::{
+    db::{self, DatabaseConnection},
+    routes::auth::*,
+    AppError, UserState,
+};
+use shared::{
+    api::{self, error::ServerError, response_errors::FetchError},
+    configure_tracing, load_dotenv,
+    model::User,
+};
 use tokio::net::TcpListener;
 use tower::ServiceBuilder;
 use tower_http::{
@@ -19,11 +37,6 @@ use tower_http::{
 use tower_sessions::{cookie::time::Duration, Expiry, MemoryStore, SessionManagerLayer};
 use tracing::{debug, info, Level};
 use webauthn_rs::{prelude::Url, WebauthnBuilder};
-
-use server::{
-    db::{self, DatabaseConnection}, AppError, UserState,
-    routes::auth::*,
-};
 
 #[derive(Debug, Parser)]
 #[clap(name = "eggercise server")]
@@ -46,7 +59,6 @@ struct Cli {
     webauthn_id: String,
     #[arg(long, env, default_value = "30")]
     session_expiry_days: i64,
-
 
     /// Deletes the database before starting the main program for debug purposes
     #[arg(long, env, default_value = "false")]
@@ -73,16 +85,22 @@ impl FromRef<AppState> for Arc<webauthn_rs::Webauthn> {
 }
 
 fn build_webauthn(args: &Cli) -> Result<webauthn_rs::Webauthn, anyhow::Error> {
-    let rp_name =format!("eggercise.rs on {}", &args.webauthn_origin);
-    let url = Url::parse(&args.webauthn_origin)
-        .with_context(|| format!("Parsing \"{}\" as webauthn origin URL", &args.webauthn_origin))?;
+    let rp_name = format!("eggercise.rs on {}", &args.webauthn_origin);
+    let url = Url::parse(&args.webauthn_origin).with_context(|| {
+        format!(
+            "Parsing \"{}\" as webauthn origin URL",
+            &args.webauthn_origin
+        )
+    })?;
 
-    let builder = WebauthnBuilder::new(&args.webauthn_id, &url)
-        .with_context(|| format!("WebauthnBuilder::new({}, {})", &args.webauthn_id, &args.webauthn_origin))?;
+    let builder = WebauthnBuilder::new(&args.webauthn_id, &url).with_context(|| {
+        format!(
+            "WebauthnBuilder::new({}, {})",
+            &args.webauthn_id, &args.webauthn_origin
+        )
+    })?;
 
-    Ok(builder
-        .rp_name(&rp_name)
-        .build()?)
+    Ok(builder.rp_name(&rp_name).build()?)
 }
 
 #[tokio::main]
@@ -100,7 +118,8 @@ async fn main() -> Result<(), anyhow::Error> {
         }
     }
 
-    // Run the migrations synchronously before creating the pool or launching the server
+    // Run the migrations synchronously before creating the pool or launching the
+    // server
     let ran = db::run_migrations(&args.sqlite_connection_string)?;
     info!("Ran {ran} db migrations");
 
@@ -111,12 +130,11 @@ async fn main() -> Result<(), anyhow::Error> {
         .builder(Runtime::Tokio1)?
         .post_create(Hook::async_fn(|object, _| {
             Box::pin(async move {
-                object.interact(|conn| {
-                    db::configure_new_connection(conn)
-                })
-                .await
-                .map_err(AppError::from)?
-                .map_err(AppError::from)?;
+                object
+                    .interact(|conn| db::configure_new_connection(conn))
+                    .await
+                    .map_err(AppError::from)?
+                    .map_err(AppError::from)?;
                 Ok(())
             })
         }))
@@ -126,7 +144,6 @@ async fn main() -> Result<(), anyhow::Error> {
 
     let listener = TcpListener::bind(socket).await?;
     debug!("listening on {}", listener.local_addr()?);
-
 
     let state = AppState {
         pool,
@@ -140,8 +157,14 @@ async fn main() -> Result<(), anyhow::Error> {
             .route(api::Auth::RegisterFinish.path(), post(register_finish))
             .route(api::Auth::LoginStart.path(), post(login_start))
             .route(api::Auth::LoginFinish.path(), post(login_finish))
-            .route(api::Auth::RegisterNewKeyStart.path(), post(register_new_key_start))
-            .route(api::Auth::RegisterNewKeyFinish.path(), post(register_new_key_finish))
+            .route(
+                api::Auth::RegisterNewKeyStart.path(),
+                post(register_new_key_start),
+            )
+            .route(
+                api::Auth::RegisterNewKeyFinish.path(),
+                post(register_new_key_finish),
+            )
             .route(api::Object::User.path(), get(fetch_user))
             .nest_service(
                 "/wasm/service_worker.js",
@@ -156,15 +179,22 @@ async fn main() -> Result<(), anyhow::Error> {
             )
             .nest_service("/", ServeDir::new(&args.assets_dir))
             .layer(middleware::map_response(fallback_layer))
-            .layer(ServiceBuilder::new()
-                .layer(TraceLayer::new_for_http()
-                    .make_span_with(DefaultMakeSpan::new().level(Level::INFO))
-                    .on_response(DefaultOnResponse::new().level(Level::INFO)))
-                .layer(SessionManagerLayer::new(MemoryStore::default())
-                    .with_secure(args.secure_sessions)
-                    .with_expiry(Expiry::OnInactivity(Duration::days(args.session_expiry_days))))
+            .layer(
+                ServiceBuilder::new()
+                    .layer(
+                        TraceLayer::new_for_http()
+                            .make_span_with(DefaultMakeSpan::new().level(Level::INFO))
+                            .on_response(DefaultOnResponse::new().level(Level::INFO)),
+                    )
+                    .layer(
+                        SessionManagerLayer::new(MemoryStore::default())
+                            .with_secure(args.secure_sessions)
+                            .with_expiry(Expiry::OnInactivity(Duration::days(
+                                args.session_expiry_days,
+                            ))),
+                    ),
             )
-            .with_state(state)
+            .with_state(state),
     )
     .await?;
 
@@ -174,27 +204,24 @@ async fn main() -> Result<(), anyhow::Error> {
 async fn fetch_user(
     DatabaseConnection(conn): DatabaseConnection,
     user_state: UserState,
-) -> Result<Json<User>, ServerError<FetchError>>{
-    let user = conn.interact(move |conn| 
-        Ok::<_, ServerError<_>>(user_state.id.fetch_full_user(conn)?))
+) -> Result<Json<User>, ServerError<FetchError>> {
+    let user = conn
+        .interact(move |conn| Ok::<_, ServerError<_>>(user_state.id.fetch_full_user(conn)?))
         .await??;
 
     Ok(Json(user))
 }
 
-async fn fallback_layer(
-    uri: Uri,
-    method: Method,
-    response: Response,
-) -> impl IntoResponse {
+async fn fallback_layer(uri: Uri, method: Method, response: Response) -> impl IntoResponse {
     let code = response.status();
 
     match code {
-        StatusCode::NOT_FOUND => 
-            Err(AppError::new(code, format!("Not found: {}", uri))),
-        StatusCode::METHOD_NOT_ALLOWED =>
-            Err(AppError::new(code, format!("Method not allowed: {}: {}", method, uri))),
-        
-        _ => Ok(response)
+        StatusCode::NOT_FOUND => Err(AppError::new(code, format!("Not found: {}", uri))),
+        StatusCode::METHOD_NOT_ALLOWED => Err(AppError::new(
+            code,
+            format!("Method not allowed: {}: {}", method, uri),
+        )),
+
+        _ => Ok(response),
     }
 }

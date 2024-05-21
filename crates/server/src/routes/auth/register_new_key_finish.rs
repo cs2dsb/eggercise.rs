@@ -1,6 +1,8 @@
 use axum::Json;
-use shared::{api::error::{Nothing, ServerError}, 
- unauthorized_error};
+use shared::{
+    api::error::{Nothing, ServerError},
+    unauthorized_error,
+};
 use webauthn_rs::prelude::RegisterPublicKeyCredential;
 
 use crate::{db::DatabaseConnection, PasskeyRegistrationState, SessionValue, UserState, Webauthn};
@@ -19,17 +21,19 @@ pub async fn register_new_key_finish(
         .ok_or(unauthorized_error!("Current session doesn't contain a PasskeyRegistrationState. Client error or replay attack?"))?;
 
     // Attempt to complete the passkey registration with the provided public key
-    let passkey = webauthn.finish_passkey_registration(&register_public_key_credential, &passkey_registration)?;
-    
+    let passkey = webauthn
+        .finish_passkey_registration(&register_public_key_credential, &passkey_registration)?;
+
     let result = {
         conn.interact(move |conn| {
             // Get the user first
-            let user = user_state.id.fetch_full_user(conn)
+            let user = user_state
+                .id
+                .fetch_full_user(conn)
                 .map_err(|e| (true, e.into()))?;
-            
+
             // Add the new passkey
-            user.add_passkey(conn, passkey)
-                .map_err(|e| (false, e))?;
+            user.add_passkey(conn, passkey).map_err(|e| (false, e))?;
 
             Ok::<_, (bool, ServerError<_>)>(())
         })
@@ -43,6 +47,6 @@ pub async fn register_new_key_finish(
         }
         Err(err)?;
     }
-    
+
     Ok(Json(()))
 }

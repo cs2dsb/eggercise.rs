@@ -1,8 +1,11 @@
 use axum::Json;
 use chrono::Utc;
 use shared::{
-    api::error::{Nothing, ServerError}, 
-    ensure_server, model::{Credential, User}, unauthorized_error};
+    api::error::{Nothing, ServerError},
+    ensure_server,
+    model::{Credential, User},
+    unauthorized_error,
+};
 use webauthn_rs::prelude::PublicKeyCredential;
 
 use crate::{db::DatabaseConnection, PasskeyAuthenticationState, SessionValue, Webauthn};
@@ -20,16 +23,17 @@ pub async fn login_finish(
         .ok_or(unauthorized_error!("Current session doesn't contain a PasskeyAuthenticationState. Client error or replay attack?"))?;
 
     // Attempt to complete the passkey authentication with the provided public key
-    let authentication_result = webauthn.finish_passkey_authentication(
-        &public_key_credential, &passkey_authentication)?;
-    
-    // At this point the autnetication has succeeded but there are a few more checks and updates we need to make
+    let authentication_result =
+        webauthn.finish_passkey_authentication(&public_key_credential, &passkey_authentication)?;
+
+    // At this point the autnetication has succeeded but there are a few more checks
+    // and updates we need to make
     let user = conn.interact(move |conn| {
         // Need a transaction because we're updating the credential and user and want it to rollback if either fail
         let tx = conn.transaction()?;
 
         let id = authentication_result.cred_id().clone().into();
-        
+
         // Get the credential 
         // If it was deleted between start & finish this might fail and we should not proceed with the login
         let mut credential = Credential::fetch(&tx, &id)?;
@@ -75,7 +79,8 @@ pub async fn login_finish(
         Ok::<_, ServerError<Nothing>>(user)
     }).await??;
 
-    // Update the user state in the session so the user is logged in on furture requests
+    // Update the user state in the session so the user is logged in on furture
+    // requests
     session.set_user_state(&user).await?;
 
     Ok(Json(user))

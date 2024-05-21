@@ -1,6 +1,6 @@
 use const_format::concatcp;
-pub mod response_errors;
 pub mod error;
+pub mod response_errors;
 
 pub const API_BASE_PATH: &str = "/api/";
 
@@ -16,7 +16,7 @@ impl Object {
             User => concatcp!(API_BASE_PATH, "user"),
         }
     }
-    
+
     pub const fn id_path(&self) -> &str {
         use Object::*;
         match self {

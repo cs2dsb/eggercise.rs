@@ -1,21 +1,17 @@
 use serde::{Deserialize, Serialize};
-use super::error::Nothing;
 use thiserror::Error;
+#[cfg(feature = "backend")]
+use {crate::api::error::ServerError, http::StatusCode};
 
-#[cfg(feature="backend")]
-use {
-    crate::api::error::ServerError,
-    http::StatusCode,
-};
-
+use super::error::Nothing;
 
 macro_rules! response_error {
-    ($name:ident { 
+    ($name:ident {
         $(
             #[code($variant_code:expr)]
             $variant:ident
-            $({ $($var_struct_body_tt:tt)* })? 
-        ,)* 
+            $({ $($var_struct_body_tt:tt)* })?
+        ,)*
     }) => {
 
         #[derive(Debug, Clone, Serialize, Deserialize, Error)]
@@ -23,18 +19,10 @@ macro_rules! response_error {
             $(
                 #[error("{}::{}: {:?}", stringify!($name), stringify!($variant), self)]
                 $variant $({
-                    $($var_struct_body_tt)* 
+                    $($var_struct_body_tt)*
                 })?,
             )*
         }
-
-        // impl fmt::Display for $name {
-        //     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        //         match &self {
-        //             $(Self::$variant { .. } => write!(f, "{}::{}: {:?}", stringify!($name), stringify!($variant), self),)*
-        //         }
-        //     }
-        // }
 
         #[cfg(feature="backend")]
         impl From<$name> for ServerError<$name> {
@@ -64,6 +52,6 @@ response_error!(LoginError {
     UserHasNoCredentials,
 });
 
-// Alias used to allow future expansion of the errors without having to go back and update
-// all routes that use it
+// Alias used to allow future expansion of the errors without having to go back
+// and update all routes that use it
 pub type FetchError = Nothing;

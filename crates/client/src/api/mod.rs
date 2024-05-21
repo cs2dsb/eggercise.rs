@@ -1,12 +1,15 @@
-use std::{any::type_name, error::Error, fmt::{Debug, Display}};
+use std::{
+    any::type_name,
+    error::Error,
+    fmt::{Debug, Display},
+};
 
-use mime::APPLICATION_JSON;
+use gloo_net::http::{Method, RequestBuilder, Response};
 use http::header::{self, ACCEPT};
-use gloo_net::http::{ RequestBuilder, Response, Method};
+use mime::APPLICATION_JSON;
 use serde::{de::DeserializeOwned, Serialize};
-
 use shared::{
-    api::error::{ FrontendError, ResultContext, ServerError, WrongContentTypeError },
+    api::error::{FrontendError, ResultContext, ServerError, WrongContentTypeError},
     model::ValidateModel,
 };
 
@@ -32,11 +35,15 @@ impl ResponseContentType for Response {
     }
 }
 
-pub async fn json_request<B, R, E>(method: Method, url: &str, body: Option<&B>) -> Result<R, FrontendError<ServerError<E>>> 
+pub async fn json_request<B, R, E>(
+    method: Method,
+    url: &str,
+    body: Option<&B>,
+) -> Result<R, FrontendError<ServerError<E>>>
 where
-    B: Serialize + Debug + ValidateModel, 
-    R: DeserializeOwned, 
-    E: Error + DeserializeOwned + Display
+    B: Serialize + Debug + ValidateModel,
+    R: DeserializeOwned,
+    E: Error + DeserializeOwned + Display,
 {
     // Check the body is valid
     if let Some(body) = body {
@@ -49,11 +56,11 @@ where
 
     // Add the json body or set the releavant headers
     let request = match body {
-            Some(body) => builder.json(body),
-            None => builder.build(),
-        }
-        .map_err(FrontendError::from)
-        .with_context(|| format!("Converting {:?} to json body (for: {method} {url}", body))?;
+        Some(body) => builder.json(body),
+        None => builder.build(),
+    }
+    .map_err(FrontendError::from)
+    .with_context(|| format!("Converting {:?} to json body (for: {method} {url}", body))?;
 
     // Send the request and handle the network and js errors
     let response = request
@@ -62,12 +69,14 @@ where
         .map_err(FrontendError::from)
         .with_context(|| format!("Sending {:?} to {method} {url}", body))?;
 
-    // Check the content-type is what we're expecting   
+    // Check the content-type is what we're expecting
     let content_type = response.content_type();
-    let is_json = content_type.as_ref()
+    let is_json = content_type
+        .as_ref()
         .map_or(false, |v| v == mime::APPLICATION_JSON.essence_str());
 
-    // Handle non-json errors (this isn't to allow the api to return other things, it's only to handle errors)
+    // Handle non-json errors (this isn't to allow the api to return other things,
+    // it's only to handle errors)
     if !is_json {
         let body = response
             .text()
@@ -78,26 +87,41 @@ where
         Err(WrongContentTypeError {
             expected: APPLICATION_JSON.to_string(),
             got: content_type,
-            body })
+            body,
+        })
         .map_err(FrontendError::from)
         .with_context(|| format!("Response from {method} {url}"))?;
     }
 
-    // Deserialize the error type 
+    // Deserialize the error type
     if !response.ok() {
-        let err = response.json::<ServerError<E>>()
+        let err = response
+            .json::<ServerError<E>>()
             .await
             .map_err(FrontendError::from)
-            .with_context(|| format!("Deserializing error response ({}) from {method} {url}", type_name::<E>()))?;
+            .with_context(|| {
+                format!(
+                    "Deserializing error response ({}) from {method} {url}",
+                    type_name::<E>()
+                )
+            })?;
 
-        Err(FrontendError::Inner { inner: err })?;
+        Err(FrontendError::Inner {
+            inner: err,
+        })?;
     }
 
     // Deserialize the ok type
-    let payload = response.json::<R>()
+    let payload = response
+        .json::<R>()
         .await
         .map_err(FrontendError::from)
-        .with_context(|| format!("Deserializing OK response ({}) from {method} {url}", type_name::<E>()))?;
+        .with_context(|| {
+            format!(
+                "Deserializing OK response ({}) from {method} {url}",
+                type_name::<E>()
+            )
+        })?;
 
     Ok(payload)
-} 
+}

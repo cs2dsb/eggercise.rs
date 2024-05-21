@@ -1,5 +1,10 @@
-use leptos::{component, create_action, create_signal, logging::{log, warn}, view, IntoView, Show, Signal, SignalGet, SignalUpdate, SignalWith};
+use leptos::{
+    component, create_action, create_signal,
+    logging::{log, warn},
+    view, IntoView, Show, Signal, SignalGet, SignalUpdate, SignalWith,
+};
 use shared::model::LoginUser;
+
 use crate::{api::login, components::LoginForm, ClientRoutes};
 
 #[component]
@@ -16,37 +21,37 @@ pub fn Login() -> impl IntoView {
         log!("Logging in user {:?}", login_user);
         async move {
             set_wait_for_response.update(|w| *w = true);
-            
+
             match login(&login_user).await {
                 Ok(res) => {
                     set_login_response.update(|v| *v = Some(res));
                     set_login_error.update(|e| *e = None);
-                }, 
-                Err(err) => {   
+                }
+                Err(err) => {
                     let msg = format!("{:?}", err);
                     warn!("Error logging in {login_user:?}: {msg}");
                     set_login_error.update(|e| *e = Some(msg));
-                },
+                }
             }
-            
+
             set_wait_for_response.update(|w| *w = false);
         }
     });
 
     view! {
         <h2>"Login"</h2>
-        <Show 
+        <Show
             when=move || login_response.with(|r| r.is_some())
             fallback=move || {
                 view! {
-                    <LoginForm 
+                    <LoginForm
                         action=login_action
                         error=login_error
                         disabled
                     />
                 }
             }
-        > 
+        >
             <p>"Login complete"</p>
             { ClientRoutes::Today.link() }
             <div>{ login_response.with(|v| format!("{:?}", v)) }</div>

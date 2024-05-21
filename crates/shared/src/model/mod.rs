@@ -1,9 +1,9 @@
 mod user;
 pub use user::*;
 
-#[cfg(feature="backend")]
+#[cfg(feature = "backend")]
 mod credential;
-#[cfg(feature="backend")]
+#[cfg(feature = "backend")]
 pub use credential::*;
 
 use crate::api::error::ValidationError;

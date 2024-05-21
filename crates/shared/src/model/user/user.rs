@@ -1,37 +1,29 @@
-
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use crate::types::Uuid;
-
-
-#[cfg(feature="backend")]
+#[cfg(feature = "backend")]
 use {
-
-    webauthn_rs::prelude::Passkey,
-
-    std::error::Error,
     crate::{
-        model::{
-            NewUser,
-            Credential, 
-            NewCredential,
-        },
-        api::error::{
-            ServerError,
-            ServerErrorContext,
-        }, 
+        api::error::{ServerError, ServerErrorContext},
+        model::{Credential, NewCredential, NewUser},
     },
     exemplar::Model,
     rusqlite::{Connection, OptionalExtension},
     sea_query::{enum_def, Expr, Query, SqliteQueryBuilder},
     sea_query_rusqlite::RusqliteBinder,
+    std::error::Error,
+    webauthn_rs::prelude::Passkey,
 };
 
+use crate::types::Uuid;
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature="backend", derive(Model))]
-#[cfg_attr(feature="backend", table("user"))]
-#[cfg_attr(feature="backend", check("../../../../server/migrations/001-user/up.sql"))]
-#[cfg_attr(feature="backend", enum_def)]
+#[cfg_attr(feature = "backend", derive(Model))]
+#[cfg_attr(feature = "backend", table("user"))]
+#[cfg_attr(
+    feature = "backend",
+    check("../../../../server/migrations/001-user/up.sql")
+)]
+#[cfg_attr(feature = "backend", enum_def)]
 pub struct User {
     pub id: Uuid,
     pub username: String,
@@ -42,7 +34,7 @@ pub struct User {
     pub last_login_date: Option<DateTime<Utc>>,
 }
 
-#[cfg(feature="backend")]
+#[cfg(feature = "backend")]
 impl User {
     pub fn fetch_by_id(conn: &Connection, id: &Uuid) -> Result<User, rusqlite::Error> {
         let (sql, values) = Query::select()
@@ -65,7 +57,10 @@ impl User {
         Ok(user)
     }
 
-    pub fn fetch_by_username<T: AsRef<str>>(conn: &Connection, username: T) -> Result<Option<User>, rusqlite::Error> {
+    pub fn fetch_by_username<T: AsRef<str>>(
+        conn: &Connection,
+        username: T,
+    ) -> Result<Option<User>, rusqlite::Error> {
         let (sql, values) = Query::select()
             .columns([
                 UserIden::Id,
@@ -82,11 +77,16 @@ impl User {
             .build_rusqlite(SqliteQueryBuilder);
 
         let mut stmt = conn.prepare_cached(&sql)?;
-        let user = stmt.query_row(&*values.as_params(), User::from_row).optional()?;
+        let user = stmt
+            .query_row(&*values.as_params(), User::from_row)
+            .optional()?;
         Ok(user)
     }
 
-    pub fn create<T: Error>(conn: &mut Connection, new_user: NewUser) -> Result<User, ServerError<T>> {
+    pub fn create<T: Error>(
+        conn: &mut Connection,
+        new_user: NewUser,
+    ) -> Result<User, ServerError<T>> {
         let tx = conn.transaction()?;
         let user = {
             new_user.insert(&tx)?;
@@ -110,20 +110,25 @@ impl User {
             ])
             .and_where(Expr::col(UserIden::Id).eq(&self.id))
             .build_rusqlite(SqliteQueryBuilder);
-        
+
         let mut stmt = conn.prepare_cached(&sql)?;
         stmt.execute(&*values.as_params())?;
 
         Ok(())
     }
 
-    pub fn add_passkey<T: Error>(mut self, conn: &mut Connection, passkey: Passkey) -> Result<Credential, ServerError<T>> {
+    pub fn add_passkey<T: Error>(
+        mut self,
+        conn: &mut Connection,
+        passkey: Passkey,
+    ) -> Result<Credential, ServerError<T>> {
         let tx = conn.transaction()?;
 
         let new_credential = NewCredential::new(self.id.clone(), passkey.into());
 
         let credential = {
-            new_credential.insert(&tx)
+            new_credential
+                .insert(&tx)
                 .context("User::add_passkey::insert(Credential)")?;
             Credential::fetch(&tx, &new_credential.id)
                 .context("User::add_passkey::fetch(Credential)")?

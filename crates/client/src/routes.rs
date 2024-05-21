@@ -1,7 +1,7 @@
 use leptos::{component, view, IntoView};
 use leptos_router::{Route, Routes, A};
 
-use crate::components::{Plan, Today, Register, Login, Profile};
+use crate::components::{Login, Plan, Profile, Register, Today};
 
 macro_rules! routes {
     ($(($path:literal, $view:ident, $ui_text:literal),)+) => {
@@ -82,7 +82,7 @@ macro_rules! routes {
 }
 
 routes!(
-    ("/", Today, "Today"), 
+    ("/", Today, "Today"),
     ("/plan", Plan, "Plan"),
     ("/register", Register, "Register"),
     ("/login", Login, "Login"),
