@@ -1,17 +1,24 @@
-use std::{error::Error, ops::{Deref, DerefMut}};
+use std::{
+    error::Error,
+    ops::{Deref, DerefMut},
+};
 
-use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
 use exemplar::Model;
-use rusqlite::{types::{FromSql, FromSqlError, FromSqlResult, ToSqlOutput, ValueRef}, Connection, ToSql};
+use rusqlite::{
+    types::{FromSql, FromSqlError, FromSqlResult, ToSqlOutput, ValueRef},
+    Connection, ToSql,
+};
 use sea_query::{enum_def, Expr, Query, SqliteQueryBuilder};
 use sea_query_rusqlite::RusqliteBinder;
+use serde::{Deserialize, Serialize};
 use webauthn_rs::prelude::{CredentialID as WebauthnCredentialId, Passkey as WebauthnPasskey};
+
 use crate::{api::error::ServerError, types::Uuid};
 
 /// Wrapper to implement ToSql and FromSql on
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct Passkey (WebauthnPasskey);
+pub struct Passkey(WebauthnPasskey);
 
 impl Passkey {
     fn to_json_string(&self) -> Result<String, serde_json::Error> {
@@ -49,14 +56,13 @@ impl ToSql for Passkey {
 impl FromSql for Passkey {
     fn column_result(value: ValueRef<'_>) -> FromSqlResult<Self> {
         <serde_json::Value as FromSql>::column_result(value)
-            .and_then(|v| serde_json::from_value(v)
-                .map_err(|e| FromSqlError::Other(Box::new(e))))        
+            .and_then(|v| serde_json::from_value(v).map_err(|e| FromSqlError::Other(Box::new(e))))
     }
 }
 
 /// Wrapper to implement ToSql and FromSql on
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct CredentialId (WebauthnCredentialId);
+pub struct CredentialId(WebauthnCredentialId);
 
 impl CredentialId {
     fn to_json_string(&self) -> Result<String, serde_json::Error> {
@@ -88,13 +94,11 @@ impl ToSql for CredentialId {
 impl FromSql for CredentialId {
     fn column_result(value: ValueRef<'_>) -> FromSqlResult<Self> {
         <serde_json::Value as FromSql>::column_result(value)
-            .and_then(|v| serde_json::from_value(v)
-                .map_err(|e| FromSqlError::Other(Box::new(e))))        
+            .and_then(|v| serde_json::from_value(v).map_err(|e| FromSqlError::Other(Box::new(e))))
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[derive(Model)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Model)]
 #[table("credential")]
 #[check("../../../server/migrations/002-credential/up.sql")]
 #[enum_def]
@@ -111,7 +115,10 @@ pub struct Credential {
 }
 
 impl Credential {
-    pub fn fetch<T: Error>(conn: &Connection, id: &CredentialId) -> Result<Credential, ServerError<T>> {
+    pub fn fetch<T: Error>(
+        conn: &Connection,
+        id: &CredentialId,
+    ) -> Result<Credential, ServerError<T>> {
         let id_value = id.to_json_string()?;
         let (sql, values) = Query::select()
             .columns([
@@ -131,13 +138,15 @@ impl Credential {
             .build_rusqlite(SqliteQueryBuilder);
 
         let mut stmt = conn.prepare_cached(&sql)?;
-        let credential = stmt
-            .query_row(&*values.as_params(), Credential::from_row)?;
+        let credential = stmt.query_row(&*values.as_params(), Credential::from_row)?;
 
         Ok(credential)
     }
 
-    pub fn fetch_passkeys<T: Error>(conn: &Connection, user_id: &Uuid) -> Result<Vec<WebauthnPasskey>, ServerError<T>> {
+    pub fn fetch_passkeys<T: Error>(
+        conn: &Connection,
+        user_id: &Uuid,
+    ) -> Result<Vec<WebauthnPasskey>, ServerError<T>> {
         let (sql, values) = Query::select()
             .column(CredentialIden::Passkey)
             .from(CredentialIden::Table)
@@ -147,15 +156,19 @@ impl Credential {
         let mut stmt = conn.prepare_cached(&sql)?;
         let passkeys = stmt
             .query_and_then(&*values.as_params(), |r| r.get::<_, serde_json::Value>(0))?
-            .map(|r| r
-                .map_err(ServerError::from)
-                .and_then(|v| serde_json::from_value(v).map_err(ServerError::from)))
+            .map(|r| {
+                r.map_err(ServerError::from)
+                    .and_then(|v| serde_json::from_value(v).map_err(ServerError::from))
+            })
             .collect::<Result<Vec<WebauthnPasskey>, _>>()?;
 
         Ok(passkeys)
     }
 
-    pub fn create<T: Error>(conn: &mut Connection, new_credential: NewCredential) -> Result<Credential, ServerError<T>> {
+    pub fn create<T: Error>(
+        conn: &mut Connection,
+        new_credential: NewCredential,
+    ) -> Result<Credential, ServerError<T>> {
         let tx = conn.transaction()?;
         let credential = {
             new_credential.insert(&tx)?;
@@ -173,13 +186,16 @@ impl Credential {
             .values([
                 (CredentialIden::Counter, self.counter.into()),
                 (CredentialIden::LastUsedDate, self.last_used_date.into()),
-                (CredentialIden::LastUpdatedDate, self.last_updated_date.into()),
+                (
+                    CredentialIden::LastUpdatedDate,
+                    self.last_updated_date.into(),
+                ),
                 (CredentialIden::BackupState, self.backup_state.into()),
                 (CredentialIden::BackupEligible, self.backup_eligible.into()),
             ])
             .and_where(Expr::col(CredentialIden::Id).eq(id_value))
             .build_rusqlite(SqliteQueryBuilder);
-        
+
         let mut stmt = conn.prepare_cached(&sql)?;
         stmt.execute(&*values.as_params())?;
 
@@ -187,8 +203,7 @@ impl Credential {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[derive(Model)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Model)]
 #[table("credential")]
 pub struct NewCredential {
     pub id: CredentialId,

@@ -1,11 +1,11 @@
-use leptos::{component, create_action, create_signal, logging::{log, warn}, view, IntoView, Show, Signal, SignalGet, SignalUpdate, SignalWith};
+use leptos::{
+    component, create_action, create_signal,
+    logging::{log, warn},
+    view, IntoView, Show, Signal, SignalGet, SignalUpdate, SignalWith,
+};
 use shared::model::RegistrationUser;
 
-use crate::{
-    api::register, 
-    components::RegistrationForm,
-    ClientRoutes,
-};
+use crate::{api::register, components::RegistrationForm, ClientRoutes};
 
 #[component]
 pub fn Register() -> impl IntoView {
@@ -21,37 +21,37 @@ pub fn Register() -> impl IntoView {
         log!("Registering new user {:?}", reg_user);
         async move {
             set_wait_for_response.update(|w| *w = true);
-            
+
             match register(&reg_user).await {
                 Ok(res) => {
                     set_register_response.update(|v| *v = Some(res));
                     set_register_error.update(|e| *e = None);
-                }, 
-                Err(err) => {   
+                }
+                Err(err) => {
                     let msg = format!("{:?}", err);
                     warn!("Error registering {reg_user:?}: {msg}");
                     set_register_error.update(|e| *e = Some(msg));
-                },
+                }
             }
-            
+
             set_wait_for_response.update(|w| *w = false);
         }
     });
 
     view! {
         <h2>"Register"</h2>
-        <Show 
+        <Show
             when=move || register_response.with(|r| r.is_some())
             fallback=move || {
                 view! {
-                    <RegistrationForm 
+                    <RegistrationForm
                         action=register_action
                         error=register_error
                         disabled
                     />
                 }
             }
-        > 
+        >
             <p>"Registration complete"</p>
             <span>"You can now "</span> { ClientRoutes::Login.link() }
         </Show>

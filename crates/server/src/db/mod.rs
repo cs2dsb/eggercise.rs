@@ -21,7 +21,7 @@ fn sqlite_connection_trace_callback(query: &str) {
 fn sqlite_log_callback(sqlite_code: c_int, msg: &str) {
     use rusqlite::ffi;
     let err_code = ffi::Error::new(sqlite_code);
-    
+
     // See https://www.sqlite.org/rescode.html for description of result codes.
     match sqlite_code & 0xff {
         ffi::SQLITE_NOTICE => info!(target: "sqlite", msg, %err_code, "SQLITE NOTICE"),
@@ -60,10 +60,8 @@ pub fn run_migrations(connection_string: &str) -> Result<usize, anyhow::Error> {
     // Configure the log callback before opening the database
     static CONFIG_LOG: Once = Once::new();
     let mut config_result = Ok(());
-    CONFIG_LOG.call_once(|| {
-        unsafe {
-            config_result = rusqlite::trace::config_log(Some(sqlite_log_callback));
-        }
+    CONFIG_LOG.call_once(|| unsafe {
+        config_result = rusqlite::trace::config_log(Some(sqlite_log_callback));
     });
     config_result?;
 

@@ -1,28 +1,27 @@
-use leptos::{component, create_signal, ev::KeyboardEvent, event_target_value, view, Action, IntoView, Signal, SignalGet, SignalUpdate, SignalWith};
+use leptos::{
+    component, create_signal, ev::KeyboardEvent, event_target_value, view, Action, IntoView,
+    Signal, SignalGet, SignalUpdate, SignalWith,
+};
 
 #[component]
 pub fn LoginForm(
     action: Action<String, ()>,
-    #[prop(into)]
-    error: Signal<Option<String>>,
+    #[prop(into)] error: Signal<Option<String>>,
     disabled: Signal<bool>,
-) -> impl IntoView 
-{
+) -> impl IntoView {
     let (name, set_name) = create_signal(String::new());
-    
-    let dispatch_action = move ||
-        action.dispatch(name.get());
 
-    let button_disabled = Signal::derive(move ||
-        disabled.get() || name.with(|n| n.is_empty()));
-        
+    let dispatch_action = move || action.dispatch(name.get());
+
+    let button_disabled = Signal::derive(move || disabled.get() || name.with(|n| n.is_empty()));
+
     view! {
         <form on:submit=|ev| ev.prevent_default()>
             {move || error.with(|e| e.as_ref().map(|e| view! {
                 <p style="color:red">{e}</p>
             }))}
 
-            <input 
+            <input
                 type="text"
                 required
                 placeholder="Username"

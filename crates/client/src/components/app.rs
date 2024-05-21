@@ -1,10 +1,5 @@
-#[allow(unused_imports)]
-use leptos::{
-    component, create_memo, create_signal, view, CollectView, For, IntoView, Signal, SignalDispose,
-    SignalUpdate, SignalWith,
-};
-#[allow(unused_imports)]
-use leptos_router::{Route, Router, Routes, A};
+use leptos::{component, view, IntoView};
+use leptos_router::Router;
 
 use crate::{AppNav, AppRoutes};
 

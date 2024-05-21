@@ -1,10 +1,10 @@
 use std::ops::Deref;
 
-use serde::{Deserialize, Serialize};
-use crate::{ model::User, types::Uuid };
-
-#[cfg(feature="backend")]
+#[cfg(feature = "backend")]
 use rusqlite::Connection;
+use serde::{Deserialize, Serialize};
+
+use crate::{model::User, types::Uuid};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct UserId {
@@ -21,12 +21,12 @@ impl Deref for UserId {
 impl From<&User> for UserId {
     fn from(value: &User) -> Self {
         Self {
-            id: value.id.clone()
+            id: value.id.clone(),
         }
     }
 }
 
-#[cfg(feature="backend")]
+#[cfg(feature = "backend")]
 impl UserId {
     pub fn fetch_full_user(&self, conn: &Connection) -> Result<User, rusqlite::Error> {
         let user = User::fetch_by_id(conn, &self.id)?;

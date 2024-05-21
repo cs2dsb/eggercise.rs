@@ -1,26 +1,24 @@
-use std::{fmt, ops::{Deref, DerefMut}};
-use serde::{ Deserialize, Serialize};
+use std::{
+    fmt,
+    ops::{Deref, DerefMut},
+};
+
+#[cfg(feature = "frontend")]
+pub use frontend::*;
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
+#[cfg(feature = "backend")]
+use {
+    axum::{
+        response::{IntoResponse, Response},
+        Json,
+    },
+    std::fmt::Display,
+};
+#[cfg(any(feature = "backend", feature = "frontend"))]
+use {http::StatusCode, std::error::Error};
 
 use crate::model::ValidateModel;
-
-#[cfg(feature="backend")]
-use {
-    std::fmt::Display,
-    axum::{ 
-        Json, 
-        response::{ IntoResponse, Response },
-    },
-};
-
-#[cfg(any(feature="backend", feature="frontend"))]
-use {
-    std::error::Error,
-    http::StatusCode,
-};
-
-#[cfg(feature="frontend")]
-pub use frontend::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Error)]
 pub struct Nothing {}
@@ -31,11 +29,13 @@ impl fmt::Display for Nothing {
     }
 }
 
-#[cfg(feature="frontend")]
+#[cfg(feature = "frontend")]
 mod frontend {
-    use std::{fmt::{self, Display}, ops::Deref};
+    use std::{
+        fmt::{self, Display},
+        ops::Deref,
+    };
 
-    use super::{Nothing, ErrorContext, ValidationError, WrongContentTypeError};
     use leptos::IntoView;
     use thiserror::Error;
     use wasm_bindgen::{JsCast, JsValue};
@@ -48,6 +48,8 @@ mod frontend {
         TypeError as JsTypeError,
         UriError as JsUriError,
     };
+
+    use super::{ErrorContext, Nothing, ValidationError, WrongContentTypeError};
 
     #[derive(Debug, Clone, Error)]
     pub enum JsError {
@@ -114,7 +116,7 @@ mod frontend {
     }
 
     #[derive(Debug, Clone, Error)]
-    pub struct FrontendErrorOnly (FrontendError<Nothing>);
+    pub struct FrontendErrorOnly(FrontendError<Nothing>);
 
     impl fmt::Display for FrontendErrorOnly {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -137,25 +139,33 @@ mod frontend {
 
     impl<T: Display> From<gloo_net::Error> for FrontendError<T> {
         fn from(value: gloo_net::Error) -> Self {
-            Self::Client { message: format!("gloo-net error: {}", value.to_string()) }
+            Self::Client {
+                message: format!("gloo-net error: {}", value.to_string()),
+            }
         }
     }
 
     impl<T: Display> From<ValidationError> for FrontendError<T> {
         fn from(inner: ValidationError) -> Self {
-            Self::Validation { inner }
+            Self::Validation {
+                inner,
+            }
         }
     }
 
     impl<T: Display> From<WrongContentTypeError> for FrontendError<T> {
         fn from(inner: WrongContentTypeError) -> Self {
-            Self::WrongContentType { inner }
+            Self::WrongContentType {
+                inner,
+            }
         }
     }
 
-    impl <T: Display> From<JsValue> for FrontendError<T> {
+    impl<T: Display> From<JsValue> for FrontendError<T> {
         fn from(value: JsValue) -> Self {
-            Self::Js { inner: JsError::from(value).to_string() }
+            Self::Js {
+                inner: JsError::from(value).to_string(),
+            }
         }
     }
 
@@ -184,22 +194,22 @@ mod frontend {
     }
 }
 
-#[cfg(any(feature="backend", feature="frontend"))]
+#[cfg(any(feature = "backend", feature = "frontend"))]
 #[derive(Debug, Clone, Error, Serialize, Deserialize)]
 #[must_use]
 pub enum ServerError<T: Error> {
     #[error("ServerError::Inner{{ code: {code}, inner: {inner} }}")]
-    Inner { 
+    Inner {
         #[serde(with = "http_serde::status_code")]
-        code: StatusCode, 
+        code: StatusCode,
         inner: T,
     },
 
     #[error("ServerError::Unauthorized {{ {message} }}")]
     Unauthorized { message: String },
 
-    // TODO: do these extra variants with the same inner type actually add anything above prefixing
-    //       the message with the name of the origin type?
+    // TODO: do these extra variants with the same inner type actually add anything above
+    // prefixing       the message with the name of the origin type?
     #[error("ServerError::Json {{ {message} }}")]
     Json { message: String },
 
@@ -219,13 +229,13 @@ pub enum ServerError<T: Error> {
     WithContext { context: String, inner: Box<Self> },
 }
 
-#[cfg(feature="backend")]
+#[cfg(feature = "backend")]
 #[macro_export]
 macro_rules! other_error {
     ($($t:tt)*) => (ServerError::Other{ message: format_args!($($t)*).to_string() })
 }
 
-#[cfg(feature="backend")]
+#[cfg(feature = "backend")]
 #[macro_export]
 macro_rules! ensure_server {
     ($expr:expr, $($t:tt)*) => (if $expr {
@@ -233,14 +243,13 @@ macro_rules! ensure_server {
     })
 }
 
-#[cfg(feature="backend")]
+#[cfg(feature = "backend")]
 #[macro_export]
 macro_rules! unauthorized_error {
     ($($t:tt)*) => (ServerError::Unauthorized{ message: format_args!($($t)*).to_string() })
 }
 
-
-#[cfg(feature="backend")]
+#[cfg(feature = "backend")]
 impl<T: Error, E: Into<ServerError<T>>> ErrorContext<ServerError<T>> for E {
     fn with_context<S: Into<String>, F: FnOnce() -> S>(self, context: F) -> ServerError<T> {
         self.context(context())
@@ -253,49 +262,63 @@ impl<T: Error, E: Into<ServerError<T>>> ErrorContext<ServerError<T>> for E {
     }
 }
 
-#[cfg(feature="backend")]
+#[cfg(feature = "backend")]
 impl<T: Error> From<rusqlite::Error> for ServerError<T> {
     fn from(value: rusqlite::Error) -> Self {
-        Self::Database { message: value.to_string() }
+        Self::Database {
+            message: value.to_string(),
+        }
     }
 }
 
-#[cfg(feature="backend")]
+#[cfg(feature = "backend")]
 impl<T: Error> From<serde_json::Error> for ServerError<T> {
     fn from(value: serde_json::Error) -> Self {
-        Self::Json { message: value.to_string() }
+        Self::Json {
+            message: value.to_string(),
+        }
     }
 }
 
-#[cfg(feature="backend")]
+#[cfg(feature = "backend")]
 impl<T: Error> From<deadpool_sqlite::InteractError> for ServerError<T> {
     fn from(value: deadpool_sqlite::InteractError) -> Self {
-        Self::Deadpool { message: value.to_string() }
+        Self::Deadpool {
+            message: value.to_string(),
+        }
     }
 }
 
-#[cfg(feature="backend")]
+#[cfg(feature = "backend")]
 impl<T: Error> From<webauthn_rs::prelude::WebauthnError> for ServerError<T> {
     fn from(value: webauthn_rs::prelude::WebauthnError) -> Self {
-        Self::Webauthn { message: value.to_string() }
+        Self::Webauthn {
+            message: value.to_string(),
+        }
     }
 }
 
-#[cfg(feature="backend")]
+#[cfg(feature = "backend")]
 impl<T: Error> ServerError<T> {
     fn code(&self) -> StatusCode {
         use ServerError::*;
-        
+
         match &self {
-            Inner { code, .. } => code.to_owned(),
-            Unauthorized { ..  } => StatusCode::UNAUTHORIZED,
-            WithContext { inner, .. } => inner.code(),
+            Inner {
+                code, ..
+            } => code.to_owned(),
+            Unauthorized {
+                ..
+            } => StatusCode::UNAUTHORIZED,
+            WithContext {
+                inner, ..
+            } => inner.code(),
             _ => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
 }
 
-#[cfg(feature="backend")]
+#[cfg(feature = "backend")]
 impl<T: Error + Serialize> IntoResponse for ServerError<T> {
     fn into_response(self) -> Response {
         let code = self.code();
@@ -303,7 +326,6 @@ impl<T: Error + Serialize> IntoResponse for ServerError<T> {
         (code, json).into_response()
     }
 }
-
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WrongContentTypeError {
@@ -314,7 +336,11 @@ pub struct WrongContentTypeError {
 
 impl fmt::Display for WrongContentTypeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Wrong content type, expected {} but got {:?}. Body: {}", self.expected, self.got, self.body)
+        write!(
+            f,
+            "Wrong content type, expected {} but got {:?}. Body: {}",
+            self.expected, self.got, self.body
+        )
     }
 }
 
@@ -333,21 +359,17 @@ impl fmt::Display for ValidationError {
     }
 }
 
-
 #[derive(Debug, Clone)]
-pub struct NoValidation<T>(
-    pub T
-);
+pub struct NoValidation<T>(pub T);
 
 impl<T: Serialize> Serialize for NoValidation<T> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: serde::Serializer 
+    where
+        S: serde::Serializer,
     {
-        self.0.serialize(serializer)   
+        self.0.serialize(serializer)
     }
 }
-
 
 impl<T> Deref for NoValidation<T> {
     type Target = T;
@@ -374,17 +396,17 @@ impl ValidateModel for () {
     }
 }
 
-#[cfg(feature="backend")]
+#[cfg(feature = "backend")]
 pub trait ServerErrorContext<T, X, Y>: Sized {
     fn with_context<S: Display, F: FnOnce() -> S>(self, f: F) -> Result<X, Y> {
         self.context(f())
     }
     fn context<S: Display>(self, context: S) -> Result<X, Y>;
-} 
+}
 
-#[cfg(feature="backend")]
+#[cfg(feature = "backend")]
 impl<R, T: Error, E: Into<ServerError<T>>> ServerErrorContext<T, R, ServerError<T>> for Result<R, E>
-where 
+where
     E: Into<ServerError<T>>,
 {
     fn context<S: Display>(self, context: S) -> Result<R, ServerError<T>> {
@@ -392,20 +414,14 @@ where
             Ok(v) => Ok(v),
             Err(e) => {
                 let inner = Box::new(e.into());
-                Err(ServerError::WithContext { 
-                    context: context.to_string(), 
+                Err(ServerError::WithContext {
+                    context: context.to_string(),
                     inner,
                 })
             }
         }
     }
 }
-
-
-
-
-
-
 
 pub trait ErrorContext<E>: Sized {
     /// Add helpful context to errors

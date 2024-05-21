@@ -1,21 +1,21 @@
 use serde::{Deserialize, Serialize};
-use crate::types::Uuid;
-
-#[cfg(feature="backend")]
+#[cfg(feature = "backend")]
 use {
-    std::error::Error,
     crate::{
-        model::{ Credential, NewCredential, User },
-        api::error::{ ServerError, ServerErrorContext },
+        api::error::{ServerError, ServerErrorContext},
+        model::{Credential, NewCredential, User},
     },
     exemplar::Model,
     rusqlite::Connection,
+    std::error::Error,
     webauthn_rs::prelude::Passkey,
 };
 
+use crate::types::Uuid;
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature="backend", derive(Model))]
-#[cfg_attr(feature="backend", table("user"))]
+#[cfg_attr(feature = "backend", derive(Model))]
+#[cfg_attr(feature = "backend", table("user"))]
 pub struct NewUser {
     pub id: Uuid,
     pub username: String,
@@ -31,21 +31,22 @@ impl NewUser {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[cfg(feature="backend")]
+#[cfg(feature = "backend")]
 pub struct NewUserWithPasskey {
     pub id: Uuid,
     pub username: String,
     pub passkey: Passkey,
 }
 
-#[cfg(feature="backend")]
+#[cfg(feature = "backend")]
 impl NewUserWithPasskey {
     fn split(self) -> (NewUser, Passkey) {
-        let Self { id, username, passkey } = self;
-        (
-            NewUser::new(id, username),
+        let Self {
+            id,
+            username,
             passkey,
-        )
+        } = self;
+        (NewUser::new(id, username), passkey)
     }
     pub fn new<I: Into<Uuid>, T: Into<String>>(id: I, username: T, passkey: Passkey) -> Self {
         Self {
@@ -55,7 +56,10 @@ impl NewUserWithPasskey {
         }
     }
 
-    pub fn create<T: Error>(self, conn: &mut Connection) -> Result<(User, Credential), ServerError<T>> {
+    pub fn create<T: Error>(
+        self,
+        conn: &mut Connection,
+    ) -> Result<(User, Credential), ServerError<T>> {
         let tx = conn.transaction()?;
 
         let (new_user, passkey) = self.split();
@@ -63,15 +67,16 @@ impl NewUserWithPasskey {
         let new_credential = NewCredential::new(new_user.id.clone(), passkey.into());
 
         let user = {
-            new_user.insert(&tx)
+            new_user
+                .insert(&tx)
                 .context("NewUserWithPasskey::insert(User)")?;
 
-            User::fetch_by_id(&tx, &user_id)
-                .context("NewUserWithPasskey::fetch(User)")?
+            User::fetch_by_id(&tx, &user_id).context("NewUserWithPasskey::fetch(User)")?
         };
 
         let credential = {
-            new_credential.insert(&tx)
+            new_credential
+                .insert(&tx)
                 .context("NewUserWithPasskey::insert(Credential)")?;
             Credential::fetch(&tx, &new_credential.id)
                 .context("NewUserWithPasskey::fetch(Credential)")?

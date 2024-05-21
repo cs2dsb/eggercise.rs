@@ -1,16 +1,12 @@
 use std::path::PathBuf;
 
-use serde::{ Deserialize, Serialize };
+use serde::{Deserialize, Serialize};
 use tracing_subscriber::fmt::format::FmtSpan;
-
-#[cfg(feature="build")]
+#[cfg(feature = "build")]
 use {
-    std::{
-        path::Path,
-        str::FromStr,
-    },
     cargo_toml::Manifest,
     chrono::Utc,
+    std::{path::Path, str::FromStr},
 };
 
 pub mod api;
@@ -39,12 +35,12 @@ pub fn load_dotenv() -> Result<Option<PathBuf>, dotenv::Error> {
     }
 }
 
-#[cfg(feature="build")]
+#[cfg(feature = "build")]
 fn read_manifest<P: AsRef<Path>>(path: P) -> Result<Manifest, cargo_toml::Error> {
     Ok(Manifest::from_path(path)?)
 }
 
-#[cfg(feature="build")]
+#[cfg(feature = "build")]
 #[derive(Debug, Clone)]
 pub struct CrateInfo {
     pub manifest_dir: PathBuf,
@@ -54,7 +50,7 @@ pub struct CrateInfo {
     pub version_with_timestamp: String,
 }
 
-#[cfg(feature="build")]
+#[cfg(feature = "build")]
 fn get_crate_info<P: AsRef<Path>>(crate_path: P) -> Result<CrateInfo, anyhow::Error> {
     let shared_dir = PathBuf::from_str(env!("CARGO_MANIFEST_DIR"))?;
     let manifest_dir = shared_dir.join(crate_path.as_ref());
@@ -76,17 +72,17 @@ fn get_crate_info<P: AsRef<Path>>(crate_path: P) -> Result<CrateInfo, anyhow::Er
     })
 }
 
-#[cfg(feature="build")]
+#[cfg(feature = "build")]
 pub fn get_service_worker_info() -> Result<CrateInfo, anyhow::Error> {
     get_crate_info("../service-worker")
 }
 
-#[cfg(feature="build")]
+#[cfg(feature = "build")]
 pub fn get_client_info() -> Result<CrateInfo, anyhow::Error> {
     get_crate_info("../client")
 }
 
-#[cfg(feature="build")]
+#[cfg(feature = "build")]
 pub fn get_server_info() -> Result<CrateInfo, anyhow::Error> {
     get_crate_info("../server")
 }

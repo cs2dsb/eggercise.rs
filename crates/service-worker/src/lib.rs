@@ -213,35 +213,32 @@ async fn fetch_cached(
     Ok(response)
 }
 
-async fn fetch_direct(
-    sw: ServiceWorkerGlobalScope,
-    request: Request,
-) -> Result<Response, JsValue> {
+async fn fetch_direct(sw: ServiceWorkerGlobalScope, request: Request) -> Result<Response, JsValue> {
     let response = JsFuture::from(sw.fetch_with_request(&request)).await?;
 
     if response.is_instance_of::<Response>() {
         Ok(response.into())
     } else {
-        let e = format!("Fetch returned something other than a Response: {:?}", response);
+        let e = format!(
+            "Fetch returned something other than a Response: {:?}",
+            response
+        );
         console_error!("{}", e);
-        
+
         // We have to construct some kind of response
         let headers = Object::new();
         js_sys::Reflect::set(
-            &headers, 
+            &headers,
             &JsValue::from_str("Content-Type"),
-            &JsValue::from_str("text/plain"))?;
+            &JsValue::from_str("text/plain"),
+        )?;
 
         let mut r_init = ResponseInit::new();
-        r_init
-            .status(500)
-            .headers(&headers);
-        let response = Response::new_with_opt_str_and_init(
-            Some(&e), &r_init)?;
+        r_init.status(500).headers(&headers);
+        let response = Response::new_with_opt_str_and_init(Some(&e), &r_init)?;
 
         Ok(response)
     }
-    
 }
 
 async fn fetch(
@@ -251,8 +248,7 @@ async fn fetch(
 ) -> Result<JsValue, JsValue> {
     let method = request.method();
     let url = request.url();
-    
-    
+
     let uri = Url::new(&url)?;
     let path = uri.pathname();
     let cache = !path.starts_with(API_BASE_PATH);
