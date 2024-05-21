@@ -1,3 +1,4 @@
+
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use crate::types::Uuid;
@@ -5,7 +6,11 @@ use crate::types::Uuid;
 
 #[cfg(feature="backend")]
 use {
-    crate::model::NewUser,
+    std::error::Error,
+    crate::{
+        model::NewUser,
+        api::error::ServerError,
+    },
     exemplar::Model,
     rusqlite::{Connection, OptionalExtension},
     sea_query::{enum_def, Expr, Query, SqliteQueryBuilder},
@@ -29,7 +34,7 @@ pub struct User {
 
 #[cfg(feature="backend")]
 impl User {
-    pub fn fetch_by_id(conn: &Connection, id: &Uuid) -> Result<User, anyhow::Error> {
+    pub fn fetch_by_id(conn: &Connection, id: &Uuid) -> Result<User, rusqlite::Error> {
         let (sql, values) = Query::select()
             .columns([
                 UserIden::Id,
@@ -50,7 +55,7 @@ impl User {
         Ok(user)
     }
 
-    pub fn fetch_by_username<T: AsRef<str>>(conn: &Connection, username: T) -> Result<Option<User>, anyhow::Error> {
+    pub fn fetch_by_username<T: AsRef<str>>(conn: &Connection, username: T) -> Result<Option<User>, rusqlite::Error> {
         let (sql, values) = Query::select()
             .columns([
                 UserIden::Id,
@@ -71,7 +76,7 @@ impl User {
         Ok(user)
     }
 
-    pub fn create(conn: &mut Connection, new_user: NewUser) -> Result<User, anyhow::Error> {
+    pub fn create<T: Error>(conn: &mut Connection, new_user: NewUser) -> Result<User, ServerError<T>> {
         let tx = conn.transaction()?;
         let user = {
             new_user.insert(&tx)?;
@@ -82,7 +87,7 @@ impl User {
         Ok(user)
     }
 
-    pub fn update(&self, conn: &Connection) -> Result<(), anyhow::Error> {
+    pub fn update<T: Error>(&self, conn: &Connection) -> Result<(), ServerError<T>> {
         let (sql, values) = Query::update()
             .table(UserIden::Table)
             .values([

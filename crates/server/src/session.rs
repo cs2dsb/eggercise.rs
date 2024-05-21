@@ -1,10 +1,16 @@
-use std::fmt::Display;
+use std::{
+    error::Error,
+    fmt::Display,
+};
 
 use axum::{async_trait, extract::FromRequestParts, http::{header::{ACCEPT, CONTENT_TYPE}, request::Parts, StatusCode}, response::{IntoResponse, Response}, Json};
 use futures::TryFutureExt;
 use serde::{Deserialize, Serialize};
-use shared::{model::{User, UserId}, types::Uuid};
-use tower_sessions::Session;
+use shared::{api::error::{ Nothing, ResultContext, ServerError}, model::{User, UserId}, types::Uuid};
+use tower_sessions::{
+    Session,
+    session::Error as SessionError,
+};
 use tracing::error;
 use webauthn_rs::prelude::{PasskeyAuthentication, PasskeyRegistration};
 
@@ -70,46 +76,51 @@ pub struct SessionValue {
 impl SessionValue {
     const SESSION_DATA_KEY: &'static str = "session.data";
 
-    pub async fn take_passkey_registration_state(&mut self) -> Result<Option<PasskeyRegistrationState>, anyhow::Error> {
+    pub async fn take_passkey_registration_state<T: Error>(&mut self) -> Result<Option<PasskeyRegistrationState>, ServerError<T>> {
         let reg = self.data.passkey_registration_state.take();
         Self::update_session(&self.session, &self.data).await?;
         Ok(reg)
     }
 
-    pub async fn set_passkey_registration_state(&mut self, passkey_registration: PasskeyRegistrationState) -> Result<(), anyhow::Error> {
+    pub async fn set_passkey_registration_state<T: Error>(&mut self, passkey_registration: PasskeyRegistrationState) -> Result<(), ServerError<T>> {
         self.data.passkey_registration_state = Some(passkey_registration);
         Self::update_session(&self.session, &self.data).await?;
         Ok(())
     }
 
-    pub async fn take_passkey_authentication_state(&mut self) -> Result<Option<PasskeyAuthenticationState>, anyhow::Error> {
+    pub async fn take_passkey_authentication_state<T: Error>(&mut self) -> Result<Option<PasskeyAuthenticationState>, ServerError<T>> {
         let reg = self.data.passkey_authentication_state.take();
         Self::update_session(&self.session, &self.data).await?;
         Ok(reg)
     }
 
-    pub async fn set_passkey_authentication_state(&mut self, passkey_authentication: PasskeyAuthenticationState) -> Result<(), anyhow::Error> {
+    pub async fn set_passkey_authentication_state<T: Error>(&mut self, passkey_authentication: PasskeyAuthenticationState) -> Result<(), ServerError<T>> {
         self.data.passkey_authentication_state = Some(passkey_authentication);
         Self::update_session(&self.session, &self.data).await?;
         Ok(())
     }
 
-    pub async fn take_user_state(&mut self) -> Result<Option<UserState>, anyhow::Error> {
+    pub async fn take_user_state<T: Error>(&mut self) -> Result<Option<UserState>, ServerError<T>> {
         let user_id = self.data.user_state.take();
         Self::update_session(&self.session, &self.data).await?;
         Ok(user_id)
     }
 
-    pub async fn set_user_state(&mut self, user: &User) -> Result<(), anyhow::Error> {
+    pub async fn set_user_state<T: Error>(&mut self, user: &User) -> Result<(), ServerError<T>> {
         self.data.user_state = Some(user.into());
         Self::update_session(&self.session, &self.data).await?;
         Ok(())
     }
 
-    async fn update_session(session: &Session, data: &SessionData) -> Result<(), anyhow::Error> {
+    async fn update_session<T: Error>(session: &Session, data: &SessionData) -> Result<(), ServerError<T>> {
         session
             .insert(Self::SESSION_DATA_KEY, data.clone())
-            .await?;
+            .await
+            .map_err(|e| match e {
+                SessionError::SerdeJson(e) => ServerError::Json { message: e.to_string() },
+                SessionError::Store(e) => ServerError::Other { message: e.to_string() },
+            })
+            .context("Updating session")?;
         Ok(())
     }
 }
@@ -166,7 +177,7 @@ impl<S> FromRequestParts<S> for UserState
 where 
     S: Send + Sync
 {
-    type Rejection = JsonOrText<&'static str>;
+    type Rejection = JsonOrText<ServerError<Nothing>>;
 
     async fn from_request_parts(req: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
         let accept_json = req.headers
@@ -197,7 +208,7 @@ where
 
         macro_rules! not_logged_in {
             // TODO: need to return a sensible struct that the client can deserialize
-            () => { JsonOrText::new(json_reply, StatusCode::UNAUTHORIZED, "Not logged in") };
+            () => { JsonOrText::new(json_reply, StatusCode::UNAUTHORIZED, ServerError::<Nothing>::Unauthorized { message: format!("Not logged in (session)")}) };
         } 
 
         let session_value = SessionValue::from_request_parts(req, state)

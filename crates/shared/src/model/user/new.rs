@@ -1,11 +1,13 @@
 use serde::{Deserialize, Serialize};
 use crate::types::Uuid;
 
-
 #[cfg(feature="backend")]
 use {
-    anyhow::Context,
-    crate::model::{ Credential, NewCredential, User },
+    std::error::Error,
+    crate::{
+        model::{ Credential, NewCredential, User },
+        api::error::{ ServerError, ServerErrorContext },
+    },
     exemplar::Model,
     rusqlite::Connection,
     webauthn_rs::prelude::Passkey,
@@ -53,7 +55,7 @@ impl NewUserWithPasskey {
         }
     }
 
-    pub fn create(self, conn: &mut Connection) -> Result<(User, Credential), anyhow::Error> {
+    pub fn create<T: Error>(self, conn: &mut Connection) -> Result<(User, Credential), ServerError<T>> {
         let tx = conn.transaction()?;
 
         let (new_user, passkey) = self.split();

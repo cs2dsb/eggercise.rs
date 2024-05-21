@@ -8,7 +8,7 @@ anyhow.workspace = true
 sha2.workspace = true
 serde_json.workspace = true
 wasm-bindgen-cli-support = "0.2.92"
-shared = { path = "../shared" }
+shared = { path = "../shared", features = [ "build" ] }
 base64 = "0.22.0"
 wasm-opt = "0.116.1"
 glob = "0.3.1"

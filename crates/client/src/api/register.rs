@@ -5,12 +5,12 @@ use gloo_net::http::Method;
 use webauthn_rs_proto::{CreationChallengeResponse, RegisterPublicKeyCredential};
 
 use shared::{
-    api::{self, error::{ FrontendError, NoValidation, ResultContext }, response_errors::RegisterError},
+    api::{self, error::{ FrontendError, NoValidation, ResultContext, ServerError }, response_errors::RegisterError},
     model::RegistrationUser,
 };
 use super::json_request;
 
-pub async fn register(reg_user: &RegistrationUser) -> Result<(), FrontendError<RegisterError>> {
+pub async fn register(reg_user: &RegistrationUser) -> Result<(), FrontendError<ServerError<RegisterError>>> {
     // Ask the server to start the registration process and return a challenge
     let creation_challenge_response: CreationChallengeResponse = json_request(
         Method::POST, 

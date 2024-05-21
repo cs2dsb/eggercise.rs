@@ -6,13 +6,13 @@ version.workspace = true
 [features]
 backend = [ "rusqlite/serde_json", "serde_json", "exemplar", "sea-query", "sea-query-rusqlite", "uuid/v4", "webauthn-rs", "axum", "deadpool-sqlite" ]
 frontend = [ "web-sys", "wasm-bindgen", "gloo-net", "leptos" ]
+build = [ "anyhow" ]
 
 [dependencies]
 tracing.workspace = true
 tracing-subscriber.workspace = true
 dotenv.workspace = true
 cargo_toml.workspace = true
-anyhow.workspace = true
 chrono.workspace = true
 serde.workspace = true
 thiserror.workspace = true
@@ -22,6 +22,7 @@ http.workspace = true
 serde_with.workspace = true
 http-serde.workspace = true
 
+anyhow = { workspace = true, optional = true }
 deadpool-sqlite = { workspace = true, optional = true }
 leptos = { workspace = true, optional = true }
 wasm-bindgen = { workspace = true, optional = true }
