@@ -1,4 +1,4 @@
-use std::{any::type_name, fmt::{Debug, Display}};
+use std::{any::type_name, error::Error, fmt::{Debug, Display}};
 
 use mime::APPLICATION_JSON;
 use http::header::{self, ACCEPT};
@@ -6,7 +6,7 @@ use gloo_net::http::{ RequestBuilder, Response, Method};
 use serde::{de::DeserializeOwned, Serialize};
 
 use shared::{
-    api::error::{ FrontendError, ResultContext, WrongContentTypeError },
+    api::error::{ FrontendError, ResultContext, ServerError, WrongContentTypeError },
     model::ValidateModel,
 };
 
@@ -30,11 +30,11 @@ impl ResponseContentType for Response {
     }
 }
 
-pub async fn json_request<B, R, E>(method: Method, url: &str, body: Option<&B>) -> Result<R, FrontendError<E>> 
+pub async fn json_request<B, R, E>(method: Method, url: &str, body: Option<&B>) -> Result<R, FrontendError<ServerError<E>>> 
 where
     B: Serialize + Debug + ValidateModel, 
     R: DeserializeOwned, 
-    E: DeserializeOwned + Display
+    E: Error + DeserializeOwned + Display
 {
     // Check the body is valid
     if let Some(body) = body {
@@ -83,17 +83,18 @@ where
 
     // Deserialize the error type 
     if !response.ok() {
-        let err = response.json::<E>()
+        let err = response.json::<ServerError<E>>()
             .await
-            .map_err(FrontendError::<E>::from)
+            .map_err(FrontendError::from)
             .with_context(|| format!("Deserializing error response ({}) from {method} {url}", type_name::<E>()))?;
+
         Err(FrontendError::Inner { inner: err })?;
     }
 
     // Deserialize the ok type
     let payload = response.json::<R>()
         .await
-        .map_err(FrontendError::<E>::from)
+        .map_err(FrontendError::from)
         .with_context(|| format!("Deserializing OK response ({}) from {method} {url}", type_name::<E>()))?;
 
     Ok(payload)

@@ -5,12 +5,12 @@ use gloo_net::http::Method;
 use webauthn_rs_proto::{ RequestChallengeResponse, PublicKeyCredential as WebauthnPublicKey };
 
 use shared::{
-    api::{self, error::{ FrontendError, NoValidation, ResultContext }, response_errors::LoginError},
+    api::{self, error::{ FrontendError, NoValidation, ResultContext, ServerError }, response_errors::LoginError},
     model::{LoginUser, User},
 };
 use super::json_request;
 
-pub async fn login(login_user: &LoginUser) -> Result<User, FrontendError<LoginError>> {
+pub async fn login(login_user: &LoginUser) -> Result<User, FrontendError<ServerError<LoginError>>> {
     // Ask the server to start the login process and return a challenge
     let request_challenge_response: RequestChallengeResponse = json_request(
         Method::POST, 

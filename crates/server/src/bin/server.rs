@@ -11,7 +11,7 @@ use chrono::Utc;
 use clap::Parser;
 use deadpool_sqlite::{Config, Hook, Pool, Runtime};
 use server::{db::{self, DatabaseConnection}, AppError, PasskeyAuthenticationState, PasskeyRegistrationState, SessionValue, UserState, Webauthn };
-use shared::{api::{self, error::ServerError, response_errors::{FetchError, LoginError, RegisterError}}, configure_tracing, load_dotenv, model::{Credential, LoginUser, NewUser, NewUserWithPasskey, RegistrationUser, User}};
+use shared::{other_error, unauthorized_error, ensure_server, api::{self, error::{Nothing, ServerError}, response_errors::{FetchError, LoginError, RegisterError}}, configure_tracing, load_dotenv, model::{Credential, LoginUser, NewUser, NewUserWithPasskey, RegistrationUser, User}};
 use tokio::net::TcpListener;
 use tower::ServiceBuilder;
 use tower_http::{
@@ -175,13 +175,11 @@ async fn register_start(
     webauthn: Webauthn,
     mut session: SessionValue,
     Json(reg_user): Json<RegistrationUser>,
-) -> Result<Json<CreationChallengeResponse>, RegisterError> {
+) -> Result<Json<CreationChallengeResponse>, ServerError<RegisterError>> {
     
     // Remove the existing challenge
     // session.take_passkey_registration_state().await?;
-    session.take_passkey_registration_state().await
-        .map_err(|e| ServerError::from(e))
-        .map_err(|e| RegisterError::from(e))?;
+    session.take_passkey_registration_state().await?;
     
     if reg_user.username.len() < 4 {
         Err(RegisterError::UsernameInvalid { message: "Username needs to be at least 4 characters".to_string() })?;
@@ -195,7 +193,7 @@ async fn register_start(
             let user_id = User::fetch_by_username(conn, username)?
                 .map(|u| u.id);
 
-            Ok::<_, anyhow::Error>(match user_id {
+            Ok::<_, ServerError<_>>(match user_id {
                 None => (false, Uuid::new_v4().into()),
                 Some(uuid) => (true, uuid),
             })
@@ -243,12 +241,12 @@ async fn register_finish(
     webauthn: Webauthn,
     mut session: SessionValue,
     Json(register_public_key_credential): Json<RegisterPublicKeyCredential>,
-) -> Result<Json<()>, AppError> {
+) -> Result<Json<()>, ServerError<Nothing>> {
     // Get the challenge from the session
     let PasskeyRegistrationState {username, id, passkey_registration } = session
         .take_passkey_registration_state()
         .await?
-        .ok_or(anyhow::anyhow!("Current session doesn't contain a PasskeyRegistrationState. Client error or replay attack?"))?;
+        .ok_or(unauthorized_error!("Current session doesn't contain a PasskeyRegistrationState. Client error or replay attack?"))?;
 
     // Attempt to complete the passkey registration with the provided public key
     let passkey = webauthn.finish_passkey_registration(&register_public_key_credential, &passkey_registration)?;
@@ -256,7 +254,7 @@ async fn register_finish(
     // Create the new user with their passkey
     let new_user = NewUserWithPasskey::new(id, username, passkey);
     conn.interact(move |conn| 
-        Ok::<_, anyhow::Error>(new_user.create(conn)?))
+        Ok::<_, ServerError<_>>(new_user.create(conn)?))
         .await??;
 
     Ok(Json(()))
@@ -267,7 +265,7 @@ async fn login_start(
     webauthn: Webauthn,
     mut session: SessionValue,
     Json(login_user): Json<LoginUser>,
-) -> Result<Json<RequestChallengeResponse>, LoginError> {
+) -> Result<Json<RequestChallengeResponse>, ServerError<LoginError>> {
     // Remove the existing challenge
     session.take_passkey_authentication_state().await?;
     
@@ -282,7 +280,7 @@ async fn login_start(
             let user = User::fetch_by_username(conn, username)?;
 
             // Then fetch the existing passkeys if the user exists
-            Ok::<_, anyhow::Error>(match user {
+            Ok::<_, ServerError<_>>(match user {
                 None => (None, None),
                 Some(user) => {
                     let passkeys = Credential::fetch_passkeys(conn, &user.id)?
@@ -323,12 +321,12 @@ async fn login_finish(
     webauthn: Webauthn,
     mut session: SessionValue,
     Json(public_key_credential): Json<PublicKeyCredential>,
-) -> Result<Json<User>, AppError> {
+) -> Result<Json<User>, ServerError<Nothing>> {
     // Get the challenge from the session
     let PasskeyAuthenticationState {user_id, passkey_authentication } = session
         .take_passkey_authentication_state()
         .await?
-        .ok_or(anyhow::anyhow!("Current session doesn't contain a PasskeyAuthenticationState. Client error or replay attack?"))?;
+        .ok_or(unauthorized_error!("Current session doesn't contain a PasskeyAuthenticationState. Client error or replay attack?"))?;
 
     // Attempt to complete the passkey authentication with the provided public key
     let authentication_result = webauthn.finish_passkey_authentication(
@@ -353,7 +351,7 @@ async fn login_finish(
         // If the counter is non-zero, we have to check it
         let counter = authentication_result.counter();
         if counter > 0 {
-            ensure!(counter > credential.counter, "Stored counter >= authentication result counter. Possible credential clone or re-use");
+            ensure_server!(counter > credential.counter, "Stored counter >= authentication result counter. Possible credential clone or re-use");
             credential.counter = counter;
             dirty = true;
         }
@@ -386,11 +384,11 @@ async fn login_finish(
 
         tx.commit()?;
 
-        Ok(user)
+        Ok::<_, ServerError<Nothing>>(user)
     }).await??;
 
     // Update the user state in the session so the user is logged in on furture requests
-    session.set_user_state(&user).await?;
+    //session.set_user_state(&user).await?;
 
     Ok(Json(user))
 }
@@ -399,10 +397,9 @@ async fn login_finish(
 async fn fetch_user(
     DatabaseConnection(conn): DatabaseConnection,
     user_state: UserState,
-) -> Result<Json<User>, FetchError> 
-{
+) -> Result<Json<User>, ServerError<FetchError>>{
     let user = conn.interact(move |conn| 
-        Ok::<_, anyhow::Error>(user_state.id.fetch_full_user(conn)?))
+        Ok::<_, ServerError<_>>(user_state.id.fetch_full_user(conn)?))
         .await??;
 
     Ok(Json(user))

@@ -1,4 +1,4 @@
-use std::ops::{Deref, DerefMut};
+use std::{error::Error, ops::{Deref, DerefMut}};
 
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
@@ -7,7 +7,7 @@ use rusqlite::{types::{FromSql, FromSqlError, FromSqlResult, ToSqlOutput, ValueR
 use sea_query::{enum_def, Expr, Query, SqliteQueryBuilder};
 use sea_query_rusqlite::RusqliteBinder;
 use webauthn_rs::prelude::{CredentialID as WebauthnCredentialId, Passkey as WebauthnPasskey};
-use crate::types::Uuid;
+use crate::{api::error::ServerError, types::Uuid};
 
 /// Wrapper to implement ToSql and FromSql on
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -111,7 +111,7 @@ pub struct Credential {
 }
 
 impl Credential {
-    pub fn fetch(conn: &Connection, id: &CredentialId) -> Result<Credential, anyhow::Error> {
+    pub fn fetch<T: Error>(conn: &Connection, id: &CredentialId) -> Result<Credential, ServerError<T>> {
         let id_value = id.to_json_string()?;
         let (sql, values) = Query::select()
             .columns([
@@ -137,7 +137,7 @@ impl Credential {
         Ok(credential)
     }
 
-    pub fn fetch_passkeys(conn: &Connection, user_id: &Uuid) -> Result<Vec<WebauthnPasskey>, anyhow::Error> {
+    pub fn fetch_passkeys<T: Error>(conn: &Connection, user_id: &Uuid) -> Result<Vec<WebauthnPasskey>, ServerError<T>> {
         let (sql, values) = Query::select()
             .column(CredentialIden::Passkey)
             .from(CredentialIden::Table)
@@ -148,14 +148,14 @@ impl Credential {
         let passkeys = stmt
             .query_and_then(&*values.as_params(), |r| r.get::<_, serde_json::Value>(0))?
             .map(|r| r
-                .map_err(anyhow::Error::from)
-                .and_then(|v| serde_json::from_value(v).map_err(anyhow::Error::from)))
+                .map_err(ServerError::from)
+                .and_then(|v| serde_json::from_value(v).map_err(ServerError::from)))
             .collect::<Result<Vec<WebauthnPasskey>, _>>()?;
 
         Ok(passkeys)
     }
 
-    pub fn create(conn: &mut Connection, new_credential: NewCredential) -> Result<Credential, anyhow::Error> {
+    pub fn create<T: Error>(conn: &mut Connection, new_credential: NewCredential) -> Result<Credential, ServerError<T>> {
         let tx = conn.transaction()?;
         let credential = {
             new_credential.insert(&tx)?;
@@ -166,7 +166,7 @@ impl Credential {
         Ok(credential)
     }
 
-    pub fn update(&self, conn: &Connection) -> Result<(), anyhow::Error> {
+    pub fn update<T: Error>(&self, conn: &Connection) -> Result<(), ServerError<T>> {
         let id_value = self.id.to_json_string()?;
         let (sql, values) = Query::update()
             .table(CredentialIden::Table)

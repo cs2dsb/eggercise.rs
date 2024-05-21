@@ -19,7 +19,7 @@ impl From<&User> for UserId {
 
 #[cfg(feature="backend")]
 impl UserId {
-    pub fn fetch_full_user(&self, conn: &Connection) -> Result<User, anyhow::Error> {
+    pub fn fetch_full_user(&self, conn: &Connection) -> Result<User, rusqlite::Error> {
         let user = User::fetch_by_id(conn, &self.id)?;
         Ok(user)
     }
