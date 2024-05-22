@@ -18,9 +18,7 @@ use axum::{
 use clap::Parser;
 use deadpool_sqlite::{Config, Hook, Pool, Runtime};
 use server::{
-    db::{self, DatabaseConnection},
-    routes::auth::*,
-    AppError, UserState,
+    db::{self, DatabaseConnection}, routes::auth::*, session_store::DeadpoolSqliteStore, AppError, UserState
 };
 use shared::{
     api::{self, error::ServerError, response_errors::FetchError},
@@ -34,7 +32,7 @@ use tower_http::{
     set_header::SetResponseHeaderLayer,
     trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer},
 };
-use tower_sessions::{cookie::time::Duration, Expiry, MemoryStore, SessionManagerLayer};
+use tower_sessions::{cookie::time::Duration, Expiry, SessionManagerLayer};
 use tracing::{debug, info, Level};
 use webauthn_rs::{prelude::Url, WebauthnBuilder};
 
@@ -140,6 +138,9 @@ async fn main() -> Result<(), anyhow::Error> {
         }))
         .build()?;
 
+    let session_store = DeadpoolSqliteStore::new(pool.clone());
+    session_store.migrate().await?;
+
     let socket = SocketAddr::new(IpAddr::from_str(&args.bind_addr)?, args.port);
 
     let listener = TcpListener::bind(socket).await?;
@@ -189,7 +190,7 @@ async fn main() -> Result<(), anyhow::Error> {
                             .on_response(DefaultOnResponse::new().level(Level::INFO)),
                     )
                     .layer(
-                        SessionManagerLayer::new(MemoryStore::default())
+                        SessionManagerLayer::new(session_store)
                             .with_secure(args.secure_sessions)
                             .with_expiry(Expiry::OnInactivity(Duration::days(
                                 args.session_expiry_days,
