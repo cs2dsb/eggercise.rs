@@ -29,6 +29,10 @@ deadpool.workspace = true
 deadpool-sqlite.workspace = true
 mime.workspace = true
 
+# QR Code generation
+qrcode = "0.14.0"
+qrcodegen = "1.8.0"
+
 # Session management
 tower-sessions = "0.12.2"
 

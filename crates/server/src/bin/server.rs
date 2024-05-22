@@ -165,7 +165,9 @@ async fn main() -> Result<(), anyhow::Error> {
                 api::Auth::RegisterNewKeyFinish.path(),
                 post(register_new_key_finish),
             )
+            // The following routes require the user to be signed in
             .route(api::Object::User.path(), get(fetch_user))
+            .route("/banana", get(add_device_qr_code))
             .nest_service(
                 "/wasm/service_worker.js",
                 ServiceBuilder::new()
