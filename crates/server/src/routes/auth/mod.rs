@@ -26,3 +26,6 @@ pub use register_new_key_start::*;
 
 mod register_new_key_finish;
 pub use register_new_key_finish::*;
+
+mod add_device_qr_code;
+pub use add_device_qr_code::*;
