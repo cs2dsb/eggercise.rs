@@ -4,7 +4,8 @@ use serde::{Deserialize, Serialize};
 use {
     crate::{
         api::error::{ServerError, ServerErrorContext},
-        model::{Credential, NewCredential, NewUser},
+        model::{Credential, NewCredential, NewUser,
+        TemporaryLogin}
     },
     exemplar::Model,
     rusqlite::{Connection, OptionalExtension},
@@ -140,5 +141,9 @@ impl User {
         tx.commit()?;
 
         Ok(credential)
+    }
+
+    pub fn temporary_login<T: Error>(&self, conn: &Connection) -> Result<Option<TemporaryLogin>, ServerError<T>> {
+        TemporaryLogin::fetch_by_user_id(conn, &self.id)
     }
 }

@@ -1,3 +1,5 @@
+#![feature(duration_constructors)]
+
 pub mod db;
 
 mod utils;
@@ -13,3 +15,5 @@ mod state;
 pub use state::*;
 
 pub mod routes;
+
+pub mod cli;

@@ -63,3 +63,10 @@ impl From<Uuid> for sea_query::Value {
         value.to_string().into()
     }
 }
+
+#[cfg(feature = "backend")]
+impl Uuid {
+    pub fn new_v4() -> Self {
+        uuid::Uuid::new_v4().into()
+    }
+}

@@ -55,3 +55,8 @@ response_error!(LoginError {
 // Alias used to allow future expansion of the errors without having to go back
 // and update all routes that use it
 pub type FetchError = Nothing;
+
+response_error!(TemporaryLoginError {
+    #[code(StatusCode::BAD_REQUEST)]
+    AlreadyExists,
+});

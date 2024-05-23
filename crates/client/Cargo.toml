@@ -27,6 +27,4 @@ web-sys = { workspace = true, features = [
     "PublicKeyCredentialCreationOptions",
 ] }
 
-
-
 shared = { path = "../shared", features = [ "frontend" ] }

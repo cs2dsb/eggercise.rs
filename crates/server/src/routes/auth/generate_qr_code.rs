@@ -1,13 +1,11 @@
 use axum::{ 
-    http::{ header, HeaderMap, HeaderValue }, 
-    response::IntoResponse, 
+    extract::Path, http::{ header, HeaderMap, HeaderValue }, response::IntoResponse 
 };
 
 use shared::api::error::{Nothing, ServerError};
 use qrcodegen::{ QrCode, QrCodeEcc, QrSegment, Version };
-use webauthn_rs::prelude::Uuid;
 
-use crate::{db::DatabaseConnection, SessionValue, UserState};
+use crate::UserState;
 
 fn to_svg_string(qr: &QrCode, border: u16) -> String {
     let border = border as i32;
@@ -36,17 +34,12 @@ fn to_svg_string(qr: &QrCode, border: u16) -> String {
 	result
 }
 
-pub async fn add_device_qr_code(
-    DatabaseConnection(_conn): DatabaseConnection,
-    _session: SessionValue,
-    user_state: UserState,
+pub async fn generate_qr_code(
+    // This is only required to make this route for logged in users only
+    _user_state: UserState,
+    payload: Path<String>,
 ) -> Result<impl IntoResponse, ServerError<Nothing>> {
-    let data = format!("https://egg.ileet.co.uk/user/{}/add_device/{}", 
-        user_state.id.id.as_hyphenated(),
-        Uuid::new_v4().as_hyphenated(),
-    );
-
-    let segments = QrSegment::make_segments(&data);
+    let segments = QrSegment::make_segments(&payload);
     let code = QrCode::encode_segments_advanced(
         &segments, 
         QrCodeEcc::Medium, 
