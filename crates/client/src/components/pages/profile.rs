@@ -1,54 +1,110 @@
 use leptos::{
-    component, create_action, create_local_resource, create_signal,
-    logging::{log, warn},
-    view, CollectView, ErrorBoundary, IntoView, Show, Signal, SignalGet, SignalUpdate, SignalWith,
+    component, create_action, Action, create_local_resource, create_signal, logging::{log, warn}, view, CollectView, ErrorBoundary, IntoView, Show, Signal, SignalGet, SignalUpdate, SignalWith
 };
-use shared::model::User;
+use shared::model::{
+    User,
+    TemporaryLogin,
+};
 
 use crate::{
-    api::{add_key, fetch_user},
-    components::forms::AddKeyForm,
+    api::{create_temporary_login, fetch_user},
+    components::forms::CreateTemporaryLoginForm,
 };
 
 #[component]
-pub fn UserView(user: User) -> impl IntoView {
-    view! {
-        <p>{ user.username } </p>
-    }
-}
-
-#[component]
-pub fn Profile() -> impl IntoView {
-    // Resources
-    let user = create_local_resource(move || (), |_| fetch_user());
-
-    // Signals
-    let (add_key_response, set_add_key_response) = create_signal(None);
-    let (add_key_error, set_add_key_error) = create_signal(None::<String>);
+fn ProfileWithUser(
+    user: Signal<Option<User>>, 
+    temporary_login: Signal<Option<TemporaryLogin>>,
+    update_action: Action<(User, TemporaryLogin), ()>,
+) -> impl IntoView {
+    let (temporary_login_error, set_temporary_login_error) = create_signal(None::<String>);
     let (wait_for_response, set_wait_for_response) = create_signal(false);
-    let disabled = Signal::derive(move || wait_for_response.get());
-
-    // Actions
-    let add_key_action = create_action(move |_: &()| {
+    
+    let create_temporary_login_action = create_action(move |_: &()| {
         log!("Adding new key...");
         async move {
             set_wait_for_response.update(|w| *w = true);
 
-            match add_key().await {
-                Ok(res) => {
-                    set_add_key_response.update(|v| *v = Some(res));
-                    set_add_key_error.update(|e| *e = None);
+            match create_temporary_login().await {
+                Ok(tl) => {
+                    set_temporary_login_error.update(|e| *e = None);
+                    update_action.dispatch((user.get().unwrap(), tl))
                 }
                 Err(err) => {
                     let msg = format!("{:?}", err);
                     warn!("Error adding key: {msg}");
-                    set_add_key_error.update(|e| *e = Some(msg));
+                    set_temporary_login_error.update(|e| *e = Some(msg));
                 }
             }
 
             set_wait_for_response.update(|w| *w = false);
         }
     });
+
+    view! {
+        <Show
+            when=move || user.with(|u| u.is_some())
+            fallback=move || {
+                view! {
+                    <p>Loading...</p>
+                }
+            }
+        >
+            <div><span>"Username: "</span><span>{ user.with(move |u| u.as_ref().map(|u| u.username.clone() )) }</span></div>
+            <Show 
+                when=move || temporary_login.with(|tl| tl.is_some())
+                fallback=move || {
+                    view! {
+                        <CreateTemporaryLoginForm
+                            action=create_temporary_login_action
+                            error=temporary_login_error
+                            disabled=wait_for_response
+                        />
+                    }
+                }
+            >
+                {move || temporary_login.with(move |tl| tl.as_ref().map(|tl| {
+                    view! {
+                        <a href={ &tl.url }>{ &tl.url }</a>
+                        <img src={ tl.qr_code_url() }/>
+                    }
+                }))}
+                // <div><span>"Temp login: "</span><span>{ temporary_login.with(move |tl| tl.as_ref().map(|tl| tl.url.clone() )) }</span></div>
+            </Show>
+        </Show>
+    }
+    
+}
+
+#[component]
+pub fn Profile() -> impl IntoView {
+    // Resources
+    let user_and_temp_login = create_local_resource(move || (), |_| fetch_user());
+
+    let update_action = create_action(move |(user, tl): &(User, TemporaryLogin)| {
+        let user = user.clone();
+        let tl = tl.clone();
+
+        async move { 
+            user_and_temp_login.update(|v| {
+                *v = Some(Ok((user, Some(tl))));
+            }) 
+        }
+    });
+
+    let user = Signal::derive(move || 
+        match user_and_temp_login.get() {
+            Some(Ok((u, _))) => Some(u),
+            _ => None,
+        }
+    );
+
+    let temporary_login = Signal::derive(move || 
+        match user_and_temp_login.get() {
+            Some(Ok((_, tl))) => tl,
+            _ => None,
+        }
+    );
 
     view! {
         <div>
@@ -64,29 +120,36 @@ pub fn Profile() -> impl IntoView {
                     </ul>
                 </div>
             }>
-            { move || user.and_then(|u| {
+            { move || user_and_temp_login.and_then(|_| {
                 view! {
-                    <UserView
-                        user=u.clone()
+                    <ProfileWithUser
+                        user
+                        temporary_login
+                        update_action
                     />
-                    <Show
-                        when=move || add_key_response.with(|r| r.is_some())
-                        fallback=move || {
-                            view! {
-                                <AddKeyForm
-                                    action=add_key_action
-                                    error=add_key_error
-                                    disabled
-                                />
-                            }
-                        }
-                    >
-                        <p>"New key added"</p>
-                    </Show>
                 }
+    //             view! {
+    //                 <UserView
+    //                     user=u.0.clone()
+    //                     temporary_login=u.1.clone()
+    //                 />
+    //                 <Show
+    //                     when=move || create_temporary_login_response.with(|r| r.is_some())
+    //                     fallback=move || {
+    //                         view! {
+    //                             <AddKeyForm
+    //                                 action=add_key_action
+    //                                 error=temporary_login_error
+    //                                 disabled
+    //                             />
+    //                         }
+    //                     }
+    //                 >
+    //                     <p>"New key added"</p>
+    //                 </Show>
+    //             }
             })}
             </ErrorBoundary>
-
         </div>
     }
 }

@@ -25,6 +25,9 @@ pub use fetch_user::*;
 mod add_key;
 pub use add_key::*;
 
+mod create_temporary_login;
+pub use create_temporary_login::*;
+
 pub trait ResponseContentType: Sized {
     fn content_type(&self) -> Option<String>;
 }

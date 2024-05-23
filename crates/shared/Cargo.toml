@@ -22,6 +22,7 @@ http.workspace = true
 serde_with.workspace = true
 http-serde.workspace = true
 
+percent-encoding = "2.3.1"
 anyhow = { workspace = true, optional = true }
 deadpool-sqlite = { workspace = true, optional = true }
 leptos = { workspace = true, optional = true }

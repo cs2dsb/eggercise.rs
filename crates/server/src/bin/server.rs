@@ -8,22 +8,20 @@ use std::{
 
 use anyhow::Context;
 use axum::{
-    extract::FromRef,
     http::{HeaderName, HeaderValue, Method, StatusCode, Uri},
     middleware,
     response::{IntoResponse, Response},
     routing::{get, post},
-    Json, Router,
+    Router,
 };
 use clap::Parser;
-use deadpool_sqlite::{Config, Hook, Pool, Runtime};
+use deadpool_sqlite::{Config, Hook, Runtime};
 use server::{
-    db::{self, DatabaseConnection}, routes::auth::*, AppError, UserState
+    cli::Cli, db, routes::auth::*, AppError, AppState
 };
 use shared::{
-    api::{self, error::ServerError, response_errors::FetchError},
+    api,
     configure_tracing, load_dotenv,
-    model::User,
 };
 use tower_sessions_deadpool_sqlite_store::DeadpoolSqliteStore;
 use tokio::net::TcpListener;
@@ -36,52 +34,6 @@ use tower_http::{
 use tower_sessions::{cookie::time::Duration, Expiry, SessionManagerLayer};
 use tracing::{debug, info, Level};
 use webauthn_rs::{prelude::Url, WebauthnBuilder};
-
-#[derive(Debug, Parser)]
-#[clap(name = "eggercise server")]
-struct Cli {
-    #[clap(long, env, default_value = "assets")]
-    assets_dir: PathBuf,
-    #[clap(long, env, default_value = "egg.sqlite")]
-    sqlite_connection_string: String,
-    #[clap(long, env, default_value = "64")]
-    database_command_channel_bound: usize,
-    #[clap(long, env, default_value = "8080")]
-    port: u16,
-    #[clap(long, env, default_value = "127.0.0.1")]
-    bind_addr: String,
-    #[clap(long, env, default_value = "false")]
-    secure_sessions: bool,
-    #[arg(long, env, default_value = "http://127.0.0.1:8080")]
-    webauthn_origin: String,
-    #[arg(long, env, default_value = "127.0.0.1")]
-    webauthn_id: String,
-    #[arg(long, env, default_value = "30")]
-    session_expiry_days: i64,
-
-    /// Deletes the database before starting the main program for debug purposes
-    #[arg(long, env, default_value = "false")]
-    debug_delete_database: bool,
-}
-
-#[derive(Debug, Clone)]
-struct AppState {
-    pool: Pool,
-    webauthn: Arc<webauthn_rs::Webauthn>,
-}
-
-impl FromRef<AppState> for Pool {
-    fn from_ref(state: &AppState) -> Self {
-        // pool uses an Arc internally so clone is cheap
-        state.pool.clone()
-    }
-}
-
-impl FromRef<AppState> for Arc<webauthn_rs::Webauthn> {
-    fn from_ref(state: &AppState) -> Self {
-        state.webauthn.clone()
-    }
-}
 
 fn build_webauthn(args: &Cli) -> Result<webauthn_rs::Webauthn, anyhow::Error> {
     let rp_name = format!("eggercise.rs on {}", &args.webauthn_origin);
@@ -125,7 +77,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let webauthn = Arc::new(build_webauthn(&args)?);
 
     // Create a database pool to add into the app state
-    let pool = Config::new(args.sqlite_connection_string)
+    let pool = Config::new(args.sqlite_connection_string.clone())
         .builder(Runtime::Tokio1)?
         .post_create(Hook::async_fn(|object, _| {
             Box::pin(async move {
@@ -150,6 +102,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let state = AppState {
         pool,
         webauthn,
+        args: Arc::new(args.clone()),
     };
 
     axum::serve(
@@ -169,7 +122,8 @@ async fn main() -> Result<(), anyhow::Error> {
             )
             // The following routes require the user to be signed in
             .route(api::Object::User.path(), get(fetch_user))
-            .route("/banana", get(add_device_qr_code))
+            .route(api::Auth::CreateTemporaryLogin.path(), post(create_temporary_login))
+            .route(api::Object::QrCode.id_path(), get(generate_qr_code))
             .nest_service(
                 "/wasm/service_worker.js",
                 ServiceBuilder::new()
@@ -203,17 +157,6 @@ async fn main() -> Result<(), anyhow::Error> {
     .await?;
 
     Ok(())
-}
-
-async fn fetch_user(
-    DatabaseConnection(conn): DatabaseConnection,
-    user_state: UserState,
-) -> Result<Json<User>, ServerError<FetchError>> {
-    let user = conn
-        .interact(move |conn| Ok::<_, ServerError<_>>(user_state.id.fetch_full_user(conn)?))
-        .await??;
-
-    Ok(Json(user))
 }
 
 async fn fallback_layer(uri: Uri, method: Method, response: Response) -> impl IntoResponse {

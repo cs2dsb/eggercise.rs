@@ -1,10 +1,10 @@
 use leptos::{component, view, Action, IntoView, Signal, SignalGet, SignalWith};
 
 #[component]
-pub fn AddKeyForm(
+pub fn CreateTemporaryLoginForm(
     action: Action<(), ()>,
     #[prop(into)] error: Signal<Option<String>>,
-    disabled: Signal<bool>,
+    #[prop(into)] disabled: Signal<bool>,
 ) -> impl IntoView {
     let dispatch_action = move || action.dispatch(());
     let button_disabled = Signal::derive(move || disabled.get());
@@ -19,7 +19,7 @@ pub fn AddKeyForm(
                 prop:disabled=move || button_disabled.get()
                 on:click=move |_| dispatch_action()
             >
-                "Enroll new key"
+                "Create temporary login code"
             </button>
         </form>
     }

@@ -7,6 +7,7 @@ pub const API_BASE_PATH: &str = "/api/";
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Object {
     User,
+    QrCode,
 }
 
 impl Object {
@@ -14,6 +15,7 @@ impl Object {
         use Object::*;
         match self {
             User => concatcp!(API_BASE_PATH, "user"),
+            QrCode => concatcp!(API_BASE_PATH, "qrcode"),
         }
     }
 
@@ -21,6 +23,7 @@ impl Object {
         use Object::*;
         match self {
             User => concatcp!(API_BASE_PATH, "user/:id"),
+            QrCode => concatcp!(API_BASE_PATH, "qrcode/:id"),
         }
     }
 }
@@ -33,6 +36,8 @@ pub enum Auth {
     LoginFinish,
     RegisterNewKeyStart,
     RegisterNewKeyFinish,
+    CreateTemporaryLogin,
+    TemporaryLogin,
 }
 
 impl Auth {
@@ -45,6 +50,8 @@ impl Auth {
             LoginFinish => concatcp!(API_BASE_PATH, "auth/login/finish"),
             RegisterNewKeyStart => concatcp!(API_BASE_PATH, "auth/register_key/start"),
             RegisterNewKeyFinish => concatcp!(API_BASE_PATH, "auth/register_key/finish"),
+            CreateTemporaryLogin => concatcp!(API_BASE_PATH, "auth/temporary_login/create"),
+            TemporaryLogin => concatcp!(API_BASE_PATH, "/temporary_login/:id"),
         }
     }
 }
