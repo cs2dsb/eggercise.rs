@@ -18,13 +18,14 @@ use axum::{
 use clap::Parser;
 use deadpool_sqlite::{Config, Hook, Pool, Runtime};
 use server::{
-    db::{self, DatabaseConnection}, routes::auth::*, session_store::DeadpoolSqliteStore, AppError, UserState
+    db::{self, DatabaseConnection}, routes::auth::*, AppError, UserState
 };
 use shared::{
     api::{self, error::ServerError, response_errors::FetchError},
     configure_tracing, load_dotenv,
     model::User,
 };
+use tower_sessions_deadpool_sqlite_store::DeadpoolSqliteStore;
 use tokio::net::TcpListener;
 use tower::ServiceBuilder;
 use tower_http::{

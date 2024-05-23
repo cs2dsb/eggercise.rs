@@ -490,7 +490,7 @@ checksum = "98cc8fbded0c607b7ba9dd60cd98df59af97e84d24e49c8557331cfc26d301ce"
 
 [[package]]
 name = "client"
-version = "0.0.37"
+version = "0.0.38"
 dependencies = [
  "console_error_panic_hook",
  "gloo-net",
@@ -2600,7 +2600,7 @@ dependencies = [
 
 [[package]]
 name = "server"
-version = "0.0.37"
+version = "0.0.38"
 dependencies = [
  "anyhow",
  "axum",
@@ -2634,6 +2634,7 @@ dependencies = [
  "tower",
  "tower-http",
  "tower-sessions",
+ "tower-sessions-deadpool-sqlite-store",
  "tracing",
  "walkdir",
  "wasm-bindgen-cli-support",
@@ -2697,7 +2698,7 @@ dependencies = [
 
 [[package]]
 name = "service-worker"
-version = "0.0.37"
+version = "0.0.38"
 dependencies = [
  "console_error_panic_hook",
  "gloo-utils",
@@ -2731,7 +2732,7 @@ dependencies = [
 
 [[package]]
 name = "shared"
-version = "0.0.37"
+version = "0.0.38"
 dependencies = [
  "anyhow",
  "axum",
@@ -3197,6 +3198,21 @@ dependencies = [
  "time",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "tower-sessions-deadpool-sqlite-store"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2e39863f3ba4a3771695ff1043faca55b6e266dd6b1ecf84f9b4d5a0ccdfedc2"
+dependencies = [
+ "async-trait",
+ "deadpool 0.11.2",
+ "deadpool-sqlite",
+ "rusqlite",
+ "serde_json",
+ "thiserror",
+ "tower-sessions",
 ]
 
 [[package]]
