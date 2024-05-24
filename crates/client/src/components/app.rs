@@ -6,7 +6,12 @@ use crate::{AppNav, AppRoutes};
 #[component]
 pub fn App() -> impl IntoView {
     view! {
-        <small>Version: { env!("CARGO_PKG_VERSION") }</small>
+        <small>{ format!("Version: {}{}", 
+            env!("CARGO_PKG_VERSION"),
+            option_env!("BUILD_TIME")
+                .map(|v| format!("- {v}"))
+                .unwrap_or("".to_string())) 
+        }</small>
         <Router>
             <AppNav/>
             <AppRoutes/>

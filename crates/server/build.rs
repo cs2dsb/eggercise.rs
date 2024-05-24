@@ -11,6 +11,7 @@ use std::{
 
 use anyhow::{bail, Context};
 use base64::{display::Base64Display, engine::general_purpose::STANDARD};
+use chrono::Utc;
 use glob::glob;
 use sha2::{Digest, Sha384};
 use shared::{
@@ -50,6 +51,7 @@ fn path_filename_to_str<'a>(path: &'a Path) -> &'a str {
 // Runs cargo rustc to build the wasm lib
 fn build_wasm(package: &str, out_dir: &str, release: bool) -> Result<(), anyhow::Error> {
     let mut cargo_cmd = Command::new("cargo");
+    cargo_cmd.env("BUILD_TIME", Utc::now().format("%Y%m%d %H%M%S").to_string());
     cargo_cmd.args([
         "rustc",
         "--package",
