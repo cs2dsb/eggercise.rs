@@ -69,4 +69,8 @@ impl Uuid {
     pub fn new_v4() -> Self {
         uuid::Uuid::new_v4().into()
     }
+    pub fn parse(value: &str) -> Result<Self, uuid::Error> {
+        uuid::Uuid::parse_str(value)
+            .map(|v| v.into())
+    }
 }

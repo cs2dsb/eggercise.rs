@@ -32,3 +32,6 @@ pub use generate_qr_code::*;
 
 mod user;
 pub use user::*;
+
+mod temporary_login;
+pub use temporary_login::*;

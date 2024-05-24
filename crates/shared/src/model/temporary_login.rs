@@ -63,6 +63,29 @@ impl TemporaryLogin {
         Ok(temporary_login)
     }
 
+    pub fn fetch_maybe<T: Error>(
+        conn: &Connection,
+        id: &Uuid,
+    ) -> Result<Option<TemporaryLogin>, ServerError<T>> {
+        let (sql, values) = Query::select()
+            .columns([
+                TemporaryLoginIden::Id,
+                TemporaryLoginIden::UserId,
+                TemporaryLoginIden::ExpiryDate,
+                TemporaryLoginIden::Url,
+            ])
+            .from(TemporaryLoginIden::Table)
+            .and_where(Expr::col(TemporaryLoginIden::Id).eq(id))
+            .limit(1)
+            .build_rusqlite(SqliteQueryBuilder);
+
+        let mut stmt = conn.prepare_cached(&sql)?;
+        let temporary_login = stmt.query_row(&*values.as_params(), TemporaryLogin::from_row)
+            .optional()?;
+
+        Ok(temporary_login)
+    }
+
     pub fn fetch_by_user_id<T: Error>(
         conn: &Connection,
         id: &Uuid,
@@ -100,8 +123,8 @@ impl TemporaryLogin {
     }
 
     pub fn delete<T: Error>(&self, conn: &Connection) -> Result<(), ServerError<T>> {
-        let (sql, values) = Query::update()
-            .table(TemporaryLoginIden::Table)
+        let (sql, values) = Query::delete()
+            .from_table(TemporaryLoginIden::Table)
             .and_where(Expr::col(TemporaryLoginIden::Id).eq(&self.id))
             .build_rusqlite(SqliteQueryBuilder);
 

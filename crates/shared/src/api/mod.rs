@@ -51,7 +51,7 @@ impl Auth {
             RegisterNewKeyStart => concatcp!(API_BASE_PATH, "auth/register_key/start"),
             RegisterNewKeyFinish => concatcp!(API_BASE_PATH, "auth/register_key/finish"),
             CreateTemporaryLogin => concatcp!(API_BASE_PATH, "auth/temporary_login/create"),
-            TemporaryLogin => concatcp!(API_BASE_PATH, "/temporary_login/:id"),
+            TemporaryLogin => concatcp!(API_BASE_PATH, "auth/login/code/:id"),
         }
     }
 }
