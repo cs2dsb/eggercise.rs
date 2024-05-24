@@ -208,6 +208,13 @@ pub enum ServerError<T: Error> {
     #[error("ServerError::Unauthorized {{ {message} }}")]
     Unauthorized { message: String },
 
+    #[error("ServerError::Status {{ {message} }}")]
+    Status { 
+        #[serde(with = "http_serde::status_code")]
+        code: StatusCode, 
+        message: String,
+    },
+
     // TODO: do these extra variants with the same inner type actually add anything above
     // prefixing       the message with the name of the origin type?
     #[error("ServerError::Json {{ {message} }}")]
@@ -247,6 +254,18 @@ macro_rules! ensure_server {
 #[macro_export]
 macro_rules! unauthorized_error {
     ($($t:tt)*) => (ServerError::Unauthorized{ message: format_args!($($t)*).to_string() })
+}
+
+#[cfg(feature = "backend")]
+#[macro_export]
+macro_rules! bad_request_error {
+    ($($t:tt)*) => (ServerError::Status{ code: StatusCode::BAD_REQUEST, message: format_args!($($t)*).to_string() })
+}
+
+#[cfg(feature = "backend")]
+#[macro_export]
+macro_rules! status_code_error {
+    ($code:expr, $($t:tt)*) => (ServerError::Status{ code: $code, message: format_args!($($t)*).to_string() })
 }
 
 #[cfg(feature = "backend")]
@@ -310,6 +329,9 @@ impl<T: Error> ServerError<T> {
             Unauthorized {
                 ..
             } => StatusCode::UNAUTHORIZED,
+            Status {
+                code, ..
+            } => code.to_owned(),
             WithContext {
                 inner, ..
             } => inner.code(),

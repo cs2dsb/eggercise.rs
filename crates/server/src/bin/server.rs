@@ -124,6 +124,7 @@ async fn main() -> Result<(), anyhow::Error> {
             .route(api::Object::User.path(), get(fetch_user))
             .route(api::Auth::CreateTemporaryLogin.path(), post(create_temporary_login))
             .route(api::Object::QrCode.id_path(), get(generate_qr_code))
+            .route(api::Auth::TemporaryLogin.path(), get(temporary_login))
             .nest_service(
                 "/wasm/service_worker.js",
                 ServiceBuilder::new()

@@ -356,18 +356,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "79296716171880943b8470b5f8d03aa55eb2e645a4874bdbb28adb49162e012c"
 
 [[package]]
-name = "bytemuck"
-version = "1.16.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "78834c15cb5d5efe3452d58b1e8ba890dd62d21907f867f383358198e56ebca5"
-
-[[package]]
-name = "byteorder"
-version = "1.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1fd0f2584146f6f2ef48085050886acf353beff7305ebd1ae69500e27c67f64b"
-
-[[package]]
 name = "bytes"
 version = "1.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -490,7 +478,7 @@ checksum = "98cc8fbded0c607b7ba9dd60cd98df59af97e84d24e49c8557331cfc26d301ce"
 
 [[package]]
 name = "client"
-version = "0.0.39"
+version = "0.0.40"
 dependencies = [
  "console_error_panic_hook",
  "gloo-net",
@@ -1413,17 +1401,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "image"
-version = "0.25.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fd54d660e773627692c524beaad361aca785a4f9f5730ce91f42aabe5bce3d11"
-dependencies = [
- "bytemuck",
- "byteorder",
- "num-traits",
-]
-
-[[package]]
 name = "include_dir"
 version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2152,15 +2129,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "qrcode"
-version = "0.14.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "23e719ca51966ff9f5a8436edb00d6115b3c606a0bb27c8f8ca74a38ff2b036d"
-dependencies = [
- "image",
-]
-
-[[package]]
 name = "qrcodegen"
 version = "1.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2600,7 +2568,7 @@ dependencies = [
 
 [[package]]
 name = "server"
-version = "0.0.39"
+version = "0.0.40"
 dependencies = [
  "anyhow",
  "axum",
@@ -2617,7 +2585,6 @@ dependencies = [
  "include_dir",
  "leptos",
  "mime",
- "qrcode",
  "qrcodegen",
  "rusqlite",
  "rusqlite_migration",
@@ -2698,7 +2665,7 @@ dependencies = [
 
 [[package]]
 name = "service-worker"
-version = "0.0.39"
+version = "0.0.40"
 dependencies = [
  "console_error_panic_hook",
  "gloo-utils",
@@ -2732,7 +2699,7 @@ dependencies = [
 
 [[package]]
 name = "shared"
-version = "0.0.39"
+version = "0.0.40"
 dependencies = [
  "anyhow",
  "axum",
