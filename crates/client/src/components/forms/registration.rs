@@ -1,6 +1,6 @@
 use leptos::{
     component, create_signal, ev::KeyboardEvent, event_target_value, view, Action, IntoView,
-    Signal, SignalGet, SignalUpdate, SignalWith,
+    Signal, SignalGet, SignalUpdate, SignalWith, logging::log,
 };
 
 #[component]
@@ -10,9 +10,11 @@ pub fn RegistrationForm(
     disabled: Signal<bool>,
 ) -> impl IntoView {
     let (name, set_name) = create_signal(String::new());
-
-    let dispatch_action = move || action.dispatch(name.get());
-
+    let dispatch_action = move || {
+        let n = name.get();
+        log!("RegistrationForm::dispatch_action: {n}");
+        action.dispatch(n)
+    };
     let button_disabled = Signal::derive(move || disabled.get() || name.with(|n| n.is_empty()));
 
     view! {

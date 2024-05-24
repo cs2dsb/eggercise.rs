@@ -1,5 +1,5 @@
 use gloo_net::http::Method;
-use leptos::window;
+use leptos::{ window, logging::log };
 use shared::{
     api::{
         self,
@@ -12,12 +12,16 @@ use wasm_bindgen_futures::JsFuture;
 use web_sys::{CredentialCreationOptions, PublicKeyCredential};
 use webauthn_rs_proto::{CreationChallengeResponse, RegisterPublicKeyCredential};
 
-use super::json_request;
+use crate::{
+    api::json_request,
+    utils::JsValueIntoOk,
+};
 
 pub async fn register(
     reg_user: &RegistrationUser,
 ) -> Result<(), FrontendError<ServerError<RegisterError>>> {
     // Ask the server to start the registration process and return a challenge
+    log!("register::json_request::register_start");
     let creation_challenge_response: CreationChallengeResponse = json_request(
         Method::POST,
         api::Auth::RegisterStart.path(),
@@ -26,9 +30,12 @@ pub async fn register(
     .await?;
 
     // Convert to the browser type
+    log!("register::CreationChallengeResponse => CredentialCreationOptions");
     let credential_creation_options: CredentialCreationOptions = creation_challenge_response.into();
 
+
     // Get a promise that returns the credentials
+    log!("register::window.credentials.create");
     let create_fut = window()
         .navigator()
         .credentials()
@@ -37,6 +44,7 @@ pub async fn register(
         .context("Creating credential create request (window.navigator.credentials.create)")?;
 
     // Get the credentials
+    log!("register::window.credentials.create.await");
     let public_key_credential: PublicKeyCredential = JsFuture::from(create_fut)
         .await
         .map_err(FrontendError::from)
@@ -44,9 +52,11 @@ pub async fn register(
         .into();
 
     // Convert to the rust type
-    let register_public_key_credentials: RegisterPublicKeyCredential = public_key_credential.into();
+    log!("register::PublicKeyCredentials => RegisterPublicKeyCredential");
+    let register_public_key_credentials: RegisterPublicKeyCredential = public_key_credential.ok()?;
 
     // Complete the registration with the server
+    log!("register::json_request::register_finish");
     json_request(
         Method::POST,
         api::Auth::RegisterFinish.path(),
