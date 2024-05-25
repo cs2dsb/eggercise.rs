@@ -1,0 +1,25 @@
+[package]
+name = "web-worker"
+edition.workspace = true
+version.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+serde.workspace = true
+console_error_panic_hook.workspace = true
+wasm-bindgen-futures.workspace = true
+wasm-bindgen.workspace = true
+
+js-sys = "0.3.69"
+shared = { path = "../shared" }
+web-sys = { workspace = true, features = [ 
+    "console", "FetchEvent",  "Request",  
+    "ReadableStream",  "ReadableStreamDefaultReader", 
+    "Headers",  "ResponseInit",  "Response", 
+    "ServiceWorkerGlobalScope", "WorkerGlobalScope", 
+    "WorkerLocation", "Clients", "CacheStorage",
+    "Cache", "RequestInit", "MessageEvent", "Url"
+] }
+gloo-utils = "0.2.0"

@@ -137,22 +137,27 @@ async fn main() -> Result<(), anyhow::Error> {
                 ServiceBuilder::new()
                     .layer(
                         TraceLayer::new_for_http()
-                            // .make_span_with(DefaultMakeSpan::new().level(Level::INFO))
-                            // .on_response(DefaultOnResponse::new().level(Level::INFO)),
                             .make_span_with(|request: &Request<_>| {
-                                // Log the matched route's path (with placeholders not filled in).
-                                // Use request.uri() or OriginalUri if you want the real path.
-                                let matched_path = request
+                                let span = info_span!(
+                                    "http_log",
+                                    status = tracing::field::Empty,
+                                    method = ?request.method(),
+                                    matched_path = tracing::field::Empty,
+                                    path = tracing::field::Empty,
+                                );
+
+                                if let Some(matched_path) = request
                                     .extensions()
                                     .get::<MatchedPath>()
-                                    .map(MatchedPath::as_str);
-            
-                                info_span!(
-                                    "http_log",
-                                    method = ?request.method(),
-                                    matched_path,
-                                    status = tracing::field::Empty,
-                                )
+                                    .map(MatchedPath::as_str) 
+                                {
+                                    span.record("matched_path", matched_path);
+                                } else {
+                                    // Fallback if the path isn't matched
+                                    span.record("path", request.uri().to_string());
+                                }
+
+                                span
                             })
                             .on_response(|response: &Response, _latency: Duration, span: &Span| {
                                 span.record("status", response.status().to_string());
@@ -171,7 +176,15 @@ async fn main() -> Result<(), anyhow::Error> {
                             .with_expiry(Expiry::OnInactivity(CookieDuration::days(
                                 args.session_expiry_days,
                             ))),
-                    ),
+                    )
+                    .layer(SetResponseHeaderLayer::if_not_present(
+                        HeaderName::from_static("cross-origin-opener-policy"),
+                        HeaderValue::from_static("same-origin"),
+                    ))
+                    .layer(SetResponseHeaderLayer::if_not_present(
+                        HeaderName::from_static("cross-origin-embedder-policy"),
+                        HeaderValue::from_static("require-corp"),
+                    )),
             )
             .with_state(state),
     )

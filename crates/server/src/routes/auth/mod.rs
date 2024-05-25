@@ -1,4 +1,4 @@
-//! Auth is based on https://github.com/kanidm/webauthn-rs/blob/628599aa47b5c120e7f29cce8c526af532fba9ce/tutorial/server/axum/src/auth.rs#L52
+//! Auth is based on <https://github.com/kanidm/webauthn-rs/blob/628599aa47b5c120e7f29cce8c526af532fba9ce/tutorial/server/axum/src/auth.rs#L52>
 //!
 //! Currently register, login and add key are implemented. Add key is somewhat
 //! useless for the most obvious case of wanting to grant your phone access to
