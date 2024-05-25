@@ -2,13 +2,16 @@ use leptos::{
     component, create_action, create_signal,
     logging::{log, warn},
     view, IntoView, Show, Signal, SignalGet, SignalUpdate, SignalWith,
+    ReadSignal,
 };
 use shared::model::LoginUser;
 
-use crate::{api::login, components::LoginForm, ClientRoutes};
+use crate::{api::login, components::{LoginForm, OfflineFallback}, ClientRoutes};
 
 #[component]
-pub fn Login() -> impl IntoView {
+pub fn Login(
+    online: ReadSignal<bool>,
+) -> impl IntoView {
     // Signals
     let (login_response, set_login_response) = create_signal(None);
     let (login_error, set_login_error) = create_signal(None::<String>);
@@ -40,21 +43,23 @@ pub fn Login() -> impl IntoView {
 
     view! {
         <h2>"Login"</h2>
-        <Show
-            when=move || login_response.with(|r| r.is_some())
-            fallback=move || {
-                view! {
-                    <LoginForm
-                        action=login_action
-                        error=login_error
-                        disabled
-                    />
+        <OfflineFallback online>
+            <Show
+                when=move || login_response.with(|r| r.is_some())
+                fallback=move || {
+                    view! {
+                        <LoginForm
+                            action=login_action
+                            error=login_error
+                            disabled
+                        />
+                    }
                 }
-            }
-        >
-            <p>"Login complete"</p>
-            { ClientRoutes::Today.link() }
-            <div>{ login_response.with(|v| format!("{:?}", v)) }</div>
-        </Show>
+            >
+                <p>"Login complete"</p>
+                { ClientRoutes::Today.link() }
+                <div>{ login_response.with(|v| format!("{:?}", v)) }</div>
+            </Show>
+        </OfflineFallback>
     }
 }

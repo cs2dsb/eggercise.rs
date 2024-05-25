@@ -29,6 +29,9 @@ pub use add_key::*;
 mod create_temporary_login;
 pub use create_temporary_login::*;
 
+mod ping;
+pub use ping::*;
+
 pub trait ResponseContentType: Sized {
     fn content_type(&self) -> Option<String>;
 }

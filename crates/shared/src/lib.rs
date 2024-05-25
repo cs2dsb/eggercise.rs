@@ -18,8 +18,8 @@ pub fn configure_tracing() {
         tracing_subscriber::FmtSubscriber::builder()
             .with_max_level(tracing::Level::TRACE)
             .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
-            .with_line_number(true)
-            .with_file(true)
+            // .with_line_number(true)
+            // .with_file(true)
             //.with_span_events(FmtSpan::ENTER | FmtSpan::CLOSE)
             .with_span_events(FmtSpan::CLOSE)
             .finish(),

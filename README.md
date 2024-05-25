@@ -27,3 +27,13 @@
 
 ## Docker build
 - Mount sqlite db 
+
+## Potentially useful crates
+
+- https://crates.io/crates/leptos-struct-table
+- https://crates.io/crates/leptos_icon_gen
+- https://crates.io/crates/leptos_webtransport
+- https://crates.io/crates/rcss-leptos
+- https://crates.io/crates/leptos-chartistry
+- https://crates.io/crates/leptos_form
+- https://thawui.vercel.app/components/calendar

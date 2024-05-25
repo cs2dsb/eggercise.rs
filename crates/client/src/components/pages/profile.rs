@@ -1,5 +1,6 @@
 use leptos::{
-    component, create_action, Action, create_local_resource, create_signal, logging::{log, warn}, view, CollectView, ErrorBoundary, IntoView, Show, Signal, SignalGet, SignalUpdate, SignalWith
+    component, create_action, Action, create_local_resource, create_signal, logging::{log, warn}, 
+    view, CollectView, ErrorBoundary, IntoView, Show, Signal, SignalGet, SignalUpdate, SignalWith, ReadSignal,
 };
 use shared::model::{
     User,
@@ -8,7 +9,10 @@ use shared::model::{
 
 use crate::{
     api::{create_temporary_login, fetch_user},
-    components::forms::CreateTemporaryLoginForm,
+    components::{
+        forms::CreateTemporaryLoginForm,
+        OfflineFallback,
+    },
 };
 
 #[component]
@@ -77,7 +81,10 @@ fn ProfileWithUser(
 }
 
 #[component]
-pub fn Profile() -> impl IntoView {
+pub fn Profile(
+    #[allow(unused_variables)]
+    online: ReadSignal<bool>,
+) -> impl IntoView {
     // Resources
     let user_and_temp_login = create_local_resource(move || (), |_| fetch_user());
 
@@ -107,49 +114,32 @@ pub fn Profile() -> impl IntoView {
     );
 
     view! {
-        <div>
-            <ErrorBoundary fallback=|errors| view! {
-                <div style="color:red">
-                    <p>Error:</p>
-                    <ul>
-                    { move || errors.with(|v|
-                        v.iter()
-                        .map(|(_, e)| view! { <li> { format!("{:?}", e) } </li>})
-                        .collect_view())
+        <h2>"Profile"</h2>
+        <OfflineFallback online>
+            <div>
+                <ErrorBoundary fallback=|errors| view! {
+                    <div style="color:red">
+                        <p>Error:</p>
+                        <ul>
+                        { move || errors.with(|v|
+                            v.iter()
+                            .map(|(_, e)| view! { <li> { format!("{:?}", e) } </li>})
+                            .collect_view())
+                        }
+                        </ul>
+                    </div>
+                }>
+                { move || user_and_temp_login.and_then(|_| {
+                    view! {
+                        <ProfileWithUser
+                            user
+                            temporary_login
+                            update_action
+                        />
                     }
-                    </ul>
-                </div>
-            }>
-            { move || user_and_temp_login.and_then(|_| {
-                view! {
-                    <ProfileWithUser
-                        user
-                        temporary_login
-                        update_action
-                    />
-                }
-    //             view! {
-    //                 <UserView
-    //                     user=u.0.clone()
-    //                     temporary_login=u.1.clone()
-    //                 />
-    //                 <Show
-    //                     when=move || create_temporary_login_response.with(|r| r.is_some())
-    //                     fallback=move || {
-    //                         view! {
-    //                             <AddKeyForm
-    //                                 action=add_key_action
-    //                                 error=temporary_login_error
-    //                                 disabled
-    //                             />
-    //                         }
-    //                     }
-    //                 >
-    //                     <p>"New key added"</p>
-    //                 </Show>
-    //             }
-            })}
-            </ErrorBoundary>
-        </div>
+                })}
+                </ErrorBoundary>
+            </div>
+        </OfflineFallback>
     }
 }
