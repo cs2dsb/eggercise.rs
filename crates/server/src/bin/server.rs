@@ -3,21 +3,17 @@ use std::{
     net::{IpAddr, SocketAddr},
     path::PathBuf,
     str::FromStr,
-    sync::Arc,
+    sync::Arc, time::Duration,
 };
 
 use anyhow::Context;
 use axum::{
-    http::{HeaderName, HeaderValue, Method, StatusCode, Uri},
-    middleware,
-    response::{IntoResponse, Response},
-    routing::{get, post},
-    Router,
+    extract::{MatchedPath, Request}, http::{HeaderName, HeaderValue, Method, StatusCode, Uri}, middleware, response::{IntoResponse, Response}, routing::{get, post}, Router
 };
 use clap::Parser;
 use deadpool_sqlite::{Config, Hook, Runtime};
 use server::{
-    cli::Cli, db, routes::auth::*, AppError, AppState
+    cli::Cli, db, routes::{auth::*, ping::ping}, AppError, AppState
 };
 use shared::{
     api,
@@ -27,12 +23,10 @@ use tower_sessions_deadpool_sqlite_store::DeadpoolSqliteStore;
 use tokio::net::TcpListener;
 use tower::ServiceBuilder;
 use tower_http::{
-    services::{ServeDir, ServeFile},
-    set_header::SetResponseHeaderLayer,
-    trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer},
+    classify::ServerErrorsFailureClass, services::{ServeDir, ServeFile}, set_header::SetResponseHeaderLayer, trace::TraceLayer
 };
-use tower_sessions::{cookie::time::Duration, Expiry, SessionManagerLayer};
-use tracing::{debug, info, Level};
+use tower_sessions::{Expiry, SessionManagerLayer, cookie::time::Duration as CookieDuration};
+use tracing::{debug, info, info_span, Span};
 use webauthn_rs::{prelude::Url, WebauthnBuilder};
 
 fn build_webauthn(args: &Cli) -> Result<webauthn_rs::Webauthn, anyhow::Error> {
@@ -120,11 +114,12 @@ async fn main() -> Result<(), anyhow::Error> {
                 api::Auth::RegisterNewKeyFinish.path(),
                 post(register_new_key_finish),
             )
+            .route(api::Auth::TemporaryLogin.path(), get(temporary_login))
+            .route(api::Object::Ping.path(), get(ping))
             // The following routes require the user to be signed in
             .route(api::Object::User.path(), get(fetch_user))
             .route(api::Auth::CreateTemporaryLogin.path(), post(create_temporary_login))
             .route(api::Object::QrCode.id_path(), get(generate_qr_code))
-            .route(api::Auth::TemporaryLogin.path(), get(temporary_login))
             .nest_service(
                 "/wasm/service_worker.js",
                 ServiceBuilder::new()
@@ -142,13 +137,38 @@ async fn main() -> Result<(), anyhow::Error> {
                 ServiceBuilder::new()
                     .layer(
                         TraceLayer::new_for_http()
-                            .make_span_with(DefaultMakeSpan::new().level(Level::INFO))
-                            .on_response(DefaultOnResponse::new().level(Level::INFO)),
+                            // .make_span_with(DefaultMakeSpan::new().level(Level::INFO))
+                            // .on_response(DefaultOnResponse::new().level(Level::INFO)),
+                            .make_span_with(|request: &Request<_>| {
+                                // Log the matched route's path (with placeholders not filled in).
+                                // Use request.uri() or OriginalUri if you want the real path.
+                                let matched_path = request
+                                    .extensions()
+                                    .get::<MatchedPath>()
+                                    .map(MatchedPath::as_str);
+            
+                                info_span!(
+                                    "http_log",
+                                    method = ?request.method(),
+                                    matched_path,
+                                    status = tracing::field::Empty,
+                                )
+                            })
+                            .on_response(|response: &Response, _latency: Duration, span: &Span| {
+                                span.record("status", response.status().to_string());
+                            })
+                            .on_failure(
+                                |error: ServerErrorsFailureClass, _latency: Duration, span: &Span| {
+                                    if let ServerErrorsFailureClass::StatusCode(code) = error {
+                                        span.record("status", code.to_string());
+                                    }
+                                },
+                            ),
                     )
                     .layer(
                         SessionManagerLayer::new(session_store)
                             .with_secure(args.secure_sessions)
-                            .with_expiry(Expiry::OnInactivity(Duration::days(
+                            .with_expiry(Expiry::OnInactivity(CookieDuration::days(
                                 args.session_expiry_days,
                             ))),
                     ),

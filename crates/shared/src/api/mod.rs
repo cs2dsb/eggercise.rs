@@ -8,6 +8,7 @@ pub const API_BASE_PATH: &str = "/api/";
 pub enum Object {
     User,
     QrCode,
+    Ping,
 }
 
 impl Object {
@@ -16,6 +17,7 @@ impl Object {
         match self {
             User => concatcp!(API_BASE_PATH, "user"),
             QrCode => concatcp!(API_BASE_PATH, "qrcode"),
+            Ping => concatcp!(API_BASE_PATH, "ping"),
         }
     }
 
@@ -24,6 +26,7 @@ impl Object {
         match self {
             User => concatcp!(API_BASE_PATH, "user/:id"),
             QrCode => concatcp!(API_BASE_PATH, "qrcode/:id"),
+            Ping => concatcp!(API_BASE_PATH, "ping"),
         }
     }
 }

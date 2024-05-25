@@ -1,7 +1,10 @@
-use leptos::{component, view, IntoView};
+use leptos::{component, view, IntoView, ReadSignal};
 
 #[component]
-pub fn Today() -> impl IntoView {
+pub fn Today(
+    #[allow(unused_variables)]
+    online: ReadSignal<bool>,
+) -> impl IntoView {
     view! {
         <p>"Today"</p>
     }
