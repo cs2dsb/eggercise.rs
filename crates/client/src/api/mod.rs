@@ -12,7 +12,6 @@ use shared::{
     api::error::{FrontendError, ResultContext, ServerError, WrongContentTypeError},
     model::ValidateModel,
 };
-use leptos::logging::log;
 
 mod register;
 pub use register::*;
@@ -31,6 +30,7 @@ pub use create_temporary_login::*;
 
 mod ping;
 pub use ping::*;
+use tracing::debug;
 
 pub trait ResponseContentType: Sized {
     fn content_type(&self) -> Option<String>;
@@ -53,11 +53,11 @@ where
     E: Error + DeserializeOwned + Display,
 {
     // Check the body is valid
-    log!("json_request({method}, {url}, body type: {})", type_name::<B>());
+    debug!("json_request({method}, {url}, body type: {})", type_name::<B>());
     if let Some(body) = body {
-        log!("json_request::body::validate");
+        debug!("json_request::body::validate");
         body.validate()?;
-        log!("json_request::body::validate ok");
+        debug!("json_request::body::validate ok");
     }
 
     let builder = RequestBuilder::new(url)
@@ -65,7 +65,7 @@ where
         .header(ACCEPT.as_str(), APPLICATION_JSON.essence_str());
 
     // Add the json body or set the releavant headers
-    log!("json_request::request::build");
+    debug!("json_request::request::build");
     let request = match body {
         Some(body) => builder.json(body),
         None => builder.build(),
@@ -74,7 +74,7 @@ where
     .with_context(|| format!("Converting {:?} to json body (for: {method} {url}", body))?;
 
     // Send the request and handle the network and js errors
-    log!("json_request::request::send");
+    debug!("json_request::request::send");
     let response = request
         .send()
         .await
@@ -86,7 +86,7 @@ where
     let is_json = content_type
     .as_ref()
     .map_or(false, |v| v == mime::APPLICATION_JSON.essence_str());
-    log!("json_request::response::is_json: {is_json}");
+    debug!("json_request::response::is_json: {is_json}");
 
     // Handle non-json errors (this isn't to allow the api to return other things,
     // it's only to handle errors)
@@ -97,7 +97,7 @@ where
             .map_err(FrontendError::from)
             .with_context(|| format!("Extracting response body as text from {method} {url}"))?;
 
-        log!("json_request::return Err(WrongContentTypeError)");
+        debug!("json_request::return Err(WrongContentTypeError)");
         Err(WrongContentTypeError {
             expected: APPLICATION_JSON.to_string(),
             got: content_type,
@@ -109,7 +109,7 @@ where
 
     // Deserialize the error type
     if !response.ok() {
-        log!("json_request::return Err(FrontendError)");
+        debug!("json_request::return Err(FrontendError)");
         let err = response
             .json::<ServerError<E>>()
             .await
@@ -128,7 +128,7 @@ where
 
 
     // Deserialize the ok type
-    log!("json_request::deserialize");
+    debug!("json_request::deserialize");
     let payload = response
         .json::<R>()
         .await
@@ -141,6 +141,6 @@ where
         })?;
 
 
-    log!("json_request::return Ok::<{}>", type_name::<R>());
+    debug!("json_request::return Ok::<{}>", type_name::<R>());
     Ok(payload)
 }

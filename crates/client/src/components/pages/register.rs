@@ -1,10 +1,10 @@
 use leptos::{
     component, create_action, create_signal,
-    logging::{log, warn},
     view, IntoView, Show, Signal, SignalGet, SignalUpdate, SignalWith,
     ReadSignal,
 };
 use shared::model::RegistrationUser;
+use tracing::{ debug, warn };
 
 use crate::{api::register, components::RegistrationForm, ClientRoutes, components::OfflineFallback};
 
@@ -19,7 +19,7 @@ pub fn Register(online: ReadSignal<bool>) -> impl IntoView {
     // Actions
     let register_action = create_action(move |username: &String| {
         let reg_user = RegistrationUser::new(username);
-        log!("Registering new user {:?}", reg_user);
+        debug!("Registering new user {:?}", reg_user);
         async move {
             set_wait_for_response.update(|w| *w = true);
 

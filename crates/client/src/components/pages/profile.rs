@@ -1,11 +1,12 @@
 use leptos::{
-    component, create_action, Action, create_local_resource, create_signal, logging::{log, warn}, 
+    component, create_action, Action, create_local_resource, create_signal, 
     view, CollectView, ErrorBoundary, IntoView, Show, Signal, SignalGet, SignalUpdate, SignalWith, ReadSignal,
 };
 use shared::model::{
     User,
     TemporaryLogin,
 };
+use tracing::{ debug, warn };
 
 use crate::{
     api::{create_temporary_login, fetch_user},
@@ -25,7 +26,7 @@ fn ProfileWithUser(
     let (wait_for_response, set_wait_for_response) = create_signal(false);
     
     let create_temporary_login_action = create_action(move |_: &()| {
-        log!("Adding new key...");
+        debug!("Adding new key...");
         async move {
             set_wait_for_response.update(|w| *w = true);
 

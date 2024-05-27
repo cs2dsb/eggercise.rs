@@ -1,6 +1,7 @@
 use std::time::Duration;
 
-use leptos::{component, create_action, logging::log, set_interval, view, ChildrenFn, IntoView, ReadSignal, SignalUpdate, WriteSignal, Show};
+use leptos::{component, create_action, set_interval, view, ChildrenFn, IntoView, ReadSignal, SignalUpdate, WriteSignal, Show};
+use tracing::debug;
 
 use crate::api::ping;
 
@@ -11,7 +12,7 @@ pub fn OnlineCheck(set_online: WriteSignal<bool>) -> impl IntoView {
     let ping_action = create_action(move |_| {
         async move {
             let online = ping().await.is_ok();
-            log!("Ping result: {online}");
+            debug!("Ping result: {online}");
             set_online.update(|v| *v = online);
         }
     });

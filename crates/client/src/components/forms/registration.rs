@@ -1,7 +1,8 @@
 use leptos::{
     component, create_signal, ev::KeyboardEvent, event_target_value, view, Action, IntoView,
-    Signal, SignalGet, SignalUpdate, SignalWith, logging::log,
+    Signal, SignalGet, SignalUpdate, SignalWith,
 };
+use tracing::debug;
 
 #[component]
 pub fn RegistrationForm(
@@ -12,7 +13,7 @@ pub fn RegistrationForm(
     let (name, set_name) = create_signal(String::new());
     let dispatch_action = move || {
         let n = name.get();
-        log!("RegistrationForm::dispatch_action: {n}");
+        debug!("RegistrationForm::dispatch_action: {n}");
         action.dispatch(n)
     };
     let button_disabled = Signal::derive(move || disabled.get() || name.with(|n| n.is_empty()));

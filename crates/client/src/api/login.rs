@@ -1,5 +1,5 @@
 use gloo_net::http::Method;
-use leptos::{ window, logging::log };
+use leptos::window;
 use shared::{
     api::{
         self,
@@ -8,6 +8,7 @@ use shared::{
     },
     model::{LoginUser, User},
 };
+use tracing::debug;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{CredentialRequestOptions, PublicKeyCredential};
 use webauthn_rs_proto::{PublicKeyCredential as WebauthnPublicKey, RequestChallengeResponse};
@@ -18,16 +19,16 @@ use super::json_request;
 
 pub async fn login(login_user: &LoginUser) -> Result<User, FrontendError<ServerError<LoginError>>> {
     // Ask the server to start the login process and return a challenge
-    log!("login::json_request::login_start");
+    debug!("login::json_request::login_start");
     let request_challenge_response: RequestChallengeResponse =
         json_request(Method::POST, api::Auth::LoginStart.path(), Some(login_user)).await?;
 
     // Convert to the browser type
-    log!("login::RequestChallengeResponse => CredentialRequestOptions");
+    debug!("login::RequestChallengeResponse => CredentialRequestOptions");
     let credential_request_options: CredentialRequestOptions = request_challenge_response.into();
 
     // Get a promise that returns the credentials
-    log!("login::window.credentials.create");
+    debug!("login::window.credentials.create");
     let get_fut = window()
         .navigator()
         .credentials()
@@ -36,7 +37,7 @@ pub async fn login(login_user: &LoginUser) -> Result<User, FrontendError<ServerE
         .context("Getting credential get request (window.navigator.credentials.get)")?;
 
     // Get the credentials
-    log!("login::window.credentials.create.await");
+    debug!("login::window.credentials.create.await");
     let public_key_credential: PublicKeyCredential = JsFuture::from(get_fut)
         .await
         .map_err(FrontendError::from)
@@ -44,11 +45,11 @@ pub async fn login(login_user: &LoginUser) -> Result<User, FrontendError<ServerE
         .into();
 
     // Convert to the rust type
-    log!("login::PublicKeyCredentials => WebauthnPublicKey");
+    debug!("login::PublicKeyCredentials => WebauthnPublicKey");
     let public_key_credentials: WebauthnPublicKey = public_key_credential.ok()?;
 
     // Complete the login with the server
-    log!("login::json_request::login_finish");
+    debug!("login::json_request::login_finish");
     let user = json_request(
         Method::POST,
         api::Auth::LoginFinish.path(),
