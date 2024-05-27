@@ -1,3 +1,6 @@
+import init_client, { start_client } from '../wasm/client.js';
+import promiser_factory from './sqlite3-worker1-promiser.mjs'
+
 const registerServiceWorker = async () => {
     if ('serviceWorker' in navigator) {
         function handle_update(registration) {
@@ -50,18 +53,30 @@ const registerServiceWorker = async () => {
         })
     }
 };
-registerServiceWorker();
+// TODO Disabled while debugging the web-worker registerServiceWorker();
 
-const registerWebWorker = () => {
-    if (window.Worker) {
-        const worker = new Worker('../wasm/web_worker.js');
-        worker.onmessage = (e) => {
-            console.log('message from worker: ', e);
-        };
-      
-        worker.postMessage('Ping');
-    } else {
-        console.log('Your browser doesn\'t support web workers.');
-    }
-};
-registerWebWorker();
+// Clean up the sqlite global
+delete window.sqlite3Worker1Promiser;
+
+// Build the sqlite promiser & initialize the wasm
+Promise.all([
+    promiser_factory(),
+    init_client(),
+])
+.then(async ([promiser]) => {
+    // Open the db
+    console.log("open db: ", 
+        await promiser('open', { 
+            filename: 'egg.sqlite3',
+            vfs: 'opfs' }));
+    
+    // Print the config for debugging
+    console.log('config-get: ', 
+        await promiser('config-get', {}));
+    
+    // Start the client, passing it the promiser
+    await start_client(promiser);
+})
+.catch((errors) => {
+    console.log(`Error constructing promiser or initializing client: ${errors}`)
+});

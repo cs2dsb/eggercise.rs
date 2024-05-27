@@ -4,7 +4,7 @@ resolver = "2"
 
 [workspace.package]
 edition = "2021"
-version = "0.0.44"
+version = "0.0.45"
 
 # This is used for the service worker wasm package
 [profile.dev-min-size]
@@ -85,3 +85,5 @@ web-sys = "0.3.69"
 wasm-bindgen = "0.2.92"
 
 wasm-bindgen-futures = "0.4.42"
+
+gloo-utils = "0.2.0"

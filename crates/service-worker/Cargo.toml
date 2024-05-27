@@ -11,6 +11,7 @@ serde.workspace = true
 console_error_panic_hook.workspace = true
 wasm-bindgen-futures.workspace = true
 wasm-bindgen.workspace = true
+gloo-utils.workspace = true
 
 js-sys = "0.3.69"
 shared = { path = "../shared" }
@@ -22,4 +23,3 @@ web-sys = { workspace = true, features = [
     "WorkerLocation", "Clients", "CacheStorage",
     "Cache", "RequestInit", "MessageEvent", "Url"
 ] }
-gloo-utils = "0.2.0"

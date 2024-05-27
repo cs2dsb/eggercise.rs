@@ -478,15 +478,17 @@ checksum = "98cc8fbded0c607b7ba9dd60cd98df59af97e84d24e49c8557331cfc26d301ce"
 
 [[package]]
 name = "client"
-version = "0.0.44"
+version = "0.0.45"
 dependencies = [
  "console_error_panic_hook",
  "gloo-net",
+ "gloo-utils",
  "http 1.1.0",
  "leptos",
  "leptos_router",
  "mime",
  "serde",
+ "serde_json",
  "shared",
  "thiserror",
  "wasm-bindgen",
@@ -2568,7 +2570,7 @@ dependencies = [
 
 [[package]]
 name = "server"
-version = "0.0.44"
+version = "0.0.45"
 dependencies = [
  "anyhow",
  "axum",
@@ -2665,7 +2667,7 @@ dependencies = [
 
 [[package]]
 name = "service-worker"
-version = "0.0.44"
+version = "0.0.45"
 dependencies = [
  "console_error_panic_hook",
  "gloo-utils",
@@ -2699,7 +2701,7 @@ dependencies = [
 
 [[package]]
 name = "shared"
-version = "0.0.44"
+version = "0.0.45"
 dependencies = [
  "anyhow",
  "axum",
@@ -3646,20 +3648,6 @@ checksum = "77afa9a11836342370f4817622a2f0f418b134426d91a82dfb48f532d2ec13ef"
 dependencies = [
  "js-sys",
  "wasm-bindgen",
-]
-
-[[package]]
-name = "web-worker"
-version = "0.0.44"
-dependencies = [
- "console_error_panic_hook",
- "gloo-utils",
- "js-sys",
- "serde",
- "shared",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "web-sys",
 ]
 
 [[package]]

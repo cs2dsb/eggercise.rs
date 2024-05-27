@@ -4,6 +4,8 @@ use leptos::logging::error;
 use shared::api::error::FrontendError;
 use wasm_bindgen::JsValue;
 
+pub mod sqlite3;
+
 pub trait JsValueIntoOk<R, E>: Sized 
 where  
     Self: Into<R>,

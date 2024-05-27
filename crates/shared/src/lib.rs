@@ -78,11 +78,6 @@ pub fn get_service_worker_info() -> Result<CrateInfo, anyhow::Error> {
 }
 
 #[cfg(feature = "build")]
-pub fn get_web_worker_info() -> Result<CrateInfo, anyhow::Error> {
-    get_crate_info("../web-worker")
-}
-
-#[cfg(feature = "build")]
 pub fn get_client_info() -> Result<CrateInfo, anyhow::Error> {
     get_crate_info("../client")
 }
