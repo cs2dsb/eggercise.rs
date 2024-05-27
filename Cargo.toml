@@ -4,7 +4,7 @@ resolver = "2"
 
 [workspace.package]
 edition = "2021"
-version = "0.0.47"
+version = "0.0.48"
 
 # This is used for the service worker wasm package
 [profile.dev-min-size]
