@@ -15,7 +15,7 @@ use chrono::Utc;
 use glob::glob;
 use sha2::{Digest, Sha384};
 use shared::{
-    get_client_info, get_server_info, get_service_worker_info, get_web_worker_info, CrateInfo, HashedFile, ServiceWorkerPackage, SERVICE_WORKER_PACKAGE_FILENAME
+    get_client_info, get_server_info, get_service_worker_info, CrateInfo, HashedFile, ServiceWorkerPackage, SERVICE_WORKER_PACKAGE_FILENAME
 };
 use wasm_opt::{OptimizationOptions, Pass};
 
@@ -171,7 +171,6 @@ fn optimize_wasm(input: &Path) -> Result<PathBuf, anyhow::Error> {
 fn main() -> Result<(), anyhow::Error> {
     let client_info = get_client_info()?;
     let service_worker_info = get_service_worker_info()?;
-    let web_worker_info = get_web_worker_info()?;
     let server_info = get_server_info()?;
 
     println!(
@@ -181,10 +180,6 @@ fn main() -> Result<(), anyhow::Error> {
     println!(
         "cargo:rerun-if-changed={}",
         path_to_str(&service_worker_info.manifest_dir)
-    );
-    println!(
-        "cargo:rerun-if-changed={}",
-        path_to_str(&web_worker_info.manifest_dir)
     );
 
     let is_release_build = !cfg!(debug_assertions);
@@ -223,14 +218,6 @@ fn main() -> Result<(), anyhow::Error> {
     } = service_worker_info;
 
     let CrateInfo {
-        manifest_dir: web_worker_dir,
-        lib_file_name: web_worker_lib_file_name,
-        package_name: web_worker_package_name,
-        version_with_timestamp: web_worker_version,
-        ..
-    } = web_worker_info;
-
-    let CrateInfo {
         lib_file_name: client_lib_file_name,
         package_name: client_package_name,
         ..
@@ -241,14 +228,6 @@ fn main() -> Result<(), anyhow::Error> {
         bail!(
             "service worker register_listeners.js missing, expected path: {:?}",
             service_worker_register_listeners_js
-        );
-    }
-
-    let web_worker_register_listeners_js = web_worker_dir.join("register_listeners.js");
-    if !web_worker_register_listeners_js.exists() {
-        bail!(
-            "web worker register_listeners.js missing, expected path: {:?}",
-            web_worker_register_listeners_js
         );
     }
 
@@ -264,13 +243,10 @@ fn main() -> Result<(), anyhow::Error> {
     // workers is minimal
     build_wasm(&service_worker_package_name, wasm_dir_str, is_release_build)
     .context("build_wasm[service_worker]")?;
-    build_wasm(&web_worker_package_name, wasm_dir_str, is_release_build)
-        .context("build_wasm[web_worker]")?;
     build_wasm(&client_package_name, wasm_dir_str, is_release_build)
         .context("build_wasm[client]")?;
 
     let service_worker_wasm_file = wasm_out_path(&service_worker_lib_file_name, &wasm_dir, profile);
-    let web_worker_wasm_file = wasm_out_path(&web_worker_lib_file_name, &wasm_dir, profile);
     let client_wasm_file = wasm_out_path(&client_lib_file_name, &wasm_dir, profile);
     
     let (service_worker_bg_file, service_worker_js_file) = generate_bindings(
@@ -281,14 +257,6 @@ fn main() -> Result<(), anyhow::Error> {
     )
     .context("generate_bindings[service_worker]")?;
     
-    let (web_worker_bg_file, web_worker_js_file) = generate_bindings(
-        &web_worker_lib_file_name,
-        &web_worker_wasm_file,
-        is_release_build,
-        false,
-    )
-    .context("generate_bindings[web_worker]")?;
-    
     let (client_bg_file, client_js_file) = generate_bindings(
         &client_lib_file_name,
         &client_wasm_file,
@@ -298,12 +266,10 @@ fn main() -> Result<(), anyhow::Error> {
     .context("generate_bindings[client]")?;
 
     let service_worker_bg_opt_file = optimize_wasm(&service_worker_bg_file).context("optimize_wasm[service_worker]")?;
-    let web_worker_bg_opt_file = optimize_wasm(&web_worker_bg_file).context("optimize_wasm[web_worker]")?;
     let client_bg_opt_file = optimize_wasm(&client_bg_file).context("optimize_wasm[client]")?;
 
     // Construct the output paths
     let service_worker_js_out = server_wasm_dir.join(path_filename_to_str(&service_worker_js_file));
-    let web_worker_js_out = server_wasm_dir.join(path_filename_to_str(&web_worker_js_file));
     let client_js_out = server_wasm_dir.join(path_filename_to_str(&client_js_file));
 
     // Note this lops off the _opt which is necessary to restore the expected
@@ -320,7 +286,6 @@ fn main() -> Result<(), anyhow::Error> {
 
     // Copy the output to the assets dir
     copy(&service_worker_js_file, &service_worker_js_out).context("copy[service_worker_js_file]")?;
-    copy(&web_worker_js_file, &web_worker_js_out).context("copy[web_worker_js_file]")?;
     copy(&client_bg_opt_file, &client_wasm_out).context("copy[client_bg_opt_file]")?;
     copy(&client_js_file, &client_js_out).context("copy[client_js_file]")?;
 
@@ -348,42 +313,21 @@ fn main() -> Result<(), anyhow::Error> {
             file.read_to_end(&mut bytes)?;
             bytes
         };
-        p!("Loading web worker wasm bytes");
-        let web_worker_wasm_bytes = {
-            let mut file = File::open(&web_worker_bg_opt_file)?;
-            let mut bytes = Vec::new();
-            file.read_to_end(&mut bytes)?;
-            bytes
-        };
-
+        
         p!("Encoding service worker wasm bytes in base64");
         let service_worker_wasm_base64 = Base64Display::new(&service_worker_wasm_bytes, &STANDARD).to_string();
-        p!("Encoding web worker wasm bytes in base64");
-        let web_worker_wasm_base64 = Base64Display::new(&web_worker_wasm_bytes, &STANDARD).to_string();
 
         p!("Reading service worker registration js");
         let service_worker_snippet = read_to_string(&service_worker_register_listeners_js)?
             .replace("SERVICE_WORKER_BASE64", &service_worker_wasm_base64)
             // Include the version so the worker can work out if an update is needed
             .replace("SERVICE_WORKER_VERSION", &service_worker_version);
-        p!("Reading web worker registration js");
-        let web_worker_snippet = read_to_string(&web_worker_register_listeners_js)?
-            .replace("WEB_WORKER_BASE64", &web_worker_wasm_base64)
-            // Include the version so the worker can work out if an update is needed
-            .replace("WEB_WORKER_VERSION", &web_worker_version);
-
         p!(
             "Appending service worker registration and base64 wasm to {}",
             path_filename_to_str(&service_worker_js_out)
         );
         let mut service_worker_js_out = OpenOptions::new().append(true).open(&service_worker_js_out)?;
         service_worker_js_out.write_all(service_worker_snippet.as_bytes())?;
-        p!(
-            "Appending web worker registration and base64 wasm to {}",
-            path_filename_to_str(&web_worker_js_out)
-        );
-        let mut web_worker_js_out = OpenOptions::new().append(true).open(&web_worker_js_out)?;
-        web_worker_js_out.write_all(web_worker_snippet.as_bytes())?;
     }
 
     // Prepare the package version info
