@@ -5,6 +5,7 @@ use shared::api::error::FrontendError;
 use wasm_bindgen::JsValue;
 
 pub mod sqlite3;
+pub mod tracing;
 
 pub trait JsValueIntoOk<R, E>: Sized 
 where  

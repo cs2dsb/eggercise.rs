@@ -11,24 +11,27 @@
     <script type='module'>
         let log = "";
         if ('serviceWorker' in navigator) {
-            let count = 0;
-            navigator.serviceWorker.getRegistrations().then(registrations => {
+            await navigator.serviceWorker.getRegistrations().then(registrations => {
+                let count = 0;
                 for (const registration of registrations) {
                     count += 1;
                     registration.unregister();
                 } 
+                const p = document.createElement('p');
+                p.textContent = "Uninstalled " + count + " workers";
+                document
+                    .body
+                    .appendChild(p);
             });
-            log += "Uninstalled " + count + " workers";
         } else {
-            log += "serviceWorker doesn't exist on navigator?";
+            const p = document.createElement('p');
+            p.textContent = "No serviceWorker in navigator...?";
+            document
+                .body
+                .appendChild(p);
         }
 
-        const p = document.createElement('p');
-        p.textContent = log;
-
-        document
-            .body
-            .appendChild(p);
+        
     </script>
   </body>
 </html>

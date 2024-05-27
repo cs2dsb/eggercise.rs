@@ -58,9 +58,13 @@ const registerServiceWorker = async () => {
 // Clean up the sqlite global
 delete window.sqlite3Worker1Promiser;
 
+const config = {
+    debug: (...args) => { console.log('Debug: ', args)},
+    onunhandled: (...args) => { console.log('Unhandled: ', args)},
+};
 // Build the sqlite promiser & initialize the wasm
 Promise.all([
-    promiser_factory(),
+    promiser_factory(config),
     init_client(),
 ])
 .then(async ([promiser]) => {

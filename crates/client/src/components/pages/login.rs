@@ -1,10 +1,10 @@
 use leptos::{
     component, create_action, create_signal,
-    logging::{log, warn},
     view, IntoView, Show, Signal, SignalGet, SignalUpdate, SignalWith,
     ReadSignal,
 };
 use shared::model::LoginUser;
+use tracing::{debug, warn};
 
 use crate::{api::login, components::{LoginForm, OfflineFallback}, ClientRoutes};
 
@@ -21,7 +21,7 @@ pub fn Login(
     // Actions
     let login_action = create_action(move |username: &String| {
         let login_user = LoginUser::new(username);
-        log!("Logging in user {:?}", login_user);
+        debug!("Logging in user {:?}", login_user);
         async move {
             set_wait_for_response.update(|w| *w = true);
 
