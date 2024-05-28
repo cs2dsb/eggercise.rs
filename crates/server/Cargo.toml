@@ -29,6 +29,7 @@ deadpool.workspace = true
 deadpool-sqlite.workspace = true
 mime.workspace = true
 thiserror.workspace = true
+include_dir.workspace = true
 
 # QR Code generation
 qrcodegen = "1.8.0"
@@ -48,9 +49,6 @@ croner = "2.0.4"
 
 # Future util
 futures = "0.3.30"
-
-# Macro to include a dir in the binary
-include_dir = "0.7.3"
 
 # Migrations for rusqlite
 rusqlite_migration = { version = "1.1.0", features = ["from-directory"] }

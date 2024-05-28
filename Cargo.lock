@@ -478,12 +478,13 @@ checksum = "98cc8fbded0c607b7ba9dd60cd98df59af97e84d24e49c8557331cfc26d301ce"
 
 [[package]]
 name = "client"
-version = "0.0.48"
+version = "0.0.49"
 dependencies = [
  "console_error_panic_hook",
  "gloo-net",
  "gloo-utils",
  "http 1.1.0",
+ "include_dir",
  "leptos",
  "leptos_router",
  "mime",
@@ -491,6 +492,7 @@ dependencies = [
  "serde_json",
  "shared",
  "thiserror",
+ "time",
  "tracing",
  "tracing-subscriber",
  "tracing-web",
@@ -2573,7 +2575,7 @@ dependencies = [
 
 [[package]]
 name = "server"
-version = "0.0.48"
+version = "0.0.49"
 dependencies = [
  "anyhow",
  "axum",
@@ -2670,7 +2672,7 @@ dependencies = [
 
 [[package]]
 name = "service-worker"
-version = "0.0.48"
+version = "0.0.49"
 dependencies = [
  "console_error_panic_hook",
  "gloo-utils",
@@ -2704,7 +2706,7 @@ dependencies = [
 
 [[package]]
 name = "shared"
-version = "0.0.48"
+version = "0.0.49"
 dependencies = [
  "anyhow",
  "axum",
@@ -2949,6 +2951,7 @@ checksum = "5dfd88e563464686c916c7e46e623e520ddc6d79fa6641390f2e3fa86e83e885"
 dependencies = [
  "deranged",
  "itoa",
+ "js-sys",
  "num-conv",
  "powerfmt",
  "serde",
@@ -3257,6 +3260,7 @@ dependencies = [
  "sharded-slab",
  "smallvec",
  "thread_local",
+ "time",
  "tracing",
  "tracing-core",
  "tracing-log",

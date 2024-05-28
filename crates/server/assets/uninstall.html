@@ -9,29 +9,37 @@
   </head>
   <body>
     <script type='module'>
-        let log = "";
-        if ('serviceWorker' in navigator) {
-            await navigator.serviceWorker.getRegistrations().then(registrations => {
-                let count = 0;
-                for (const registration of registrations) {
-                    count += 1;
-                    registration.unregister();
-                } 
-                const p = document.createElement('p');
-                p.textContent = "Uninstalled " + count + " workers";
-                document
-                    .body
-                    .appendChild(p);
-            });
-        } else {
-            const p = document.createElement('p');
-            p.textContent = "No serviceWorker in navigator...?";
-            document
-                .body
-                .appendChild(p);
-        }
+      const log = (text) => {
+        const p = document.createElement('p');
+        p.textContent = text;
+        document
+          .body
+          .appendChild(p);
+      };
 
+      if ('serviceWorker' in navigator) {
+        await navigator.serviceWorker.getRegistrations().then(registrations => {
+          let count = 0;
+          for (const registration of registrations) {
+            count += 1;
+            registration.unregister();
+          } 
+          log(`Uninstalled ${count} workers`);
+        });
+      } else {
+        log('No serviceWorker in navigator...?');
+      }
+
+      if ('storage' in navigator) {
+        const root = await navigator.storage.getDirectory();
         
+        for await (const [key, value] of root.entries()) {
+          await root.removeEntry(key);
+          log(`Removed ${key}`);
+        }
+      } else {
+        log('No storage in navigator...?');
+      }
     </script>
   </body>
 </html>

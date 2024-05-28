@@ -21,8 +21,9 @@ http.workspace = true
 mime.workspace = true
 webauthn-rs-proto = { workspace = true, features = [ "wasm" ] }
 tracing.workspace = true
-tracing-subscriber.workspace = true
+tracing-subscriber = { workspace = true, features = [ "time" ] }
 tracing-web.workspace = true
+include_dir.workspace = true
 web-sys = { workspace = true, features = [
     "CredentialCreationOptions",
     "CredentialRequestOptions",
@@ -33,3 +34,4 @@ web-sys = { workspace = true, features = [
 ] }
 
 shared = { path = "../shared", features = [ "frontend" ] }
+time = { version = "0.3.36", features = ["wasm-bindgen"] }
