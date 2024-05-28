@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use std::collections::HashMap;
+use std::{any::type_name, collections::HashMap};
 
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use tracing::trace;
@@ -9,6 +9,7 @@ use wasm_bindgen_futures::JsFuture;
 use web_sys::js_sys::{Function, Promise};
 use gloo_utils::{errors::{JsError, NotJsError}, format::JsValueSerdeExt};
 use thiserror::Error;
+use leptos::{provide_context, use_context};
 
 #[derive(Debug, Error)]
 pub enum SqlitePromiserError {
@@ -60,7 +61,7 @@ impl SqlitePromiserError {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SqlitePromiser {
     inner: Function,
 }
@@ -197,6 +198,15 @@ impl SqlitePromiser {
         Self {
             inner
         }
+    }
+
+    pub fn provide_context(self) {
+        provide_context(self);
+    }
+
+    pub fn use_promiser() -> Self {
+        use_context::<Self>()
+            .expect(&format!("{} missing from context", type_name::<Self>()))
     }
 
     pub async fn configure(&self) -> Result<(), SqlitePromiserError> {

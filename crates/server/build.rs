@@ -187,6 +187,14 @@ fn main() -> Result<(), anyhow::Error> {
         let service_worker_info = get_service_worker_info()?;
         let server_info = get_server_info()?;
 
+        let is_release_build = !cfg!(debug_assertions);
+        let server_dir = server_info.manifest_dir.clone();
+        let out_dir = PathBuf::from(env::var("OUT_DIR")?);
+        let wasm_dir = out_dir.join("wasm");
+        let wasm_dir_str = path_to_str(&wasm_dir);
+        let assets_dir = server_dir.join("assets");
+        let server_wasm_dir = assets_dir.join("wasm");
+        
         println!(
             "cargo:rerun-if-changed={}",
             path_to_str(&client_info.manifest_dir)
@@ -196,13 +204,27 @@ fn main() -> Result<(), anyhow::Error> {
             path_to_str(&service_worker_info.manifest_dir)
         );
 
-        let is_release_build = !cfg!(debug_assertions);
-        let server_dir = server_info.manifest_dir.clone();
-        let out_dir = PathBuf::from(env::var("OUT_DIR")?);
-        let wasm_dir = out_dir.join("wasm");
-        let wasm_dir_str = path_to_str(&wasm_dir);
-        let assets_dir = server_dir.join("assets");
-        let server_wasm_dir = assets_dir.join("wasm");
+        // Add everything in the assets folder *except* the wasm dir to rerun-if-changed
+        // This won't work for new files in the root but this is an acceptable tradeoff
+        // to prevent rebuilding every time the wasm folder is touched. The alternative
+        // would be to diff the output of this build with the wasm folder and not
+        // update it if it hasn't changed but this still requires running build.rs
+        // every time
+        // We monitor this to trigger creating the service worker package file. It's 
+        // unfortunate this restarts the server and does all the other build steps. It 
+        // could be split up down the line to reduce rework.
+        for f in glob(&format!(
+            "{}/**/*",
+            assets_dir.to_str().expect("Invalid assets_dir path")
+        ))?
+        .into_iter()
+        .collect::<Result<Vec<_>, _>>()?
+        .into_iter()
+        .filter(|f| !f.starts_with(&server_wasm_dir))
+        {
+            println!("cargo:rerun-if-changed={}", path_to_str(&f));
+        }
+
 
         p!("Out path: {:?}", out_dir);
         let CrateInfo {

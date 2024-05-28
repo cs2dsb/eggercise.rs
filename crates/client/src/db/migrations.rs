@@ -12,12 +12,18 @@ use crate::utils::sqlite3::{SqlitePromiser, SqlitePromiserError};
 
 static MIGRATIONS_DIR: Dir = include_dir!("$CARGO_MANIFEST_DIR/migrations");
 
-#[derive(Debug, Error)]
+#[derive(Debug, Clone, Error)]
 pub enum MigrationError {
     #[error("Migrations dir error: {0}")]
     Dir(String),
-    #[error("Sql error: {0}")]
-    Sql(#[from] SqlitePromiserError),
+    #[error("Sqlite Promiser error: {0}")]
+    Sql(String),
+}
+
+impl From<SqlitePromiserError> for MigrationError {
+    fn from(value: SqlitePromiserError) -> Self {
+        Self::Sql(value.to_string())
+    }
 }
 
 async fn get_version(conn: &SqlitePromiser) -> Result<usize, SqlitePromiserError> {
