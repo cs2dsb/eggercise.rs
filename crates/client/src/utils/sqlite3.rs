@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use tracing::trace;
 use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::JsFuture;
@@ -24,6 +24,9 @@ pub enum SqlitePromiserError {
 
     #[error("Unexpected result. Expected {0:?} but got {1:?}")]
     UnexpectedResult(Type, Type),
+
+    #[error("Unexpected exec result: {0}")]
+    ExecResult(String),
 
     #[error("JsValue wasn't an Error...: {0}")]
     NotJs(NotJsError),
@@ -196,6 +199,16 @@ impl SqlitePromiser {
         }
     }
 
+    pub async fn configure(&self) -> Result<(), SqlitePromiserError> {
+        let pragmas = r#"
+            PRAGMA journal_mode = WAL;
+            PRAGMA synchronous = NORMAL;
+            PRAGMA foreign_keys = ON;
+        "#;
+        self.exec(pragmas).await?;
+        Ok(())
+    }
+
     async fn send_command(&self, type_: Type, args: Args) -> Result<CommandResult, SqlitePromiserError> {
         let this = JsValue::from(&self.inner); 
         let cmd = Command {
@@ -243,6 +256,25 @@ impl SqlitePromiser {
         else { unreachable!() };
 
         Ok(result)
+    }
+
+    pub async fn get_value<T: Into<String>, V: DeserializeOwned>(&self, sql: T) -> Result<V, SqlitePromiserError> {
+        let mut result = self.exec(sql).await?;
+
+        if result.column_names.len() != 1 {
+            Err(SqlitePromiserError::ExecResult(format!("get_value expected a single column result but got {}", result.column_names.len())))
+        } else if result.result_rows.len() != 1 {
+            Err(SqlitePromiserError::ExecResult(format!("get_value expected a single row result but got {}", result.result_rows.len())))
+        } else if result.result_rows[0].len() != 1 {
+            Err(SqlitePromiserError::ExecResult(format!("get_value expected a single row result with a single value inside but got {}. (This seems like a sqlite bug)", result.result_rows[0].len())))
+        } else {
+            let json_value = result.result_rows
+                .pop().unwrap()
+                .pop().unwrap();
+
+            let value = serde_json::from_value(json_value)?;
+            Ok(value)
+        }
     }
 
     pub async fn opfs_tree(&self) -> Result<OpfsTreeResults, SqlitePromiserError> {
