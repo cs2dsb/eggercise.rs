@@ -6,12 +6,12 @@ use std::{
     io::{self, Read, Write},
     path::{Path, PathBuf},
     process::Command,
-    time::Instant,
+    time::{Instant, SystemTime},
 };
 
 use anyhow::{bail, Context};
 use base64::{display::Base64Display, engine::general_purpose::STANDARD};
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use glob::glob;
 use sha2::{Digest, Sha384};
 use shared::{
@@ -47,10 +47,30 @@ fn path_filename_to_str<'a>(path: &'a Path) -> &'a str {
         .expect(&format!("Path \"{:?}\" cannot be converted to utf8", path))
 }
 
+fn modificiation_date<P: AsRef<Path>>(package_dir: P) -> Result<DateTime<Utc>, anyhow::Error> {
+    let package_dir = package_dir.as_ref();
+
+    let newest_file = glob(&format!(
+        "{}/**/*",
+        path_to_str(package_dir),
+    ))?
+    .into_iter()
+    .flat_map(|f| f.map(|f| f.metadata()))
+    .flat_map(|f| f.map(|m| m.modified())) 
+    .collect::<Result<Vec<_>, _>>()?
+    .into_iter()
+    .max();
+
+    p!("newest_file: {:?}", newest_file);
+    let mod_date = newest_file.unwrap_or(SystemTime::now());
+
+    Ok(mod_date.into())
+}
+
 // Runs cargo rustc to build the wasm lib
-fn build_wasm(package: &str, out_dir: &str, release: bool) -> Result<(), anyhow::Error> {
+fn build_wasm(package: &str, out_dir: &str, release: bool, modified_time: DateTime<Utc>) -> Result<(), anyhow::Error> {
     let mut cargo_cmd = Command::new("cargo");
-    cargo_cmd.env("BUILD_TIME", Utc::now().format("%Y%m%d %H%M%S").to_string());
+    cargo_cmd.env("BUILD_TIME", modified_time.format("%Y%m%d %H%M%S").to_string());
     cargo_cmd.args([
         "rustc",
         "--package",
@@ -196,17 +216,17 @@ fn main() -> Result<(), anyhow::Error> {
     // would be to diff the output of this build with the wasm folder and not
     // update it if it hasn't changed but this still requires running build.rs
     // every time
-    for f in glob(&format!(
-        "{}/**/*",
-        assets_dir.to_str().expect("Invalid assets_dir path")
-    ))?
-    .into_iter()
-    .collect::<Result<Vec<_>, _>>()?
-    .into_iter()
-    .filter(|f| !f.starts_with(&server_wasm_dir))
-    {
-        println!("cargo:rerun-if-changed={}", path_to_str(&f));
-    }
+    // for f in glob(&format!(
+    //     "{}/**/*",
+    //     assets_dir.to_str().expect("Invalid assets_dir path")
+    // ))?
+    // .into_iter()
+    // .collect::<Result<Vec<_>, _>>()?
+    // .into_iter()
+    // .filter(|f| !f.starts_with(&server_wasm_dir))
+    // {
+    //     println!("cargo:rerun-if-changed={}", path_to_str(&f));
+    // }
 
     p!("Out path: {:?}", out_dir);
     let CrateInfo {
@@ -218,6 +238,7 @@ fn main() -> Result<(), anyhow::Error> {
     } = service_worker_info;
 
     let CrateInfo {
+        manifest_dir: client_dir,
         lib_file_name: client_lib_file_name,
         package_name: client_package_name,
         ..
@@ -239,12 +260,17 @@ fn main() -> Result<(), anyhow::Error> {
         },
     };
 
+    
+    let service_worker_mod_time = modificiation_date(&service_worker_dir)?;
+    let client_mod_time = modificiation_date(&client_dir)?;
+    
     // worker can't use modules because browser support for modules in service
     // workers is minimal
-    build_wasm(&service_worker_package_name, wasm_dir_str, is_release_build)
-    .context("build_wasm[service_worker]")?;
-    build_wasm(&client_package_name, wasm_dir_str, is_release_build)
-        .context("build_wasm[client]")?;
+    build_wasm(&service_worker_package_name, wasm_dir_str, is_release_build, service_worker_mod_time)
+        .context("build_wasm[service_worker]")?;
+
+    build_wasm(&client_package_name, wasm_dir_str, is_release_build, client_mod_time)
+        .context("build_wasm[client]")?;    
 
     let service_worker_wasm_file = wasm_out_path(&service_worker_lib_file_name, &wasm_dir, profile);
     let client_wasm_file = wasm_out_path(&client_lib_file_name, &wasm_dir, profile);
@@ -288,19 +314,6 @@ fn main() -> Result<(), anyhow::Error> {
     copy(&service_worker_js_file, &service_worker_js_out).context("copy[service_worker_js_file]")?;
     copy(&client_bg_opt_file, &client_wasm_out).context("copy[client_bg_opt_file]")?;
     copy(&client_js_file, &client_js_out).context("copy[client_js_file]")?;
-
-    // TODO: this is a bit of a bodge
-    for f in glob(&format!(
-        "{}/**/sqlite3*",
-        assets_dir.to_str().expect("Invalid assets_dir path")
-    ))?
-    .into_iter()
-    .collect::<Result<Vec<_>, _>>()?
-    .into_iter()
-    .filter(|f| f.is_file())
-    {
-        copy(&f, server_wasm_dir.join(path_filename_to_str(&f)))?;
-    }
 
     // Embed the wasm as a base64 encoded string in the output js so that it is
     // accessible from the installed service worker without having to add extra
