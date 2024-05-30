@@ -10,7 +10,6 @@ pub use args::*;
 
 use crate::cli::Cli;
 
-
 #[derive(Debug, Clone)]
 pub struct AppState {
     pub pool: Pool,

@@ -209,9 +209,9 @@ pub enum ServerError<T: Error> {
     Unauthorized { message: String },
 
     #[error("ServerError::Status {{ {message} }}")]
-    Status { 
+    Status {
         #[serde(with = "http_serde::status_code")]
-        code: StatusCode, 
+        code: StatusCode,
         message: String,
     },
 

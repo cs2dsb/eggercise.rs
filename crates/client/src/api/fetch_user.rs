@@ -10,10 +10,12 @@ use shared::{
 
 use super::json_request;
 
-pub async fn fetch_user() -> Result<(User, Option<TemporaryLogin>), FrontendError<ServerError<FetchError>>> {
+pub async fn fetch_user(
+) -> Result<(User, Option<TemporaryLogin>), FrontendError<ServerError<FetchError>>> {
     json_request::<_, (User, Option<TemporaryLogin>), _>(
-        Method::GET, 
+        Method::GET,
         api::Object::User.path(),
         None::<&()>,
-    ).await
+    )
+    .await
 }

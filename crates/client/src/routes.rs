@@ -1,4 +1,4 @@
-use leptos::{component, view, IntoView, ReadSignal};
+use leptos::{component, view, IntoView};
 use leptos_router::{Route, Routes, A};
 
 use crate::components::{Login, Plan, Profile, Register, Today};
@@ -63,15 +63,13 @@ macro_rules! routes {
         }
 
         #[component(transparent)]
-        pub fn AppRoutes(online: ReadSignal<bool>) -> impl IntoView {
+        pub fn AppRoutes() -> impl IntoView {
             view! {
                 <Routes>
                 $(
-                    <Route 
-                        path=$path 
-                        view=move || view! { 
-                            <$view online /> 
-                        }
+                    <Route
+                        path=$path
+                        view=$view
                     />
                 )+
                 </Routes>

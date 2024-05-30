@@ -1,7 +1,13 @@
 #![feature(path_file_prefix)]
 
 use std::{
-    env, fmt::Display, fs::{copy, create_dir_all, read_to_string, remove_dir_all, remove_file, File, OpenOptions}, io::{self, Read, Write}, path::{Path, PathBuf}, process::Command, time::{Instant, SystemTime}
+    env,
+    fmt::Display,
+    fs::{copy, create_dir_all, read_to_string, remove_dir_all, remove_file, File, OpenOptions},
+    io::{self, Read, Write},
+    path::{Path, PathBuf},
+    process::Command,
+    time::{Instant, SystemTime},
 };
 
 use anyhow::{bail, Context};
@@ -10,7 +16,8 @@ use chrono::{DateTime, Utc};
 use glob::glob;
 use sha2::{Digest, Sha384};
 use shared::{
-    get_client_info, get_server_info, get_service_worker_info, CrateInfo, HashedFile, ServiceWorkerPackage, SERVICE_WORKER_PACKAGE_FILENAME
+    get_client_info, get_server_info, get_service_worker_info, CrateInfo, HashedFile,
+    ServiceWorkerPackage, SERVICE_WORKER_PACKAGE_FILENAME,
 };
 use wasm_opt::{OptimizationOptions, Pass};
 
@@ -45,16 +52,13 @@ fn path_filename_to_str<'a>(path: &'a Path) -> &'a str {
 fn modificiation_date<P: AsRef<Path>>(package_dir: P) -> Result<DateTime<Utc>, anyhow::Error> {
     let package_dir = package_dir.as_ref();
 
-    let newest_file = glob(&format!(
-        "{}/**/*",
-        path_to_str(package_dir),
-    ))?
-    .into_iter()
-    .flat_map(|f| f.map(|f| f.metadata()))
-    .flat_map(|f| f.map(|m| m.modified())) 
-    .collect::<Result<Vec<_>, _>>()?
-    .into_iter()
-    .max();
+    let newest_file = glob(&format!("{}/**/*", path_to_str(package_dir),))?
+        .into_iter()
+        .flat_map(|f| f.map(|f| f.metadata()))
+        .flat_map(|f| f.map(|m| m.modified()))
+        .collect::<Result<Vec<_>, _>>()?
+        .into_iter()
+        .max();
 
     let mod_date = newest_file.unwrap_or(SystemTime::now());
 
@@ -62,9 +66,17 @@ fn modificiation_date<P: AsRef<Path>>(package_dir: P) -> Result<DateTime<Utc>, a
 }
 
 // Runs cargo rustc to build the wasm lib
-fn build_wasm(package: &str, out_dir: &str, release: bool, modified_time: DateTime<Utc>) -> Result<(), anyhow::Error> {
+fn build_wasm(
+    package: &str,
+    out_dir: &str,
+    release: bool,
+    modified_time: DateTime<Utc>,
+) -> Result<(), anyhow::Error> {
     let mut cargo_cmd = Command::new("cargo");
-    cargo_cmd.env("BUILD_TIME", modified_time.format("%Y%m%d %H%M%S").to_string());
+    cargo_cmd.env(
+        "BUILD_TIME",
+        modified_time.format("%Y%m%d %H%M%S").to_string(),
+    );
     cargo_cmd.args([
         "rustc",
         "--package",
@@ -177,7 +189,12 @@ where
     let start = Instant::now();
     let r = f();
     let elapsed = start.elapsed().as_secs_f32();
-    p!("{}{:.2}s \"{msg}\" {}", "   ".repeat(indent), elapsed, if r.is_err() { "Error" } else { "" });
+    p!(
+        "{}{:.2}s \"{msg}\" {}",
+        "   ".repeat(indent),
+        elapsed,
+        if r.is_err() { "Error" } else { "" }
+    );
     r
 }
 
@@ -194,7 +211,7 @@ fn main() -> Result<(), anyhow::Error> {
         let wasm_dir_str = path_to_str(&wasm_dir);
         let assets_dir = server_dir.join("assets");
         let server_wasm_dir = assets_dir.join("wasm");
-        
+
         println!(
             "cargo:rerun-if-changed={}",
             path_to_str(&client_info.manifest_dir)
@@ -210,8 +227,8 @@ fn main() -> Result<(), anyhow::Error> {
         // would be to diff the output of this build with the wasm folder and not
         // update it if it hasn't changed but this still requires running build.rs
         // every time
-        // We monitor this to trigger creating the service worker package file. It's 
-        // unfortunate this restarts the server and does all the other build steps. It 
+        // We monitor this to trigger creating the service worker package file. It's
+        // unfortunate this restarts the server and does all the other build steps. It
         // could be split up down the line to reduce rework.
         for f in glob(&format!(
             "{}/**/*",
@@ -224,7 +241,6 @@ fn main() -> Result<(), anyhow::Error> {
         {
             println!("cargo:rerun-if-changed={}", path_to_str(&f));
         }
-
 
         p!("Out path: {:?}", out_dir);
         let CrateInfo {
@@ -258,54 +274,75 @@ fn main() -> Result<(), anyhow::Error> {
             },
         };
 
-        
-        let service_worker_mod_time = time("Find latest change for service worker", 1,|| modificiation_date(&service_worker_dir))?;
-        let client_mod_time = time("Find latest change for client", 1, || modificiation_date(&client_dir))?;
-        
+        let service_worker_mod_time = time("Find latest change for service worker", 1, || {
+            modificiation_date(&service_worker_dir)
+        })?;
+        let client_mod_time = time("Find latest change for client", 1, || {
+            modificiation_date(&client_dir)
+        })?;
+
         // worker can't use modules because browser support for modules in service
         // workers is minimal
-        time("Build service worker wasm", 1, ||
-            build_wasm(&service_worker_package_name, wasm_dir_str, is_release_build, service_worker_mod_time)
-                .context("build_wasm[service_worker]"))?;
-
-
-        time("Build client wasm", 1, ||
-            build_wasm(&client_package_name, wasm_dir_str, is_release_build, client_mod_time)
-                .context("build_wasm[client]"))?;    
-
-        let service_worker_wasm_file = wasm_out_path(&service_worker_lib_file_name, &wasm_dir, profile);
-        let client_wasm_file = wasm_out_path(&client_lib_file_name, &wasm_dir, profile);
-        
-        let (service_worker_bg_file, service_worker_js_file) = time("Generate service worker bindings", 1, ||
-            generate_bindings(
-                &service_worker_lib_file_name,
-                &service_worker_wasm_file,
+        time("Build service worker wasm", 1, || {
+            build_wasm(
+                &service_worker_package_name,
+                wasm_dir_str,
                 is_release_build,
-                false,
+                service_worker_mod_time,
             )
-            .context("generate_bindings[service_worker]"))?;
-        
-        let (client_bg_file, client_js_file) = time("Generate client bindings", 1, ||
+            .context("build_wasm[service_worker]")
+        })?;
+
+        time("Build client wasm", 1, || {
+            build_wasm(
+                &client_package_name,
+                wasm_dir_str,
+                is_release_build,
+                client_mod_time,
+            )
+            .context("build_wasm[client]")
+        })?;
+
+        let service_worker_wasm_file =
+            wasm_out_path(&service_worker_lib_file_name, &wasm_dir, profile);
+        let client_wasm_file = wasm_out_path(&client_lib_file_name, &wasm_dir, profile);
+
+        let (service_worker_bg_file, service_worker_js_file) =
+            time("Generate service worker bindings", 1, || {
+                generate_bindings(
+                    &service_worker_lib_file_name,
+                    &service_worker_wasm_file,
+                    is_release_build,
+                    false,
+                )
+                .context("generate_bindings[service_worker]")
+            })?;
+
+        let (client_bg_file, client_js_file) = time("Generate client bindings", 1, || {
             generate_bindings(
                 &client_lib_file_name,
                 &client_wasm_file,
                 is_release_build,
                 true,
             )
-            .context("generate_bindings[client]"))?;
+            .context("generate_bindings[client]")
+        })?;
 
         let (service_worker_bg_opt_file, client_bg_opt_file) = if is_release_build {
-            let service_worker_bg_opt_file = time("Optimize service worker wasm", 1, ||
-                optimize_wasm(&service_worker_bg_file).context("optimize_wasm[service_worker]"))?;
-            let client_bg_opt_file = time("Optimize client wasm", 1, ||
-                optimize_wasm(&client_bg_file).context("optimize_wasm[client]"))?;
+            let service_worker_bg_opt_file = time("Optimize service worker wasm", 1, || {
+                optimize_wasm(&service_worker_bg_file).context("optimize_wasm[service_worker]")
+            })?;
+            let client_bg_opt_file = time("Optimize client wasm", 1, || {
+                optimize_wasm(&client_bg_file).context("optimize_wasm[client]")
+            })?;
             (service_worker_bg_opt_file, client_bg_opt_file)
         } else {
             (service_worker_bg_file.clone(), client_bg_file.clone())
         };
 
         // Construct the output paths
-        let service_worker_js_out = server_wasm_dir.join(path_filename_to_str(&service_worker_js_file));
+        let service_worker_js_out =
+            server_wasm_dir.join(path_filename_to_str(&service_worker_js_file));
         let client_js_out = server_wasm_dir.join(path_filename_to_str(&client_js_file));
 
         // Note this lops off the _opt which is necessary to restore the expected
@@ -314,8 +351,9 @@ fn main() -> Result<(), anyhow::Error> {
 
         // Delete the output directory if it exists
         if server_wasm_dir.exists() {
-            time("Remove output wasm dir", 1, ||
-                remove_dir_all(&server_wasm_dir).context("remove_dir_all[server_wasm_dir]"))?;
+            time("Remove output wasm dir", 1, || {
+                remove_dir_all(&server_wasm_dir).context("remove_dir_all[server_wasm_dir]")
+            })?;
         }
 
         // Recreate it
@@ -323,9 +361,11 @@ fn main() -> Result<(), anyhow::Error> {
 
         // Copy the output to the assets dir
         time("Copy wasm & js files to output wasm dir", 1, || {
-            copy(&service_worker_js_file, &service_worker_js_out).context("copy[service_worker_js_file]")?;
+            copy(&service_worker_js_file, &service_worker_js_out)
+                .context("copy[service_worker_js_file]")?;
             copy(&client_bg_opt_file, &client_wasm_out).context("copy[client_bg_opt_file]")?;
-            copy(&client_js_file, &client_js_out).context("copy[client_js_file]") })?;
+            copy(&client_js_file, &client_js_out).context("copy[client_js_file]")
+        })?;
 
         // Embed the wasm as a base64 encoded string in the output js so that it is
         // accessible from the installed service worker without having to add extra
@@ -337,18 +377,27 @@ fn main() -> Result<(), anyhow::Error> {
                 file.read_to_end(&mut bytes)?;
                 Ok(bytes)
             })?;
-            
-            let service_worker_wasm_base64 = time("Base64 encode service worker wasm bytes", 1, ||
-                Ok(Base64Display::new(&service_worker_wasm_bytes, &STANDARD).to_string()))?;
 
-            let service_worker_snippet = time("Read service worker register listners and replace placeholders", 1, ||
-                Ok(read_to_string(&service_worker_register_listeners_js)?
-                    .replace("SERVICE_WORKER_BASE64", &service_worker_wasm_base64)
-                    // Include the version so the worker can work out if an update is needed
-                    .replace("SERVICE_WORKER_VERSION", &service_worker_version)))?;
+            let service_worker_wasm_base64 =
+                time("Base64 encode service worker wasm bytes", 1, || {
+                    Ok(Base64Display::new(&service_worker_wasm_bytes, &STANDARD).to_string())
+                })?;
+
+            let service_worker_snippet = time(
+                "Read service worker register listners and replace placeholders",
+                1,
+                || {
+                    Ok(read_to_string(&service_worker_register_listeners_js)?
+                        .replace("SERVICE_WORKER_BASE64", &service_worker_wasm_base64)
+                        // Include the version so the worker can work out if an update is needed
+                        .replace("SERVICE_WORKER_VERSION", &service_worker_version))
+                },
+            )?;
 
             time("Write service worker registration js", 1, move || {
-                let mut service_worker_js_out = OpenOptions::new().append(true).open(&service_worker_js_out)?;
+                let mut service_worker_js_out = OpenOptions::new()
+                    .append(true)
+                    .open(&service_worker_js_out)?;
                 service_worker_js_out.write_all(service_worker_snippet.as_bytes())?;
                 Ok(())
             })?;
@@ -361,7 +410,7 @@ fn main() -> Result<(), anyhow::Error> {
             if package_file_path.exists() {
                 remove_file(&package_file_path)?;
             }
-            
+
             time("Hashing files", 1, || {
                 let mut files = Vec::new();
 
@@ -381,7 +430,10 @@ fn main() -> Result<(), anyhow::Error> {
                         io::copy(&mut file, &mut hasher)?;
 
                         let hash_bytes = hasher.finalize();
-                        Ok(format!("sha384-{}", Base64Display::new(&hash_bytes, &STANDARD)))
+                        Ok(format!(
+                            "sha384-{}",
+                            Base64Display::new(&hash_bytes, &STANDARD)
+                        ))
                     })?;
 
                     let path = format!(

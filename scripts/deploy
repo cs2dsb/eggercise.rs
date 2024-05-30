@@ -17,8 +17,16 @@ set -o pipefail
 readonly repo_dir="$( cd $(dirname ${BASH_SOURCE}); cd ..; pwd )";
 cd $repo_dir
 
+RED='\033[0;31m'
+NC='\033[0m' # No Color
+
 if ! cargo test; then 
-    >&2 echo "Failing tests detected. Aborting";
+    >&2 echo -e "${RED}Failing tests detected. Aborting${NC}";
+    exit 1;
+fi
+
+if ! cargo +nightly fmt -- --check >/dev/null; then
+    >&2 echo -e "${RED}Run rust fmt. Aborting${NC}";
     exit 1;
 fi
 

@@ -3,29 +3,38 @@ use std::{
     net::{IpAddr, SocketAddr},
     path::PathBuf,
     str::FromStr,
-    sync::Arc, time::Duration,
+    sync::Arc,
+    time::Duration,
 };
 
 use anyhow::Context;
 use axum::{
-    extract::{MatchedPath, Request}, http::{HeaderName, HeaderValue, Method, StatusCode, Uri}, middleware, response::{IntoResponse, Response}, routing::{get, post}, Router
+    extract::{MatchedPath, Request},
+    http::{HeaderName, HeaderValue, Method, StatusCode, Uri},
+    middleware,
+    response::{IntoResponse, Response},
+    routing::{get, post},
+    Router,
 };
 use clap::Parser;
 use deadpool_sqlite::{Config, Hook, Runtime};
 use server::{
-    cli::Cli, db, routes::{auth::*, ping::ping}, AppError, AppState
+    cli::Cli,
+    db,
+    routes::{auth::*, ping::ping},
+    AppError, AppState,
 };
-use shared::{
-    api,
-    configure_tracing, load_dotenv,
-};
-use tower_sessions_deadpool_sqlite_store::DeadpoolSqliteStore;
+use shared::{api, configure_tracing, load_dotenv};
 use tokio::net::TcpListener;
 use tower::ServiceBuilder;
 use tower_http::{
-    classify::ServerErrorsFailureClass, services::{ServeDir, ServeFile}, set_header::SetResponseHeaderLayer, trace::TraceLayer
+    classify::ServerErrorsFailureClass,
+    services::{ServeDir, ServeFile},
+    set_header::SetResponseHeaderLayer,
+    trace::TraceLayer,
 };
-use tower_sessions::{Expiry, SessionManagerLayer, cookie::time::Duration as CookieDuration};
+use tower_sessions::{cookie::time::Duration as CookieDuration, Expiry, SessionManagerLayer};
+use tower_sessions_deadpool_sqlite_store::DeadpoolSqliteStore;
 use tracing::{debug, info, info_span, Span};
 use webauthn_rs::{prelude::Url, WebauthnBuilder};
 
@@ -118,7 +127,10 @@ async fn main() -> Result<(), anyhow::Error> {
             .route(api::Object::Ping.path(), get(ping))
             // The following routes require the user to be signed in
             .route(api::Object::User.path(), get(fetch_user))
-            .route(api::Auth::CreateTemporaryLogin.path(), post(create_temporary_login))
+            .route(
+                api::Auth::CreateTemporaryLogin.path(),
+                post(create_temporary_login),
+            )
             .route(api::Object::QrCode.id_path(), get(generate_qr_code))
             .nest_service(
                 "/wasm/service_worker.js",
@@ -149,7 +161,7 @@ async fn main() -> Result<(), anyhow::Error> {
                                 if let Some(matched_path) = request
                                     .extensions()
                                     .get::<MatchedPath>()
-                                    .map(MatchedPath::as_str) 
+                                    .map(MatchedPath::as_str)
                                 {
                                     span.record("matched_path", matched_path);
                                 } else {
@@ -163,7 +175,9 @@ async fn main() -> Result<(), anyhow::Error> {
                                 span.record("status", response.status().to_string());
                             })
                             .on_failure(
-                                |error: ServerErrorsFailureClass, _latency: Duration, span: &Span| {
+                                |error: ServerErrorsFailureClass,
+                                 _latency: Duration,
+                                 span: &Span| {
                                     if let ServerErrorsFailureClass::StatusCode(code) = error {
                                         span.record("status", code.to_string());
                                     }

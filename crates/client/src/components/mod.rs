@@ -9,3 +9,6 @@ pub use forms::*;
 
 mod online_check;
 pub use online_check::*;
+
+mod components;
+pub use components::*;

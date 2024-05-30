@@ -1,17 +1,18 @@
 use leptos::{
-    component, create_action, create_signal,
-    view, IntoView, Show, Signal, SignalGet, SignalUpdate, SignalWith,
-    ReadSignal,
+    component, create_action, create_signal, view, IntoView, Show, Signal, SignalGet, SignalUpdate,
+    SignalWith,
 };
 use shared::model::LoginUser;
 use tracing::{debug, warn};
 
-use crate::{api::login, components::{LoginForm, OfflineFallback}, ClientRoutes};
+use crate::{
+    api::login,
+    components::{LoginForm, OfflineFallback},
+    ClientRoutes,
+};
 
 #[component]
-pub fn Login(
-    online: ReadSignal<bool>,
-) -> impl IntoView {
+pub fn Login() -> impl IntoView {
     // Signals
     let (login_response, set_login_response) = create_signal(None);
     let (login_error, set_login_error) = create_signal(None::<String>);
@@ -43,7 +44,7 @@ pub fn Login(
 
     view! {
         <h2>"Login"</h2>
-        <OfflineFallback online>
+        <OfflineFallback>
             <Show
                 when=move || login_response.with(|r| r.is_some())
                 fallback=move || {
