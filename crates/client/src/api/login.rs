@@ -13,9 +13,8 @@ use wasm_bindgen_futures::JsFuture;
 use web_sys::{CredentialRequestOptions, PublicKeyCredential};
 use webauthn_rs_proto::{PublicKeyCredential as WebauthnPublicKey, RequestChallengeResponse};
 
-use crate::utils::JsValueIntoOk;
-
 use super::json_request;
+use crate::utils::JsValueIntoOk;
 
 pub async fn login(login_user: &LoginUser) -> Result<User, FrontendError<ServerError<LoginError>>> {
     // Ask the server to start the login process and return a challenge

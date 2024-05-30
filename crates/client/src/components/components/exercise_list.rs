@@ -1,4 +1,4 @@
-use leptos::{component, view, IntoView, Transition, ErrorBoundary, SignalWith, CollectView};
+use leptos::{component, view, CollectView, ErrorBoundary, IntoView, SignalWith, Transition};
 
 use crate::db::model::exercise::get_exercises;
 

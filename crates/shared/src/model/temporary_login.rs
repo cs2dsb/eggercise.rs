@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use {
     crate::api::error::ServerError,
     exemplar::Model,
-    rusqlite::{ Connection, OptionalExtension },
+    rusqlite::{Connection, OptionalExtension},
     sea_query::{enum_def, Expr, Query, SqliteQueryBuilder},
     sea_query_rusqlite::RusqliteBinder,
     std::error::Error,
@@ -30,8 +30,10 @@ pub struct TemporaryLogin {
 
 impl TemporaryLogin {
     pub fn qr_code_url(&self) -> String {
-        Object::QrCode.id_path()
-            .replace(":id", &percent_encode(self.url.as_bytes(), NON_ALPHANUMERIC).to_string())
+        Object::QrCode.id_path().replace(
+            ":id",
+            &percent_encode(self.url.as_bytes(), NON_ALPHANUMERIC).to_string(),
+        )
     }
 
     pub fn expired(&self) -> bool {
@@ -41,10 +43,7 @@ impl TemporaryLogin {
 
 #[cfg(feature = "backend")]
 impl TemporaryLogin {
-    pub fn fetch<T: Error>(
-        conn: &Connection,
-        id: &Uuid,
-    ) -> Result<TemporaryLogin, ServerError<T>> {
+    pub fn fetch<T: Error>(conn: &Connection, id: &Uuid) -> Result<TemporaryLogin, ServerError<T>> {
         let (sql, values) = Query::select()
             .columns([
                 TemporaryLoginIden::Id,
@@ -80,7 +79,8 @@ impl TemporaryLogin {
             .build_rusqlite(SqliteQueryBuilder);
 
         let mut stmt = conn.prepare_cached(&sql)?;
-        let temporary_login = stmt.query_row(&*values.as_params(), TemporaryLogin::from_row)
+        let temporary_login = stmt
+            .query_row(&*values.as_params(), TemporaryLogin::from_row)
             .optional()?;
 
         Ok(temporary_login)
@@ -103,7 +103,9 @@ impl TemporaryLogin {
             .build_rusqlite(SqliteQueryBuilder);
 
         let mut stmt = conn.prepare_cached(&sql)?;
-        let temporary_login = stmt.query_row(&*values.as_params(), TemporaryLogin::from_row).optional()?;
+        let temporary_login = stmt
+            .query_row(&*values.as_params(), TemporaryLogin::from_row)
+            .optional()?;
 
         Ok(temporary_login)
     }

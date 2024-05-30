@@ -1,11 +1,15 @@
 use leptos::{
-    component, create_action, create_signal,
-    view, IntoView, Show, Signal, SignalGet, SignalUpdate, SignalWith,
+    component, create_action, create_signal, view, IntoView, Show, Signal, SignalGet, SignalUpdate,
+    SignalWith,
 };
 use shared::model::LoginUser;
 use tracing::{debug, warn};
 
-use crate::{api::login, components::{LoginForm, OfflineFallback}, ClientRoutes};
+use crate::{
+    api::login,
+    components::{LoginForm, OfflineFallback},
+    ClientRoutes,
+};
 
 #[component]
 pub fn Login() -> impl IntoView {

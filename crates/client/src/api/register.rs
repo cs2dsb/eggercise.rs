@@ -13,10 +13,7 @@ use wasm_bindgen_futures::JsFuture;
 use web_sys::{CredentialCreationOptions, PublicKeyCredential};
 use webauthn_rs_proto::{CreationChallengeResponse, RegisterPublicKeyCredential};
 
-use crate::{
-    api::json_request,
-    utils::JsValueIntoOk,
-};
+use crate::{api::json_request, utils::JsValueIntoOk};
 
 pub async fn register(
     reg_user: &RegistrationUser,
@@ -33,7 +30,6 @@ pub async fn register(
     // Convert to the browser type
     debug!("register::CreationChallengeResponse => CredentialCreationOptions");
     let credential_creation_options: CredentialCreationOptions = creation_challenge_response.into();
-
 
     // Get a promise that returns the credentials
     debug!("register::window.credentials.create");
@@ -54,7 +50,8 @@ pub async fn register(
 
     // Convert to the rust type
     debug!("register::PublicKeyCredentials => RegisterPublicKeyCredential");
-    let register_public_key_credentials: RegisterPublicKeyCredential = public_key_credential.ok()?;
+    let register_public_key_credentials: RegisterPublicKeyCredential =
+        public_key_credential.ok()?;
 
     // Complete the registration with the server
     debug!("register::json_request::register_finish");

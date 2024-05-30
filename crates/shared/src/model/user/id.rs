@@ -1,5 +1,4 @@
-use std::fmt;
-use std::ops::Deref;
+use std::{fmt, ops::Deref};
 
 #[cfg(feature = "backend")]
 use rusqlite::Connection;

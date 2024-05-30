@@ -53,7 +53,10 @@ where
     E: Error + DeserializeOwned + Display,
 {
     // Check the body is valid
-    debug!("json_request({method}, {url}, body type: {})", type_name::<B>());
+    debug!(
+        "json_request({method}, {url}, body type: {})",
+        type_name::<B>()
+    );
     if let Some(body) = body {
         debug!("json_request::body::validate");
         body.validate()?;
@@ -84,8 +87,8 @@ where
     // Check the content-type is what we're expecting
     let content_type = response.content_type();
     let is_json = content_type
-    .as_ref()
-    .map_or(false, |v| v == mime::APPLICATION_JSON.essence_str());
+        .as_ref()
+        .map_or(false, |v| v == mime::APPLICATION_JSON.essence_str());
     debug!("json_request::response::is_json: {is_json}");
 
     // Handle non-json errors (this isn't to allow the api to return other things,
@@ -126,7 +129,6 @@ where
         })?;
     }
 
-
     // Deserialize the ok type
     debug!("json_request::deserialize");
     let payload = response
@@ -139,7 +141,6 @@ where
                 type_name::<E>()
             )
         })?;
-
 
     debug!("json_request::return Ok::<{}>", type_name::<R>());
     Ok(payload)

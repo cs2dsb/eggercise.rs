@@ -67,8 +67,8 @@ macro_rules! routes {
             view! {
                 <Routes>
                 $(
-                    <Route 
-                        path=$path 
+                    <Route
+                        path=$path
                         view=$view
                     />
                 )+

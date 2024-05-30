@@ -7,9 +7,5 @@ use shared::api::{
 use super::json_request;
 
 pub async fn ping() -> Result<(), FrontendError<ServerError<Nothing>>> {
-    json_request::<_, (), _>(
-        Method::GET, 
-        api::Object::Ping.path(),
-        None::<&()>,
-    ).await
+    json_request::<_, (), _>(Method::GET, api::Object::Ping.path(), None::<&()>).await
 }

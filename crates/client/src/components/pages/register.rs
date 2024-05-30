@@ -1,11 +1,15 @@
 use leptos::{
-    component, create_action, create_signal,
-    view, IntoView, Show, Signal, SignalGet, SignalUpdate, SignalWith,
+    component, create_action, create_signal, view, IntoView, Show, Signal, SignalGet, SignalUpdate,
+    SignalWith,
 };
 use shared::model::RegistrationUser;
-use tracing::{ debug, warn };
+use tracing::{debug, warn};
 
-use crate::{api::register, components::RegistrationForm, ClientRoutes, components::OfflineFallback};
+use crate::{
+    api::register,
+    components::{OfflineFallback, RegistrationForm},
+    ClientRoutes,
+};
 
 #[component]
 pub fn Register() -> impl IntoView {
