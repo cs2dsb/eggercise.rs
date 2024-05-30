@@ -24,6 +24,7 @@ tracing.workspace = true
 tracing-subscriber = { workspace = true, features = [ "time" ] }
 tracing-web.workspace = true
 include_dir.workspace = true
+chrono.workspace = true
 web-sys = { workspace = true, features = [
     "CredentialCreationOptions",
     "CredentialRequestOptions",

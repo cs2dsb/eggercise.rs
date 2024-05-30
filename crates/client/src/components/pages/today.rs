@@ -1,11 +1,11 @@
-use leptos::{component, view, IntoView, ReadSignal};
+use leptos::{component, view, IntoView};
+
+use crate::components::ExerciseList;
 
 #[component]
-pub fn Today(
-    #[allow(unused_variables)]
-    online: ReadSignal<bool>,
-) -> impl IntoView {
+pub fn Today() -> impl IntoView {
     view! {
         <p>"Today"</p>
+        <ExerciseList />
     }
 }

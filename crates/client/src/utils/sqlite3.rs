@@ -11,17 +11,16 @@ use gloo_utils::{errors::{JsError, NotJsError}, format::JsValueSerdeExt};
 use thiserror::Error;
 use leptos::{provide_context, use_context};
 
-#[derive(Debug, Error)]
+#[derive(Debug, Clone, Error)]
 pub enum SqlitePromiserError {
     #[error("Error getting promise from promiser: {0}")]
-    Promiser(JsError),
+    Promiser(String),
 
     #[error("Error from sqlite (calling promiser promise): {0}")]
-    Sqlite(JsError),
+    Sqlite(String),
 
     #[error("Error serializing json: {0}")]
-    // TODO: is this inflating the binary size for little benefit?
-    Json(serde_json::Error),
+    Json(String),
 
     #[error("Unexpected result. Expected {0:?} but got {1:?}")]
     UnexpectedResult(Type, Type),
@@ -30,33 +29,33 @@ pub enum SqlitePromiserError {
     ExecResult(String),
 
     #[error("JsValue wasn't an Error...: {0}")]
-    NotJs(NotJsError),
+    NotJs(String),
 }
 
 impl From<NotJsError> for SqlitePromiserError {
     fn from(value: NotJsError) -> Self {
-        Self::NotJs(value)
+        Self::NotJs(value.to_string())
     }
 }
 
 impl From<serde_json::Error> for SqlitePromiserError {
     fn from(value: serde_json::Error) -> Self {
-        Self::Json(value)
+        Self::Json(value.to_string())
     }
 }
 
 impl SqlitePromiserError {
     fn from_promiser(value: JsValue) -> Self {
         match JsError::try_from(value) {
-            Ok(v) => Self::Promiser(v),
-            Err(e) => Self::NotJs(e),
+            Ok(v) => Self::Promiser(v.to_string()),
+            Err(e) => Self::NotJs(e.to_string()),
         }
     }
 
     fn from_sqlite(value: JsValue) -> Self {
         match JsError::try_from(value) {
-            Ok(v) => Self::Sqlite(v),
-            Err(e) => Self::NotJs(e),
+            Ok(v) => Self::Sqlite(v.to_string()),
+            Err(e) => Self::NotJs(e.to_string()),
         }
     }
 }

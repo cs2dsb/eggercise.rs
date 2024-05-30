@@ -5,7 +5,7 @@ use leptos::{mount_to_body, view };
 use wasm_bindgen::prelude::wasm_bindgen;
 
 mod components;
-use components::App;
+use components::{App, Online};
 
 mod routes;
 pub use routes::*;
@@ -26,6 +26,7 @@ pub async fn start_client(sqlite_promiser: Function) {
     configure_tracing();
 
     SqlitePromiser::new(sqlite_promiser).provide_context();
+    Online::provide_context();
     mount_to_body(move || view! { 
         <App/>
     });

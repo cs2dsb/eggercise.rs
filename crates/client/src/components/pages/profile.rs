@@ -1,6 +1,6 @@
 use leptos::{
     component, create_action, Action, create_local_resource, create_signal, 
-    view, CollectView, ErrorBoundary, IntoView, Show, Signal, SignalGet, SignalUpdate, SignalWith, ReadSignal,
+    view, CollectView, ErrorBoundary, IntoView, Show, Signal, SignalGet, SignalUpdate, SignalWith,
 };
 use shared::model::{
     User,
@@ -82,10 +82,7 @@ fn ProfileWithUser(
 }
 
 #[component]
-pub fn Profile(
-    #[allow(unused_variables)]
-    online: ReadSignal<bool>,
-) -> impl IntoView {
+pub fn Profile() -> impl IntoView {
     // Resources
     let user_and_temp_login = create_local_resource(move || (), |_| fetch_user());
 
@@ -116,7 +113,7 @@ pub fn Profile(
 
     view! {
         <h2>"Profile"</h2>
-        <OfflineFallback online>
+        <OfflineFallback>
             <div>
                 <ErrorBoundary fallback=|errors| view! {
                     <div style="color:red">

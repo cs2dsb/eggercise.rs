@@ -1,7 +1,6 @@
 use leptos::{
     component, create_action, create_signal,
     view, IntoView, Show, Signal, SignalGet, SignalUpdate, SignalWith,
-    ReadSignal,
 };
 use shared::model::RegistrationUser;
 use tracing::{ debug, warn };
@@ -9,7 +8,7 @@ use tracing::{ debug, warn };
 use crate::{api::register, components::RegistrationForm, ClientRoutes, components::OfflineFallback};
 
 #[component]
-pub fn Register(online: ReadSignal<bool>) -> impl IntoView {
+pub fn Register() -> impl IntoView {
     // Signals
     let (register_response, set_register_response) = create_signal(None);
     let (register_error, set_register_error) = create_signal(None::<String>);
@@ -41,7 +40,7 @@ pub fn Register(online: ReadSignal<bool>) -> impl IntoView {
 
     view! {
         <h2>"Register"</h2>
-        <OfflineFallback online>
+        <OfflineFallback>
             <Show
                 when=move || register_response.with(|r| r.is_some())
                 fallback=move || {

@@ -480,6 +480,7 @@ checksum = "98cc8fbded0c607b7ba9dd60cd98df59af97e84d24e49c8557331cfc26d301ce"
 name = "client"
 version = "0.0.51"
 dependencies = [
+ "chrono",
  "console_error_panic_hook",
  "gloo-net",
  "gloo-utils",
