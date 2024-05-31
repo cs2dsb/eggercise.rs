@@ -1,32 +1,31 @@
 use chrono::{DateTime, Utc};
+
+use crate::{api::Object, feature_model_derives, feature_model_imports, types::Uuid};
+
+feature_model_imports!();
+
 use percent_encoding::{percent_encode, NON_ALPHANUMERIC};
-use serde::{Deserialize, Serialize};
 #[cfg(feature = "backend")]
-use {
-    crate::api::error::ServerError,
-    exemplar::Model,
-    rusqlite::{Connection, OptionalExtension},
-    sea_query::{enum_def, Expr, Query, SqliteQueryBuilder},
-    sea_query_rusqlite::RusqliteBinder,
-    std::error::Error,
-};
+use {crate::api::error::ServerError, rusqlite::OptionalExtension, std::error::Error};
 
-use crate::{api::Object, types::Uuid};
+feature_model_derives!(
+    "temporary_login",
+    "../../../server/migrations/003-temporary_login/up.sql",
+    pub struct TemporaryLogin {
+        pub id: Uuid,
+        pub user_id: Uuid,
+        pub expiry_date: DateTime<Utc>,
+        pub url: String,
+    }
+);
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "backend", derive(Model))]
-#[cfg_attr(feature = "backend", table("temporary_login"))]
-#[cfg_attr(
-    feature = "backend",
-    check("../../../server/migrations/003-temporary_login/up.sql")
-)]
-#[cfg_attr(feature = "backend", enum_def)]
-pub struct TemporaryLogin {
-    pub id: Uuid,
-    pub user_id: Uuid,
-    pub expiry_date: DateTime<Utc>,
-    pub url: String,
-}
+#[cfg(feature = "sea-query-enum")]
+const TEMPORARY_LOGIN_STAR: [TemporaryLoginIden; 4] = [
+    TemporaryLoginIden::Id,
+    TemporaryLoginIden::UserId,
+    TemporaryLoginIden::ExpiryDate,
+    TemporaryLoginIden::Url,
+];
 
 impl TemporaryLogin {
     pub fn qr_code_url(&self) -> String {
@@ -45,12 +44,7 @@ impl TemporaryLogin {
 impl TemporaryLogin {
     pub fn fetch<T: Error>(conn: &Connection, id: &Uuid) -> Result<TemporaryLogin, ServerError<T>> {
         let (sql, values) = Query::select()
-            .columns([
-                TemporaryLoginIden::Id,
-                TemporaryLoginIden::UserId,
-                TemporaryLoginIden::ExpiryDate,
-                TemporaryLoginIden::Url,
-            ])
+            .columns(TEMPORARY_LOGIN_STAR)
             .from(TemporaryLoginIden::Table)
             .and_where(Expr::col(TemporaryLoginIden::Id).eq(id))
             .limit(1)
@@ -67,12 +61,7 @@ impl TemporaryLogin {
         id: &Uuid,
     ) -> Result<Option<TemporaryLogin>, ServerError<T>> {
         let (sql, values) = Query::select()
-            .columns([
-                TemporaryLoginIden::Id,
-                TemporaryLoginIden::UserId,
-                TemporaryLoginIden::ExpiryDate,
-                TemporaryLoginIden::Url,
-            ])
+            .columns(TEMPORARY_LOGIN_STAR)
             .from(TemporaryLoginIden::Table)
             .and_where(Expr::col(TemporaryLoginIden::Id).eq(id))
             .limit(1)
@@ -91,12 +80,7 @@ impl TemporaryLogin {
         id: &Uuid,
     ) -> Result<Option<TemporaryLogin>, ServerError<T>> {
         let (sql, values) = Query::select()
-            .columns([
-                TemporaryLoginIden::Id,
-                TemporaryLoginIden::UserId,
-                TemporaryLoginIden::ExpiryDate,
-                TemporaryLoginIden::Url,
-            ])
+            .columns(TEMPORARY_LOGIN_STAR)
             .from(TemporaryLoginIden::Table)
             .and_where(Expr::col(TemporaryLoginIden::UserId).eq(id))
             .limit(1)

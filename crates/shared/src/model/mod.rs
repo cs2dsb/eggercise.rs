@@ -23,30 +23,24 @@ pub trait ValidateModel {
 #[macro_export]
 macro_rules! feature_model_imports {
     () => {
-        #[allow(unused_imports)]
-        use serde::{Deserialize, Serialize};
-
         #[cfg(feature = "exemplar-model")]
         #[allow(unused_imports)]
         use exemplar::Model;
-
-        #[cfg(feature = "sea-query-enum")] 
+        #[cfg(feature = "sea-query-enum")]
         #[allow(unused_imports)]
         use sea_query::{enum_def, Expr, Query, SqliteQueryBuilder};
-
+        #[allow(unused_imports)]
+        use serde::{Deserialize, Serialize};
         #[cfg(feature = "backend")]
         #[allow(unused_imports)]
-        use {
-            rusqlite::Connection,
-            sea_query_rusqlite::RusqliteBinder,
-        };
+        use {rusqlite::Connection, sea_query_rusqlite::RusqliteBinder};
     };
 }
 
 #[macro_export]
 macro_rules! feature_model_derives {
     ($table_name:literal, $migration_path:literal, $($struct_body_tt:tt)*) => {
-        
+
         #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
         #[cfg_attr(feature = "exemplar-model", derive(Model))]
         #[cfg_attr(feature = "exemplar-model", table($table_name))]
@@ -57,4 +51,3 @@ macro_rules! feature_model_derives {
         $($struct_body_tt)*
     };
 }
-

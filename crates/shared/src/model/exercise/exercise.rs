@@ -1,27 +1,23 @@
 use chrono::{DateTime, Utc};
 
-use crate::{ 
-    types::Uuid,
-    feature_model_imports,
-    feature_model_derives,
-};
+use crate::{feature_model_derives, feature_model_imports, types::Uuid};
 
 feature_model_imports!();
 
 feature_model_derives!(
-    "exercise", 
+    "exercise",
     "../../../migrations/004-exercise/up.sql",
     pub struct Exercise {
-        pub id:                  Uuid,
-        pub name:                String,
-        pub description:         Option<String>,
-        pub creation_date:       DateTime<Utc>,
-        pub last_updated_date:   DateTime<Utc>,
+        pub id: Uuid,
+        pub name: String,
+        pub description: Option<String>,
+        pub creation_date: DateTime<Utc>,
+        pub last_updated_date: DateTime<Utc>,
     }
 );
 
 #[cfg(feature = "sea-query-enum")]
-const EXERCISE_STAR: [ExerciseIden; 5]= [
+const EXERCISE_STAR: [ExerciseIden; 5] = [
     ExerciseIden::Id,
     ExerciseIden::Name,
     ExerciseIden::Description,
@@ -51,7 +47,8 @@ impl Exercise {
             .build_rusqlite(SqliteQueryBuilder);
 
         let mut stmt = conn.prepare_cached(&sql)?;
-        let res = stmt.query_map(&*values.as_params(), Exercise::from_row)?
+        let res = stmt
+            .query_map(&*values.as_params(), Exercise::from_row)?
             .collect::<Result<_, _>>()?;
         Ok(res)
     }

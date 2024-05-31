@@ -1,42 +1,35 @@
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
-#[cfg(feature = "backend")]
-use {
-    exemplar::Model,
-    rusqlite::Connection,
-    sea_query::{enum_def, Expr, Query, SqliteQueryBuilder},
-    sea_query_rusqlite::RusqliteBinder,
-};
 
-use crate::types::Uuid;
+use crate::{feature_model_derives, feature_model_imports, types::Uuid};
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "backend", derive(Model))]
-#[cfg_attr(feature = "backend", table("exercise_group"))]
-#[cfg_attr(
-    feature = "backend",
-    check("../../../migrations/007-exercise_group/up.sql")
-)]
-#[cfg_attr(feature = "backend", enum_def)]
-pub struct ExerciseGroup {
-    pub id:                  Uuid,
-    pub name:                String,
-    pub description:         Option<String>,
-    pub creation_date:       DateTime<Utc>,
-    pub last_updated_date:   DateTime<Utc>,
-}
+feature_model_imports!();
+
+feature_model_derives!(
+    "exercise_group",
+    "../../../migrations/007-exercise_group/up.sql",
+    pub struct ExerciseGroup {
+        pub id: Uuid,
+        pub name: String,
+        pub description: Option<String>,
+        pub creation_date: DateTime<Utc>,
+        pub last_updated_date: DateTime<Utc>,
+    }
+);
+
+#[cfg(feature = "sea-query-enum")]
+const EXERCISE_GROUP_STAR: [ExerciseGroupIden; 5] = [
+    ExerciseGroupIden::Id,
+    ExerciseGroupIden::Name,
+    ExerciseGroupIden::Description,
+    ExerciseGroupIden::CreationDate,
+    ExerciseGroupIden::LastUpdatedDate,
+];
 
 #[cfg(feature = "backend")]
 impl ExerciseGroup {
     pub fn fetch_by_id(conn: &Connection, id: &Uuid) -> Result<ExerciseGroup, rusqlite::Error> {
         let (sql, values) = Query::select()
-            .columns([
-                ExerciseGroupIden::Id,
-                ExerciseGroupIden::Name,
-                ExerciseGroupIden::Description,
-                ExerciseGroupIden::CreationDate,
-                ExerciseGroupIden::LastUpdatedDate,
-            ])
+            .columns(EXERCISE_GROUP_STAR)
             .from(ExerciseGroupIden::Table)
             .and_where(Expr::col(ExerciseGroupIden::Id).eq(id))
             .limit(1)

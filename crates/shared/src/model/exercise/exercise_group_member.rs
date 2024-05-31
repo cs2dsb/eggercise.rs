@@ -1,37 +1,32 @@
-use serde::{Deserialize, Serialize};
-#[cfg(feature = "backend")]
-use {
-    exemplar::Model,
-    rusqlite::Connection,
-    sea_query::{enum_def, Expr, Query, SqliteQueryBuilder},
-    sea_query_rusqlite::RusqliteBinder,
-};
+use crate::{feature_model_derives, feature_model_imports, types::Uuid};
 
-use crate::types::Uuid;
+feature_model_imports!();
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "backend", derive(Model))]
-#[cfg_attr(feature = "backend", table("exercise_group_member"))]
-#[cfg_attr(
-    feature = "backend",
-    check("../../../migrations/007-exercise_group/up.sql")
-)]
-#[cfg_attr(feature = "backend", enum_def)]
-pub struct ExerciseGroupMember {
-    pub id:             Uuid,
-    pub exercise_id:    Uuid,
-    pub group_id:       Uuid,
-}
+feature_model_derives!(
+    "exercise_group_member",
+    "../../../migrations/007-exercise_group/up.sql",
+    pub struct ExerciseGroupMember {
+        pub id: Uuid,
+        pub exercise_id: Uuid,
+        pub group_id: Uuid,
+    }
+);
+
+#[cfg(feature = "sea-query-enum")]
+const EXERCISE_GROUP_MEMBER_STAR: [ExerciseGroupMemberIden; 3] = [
+    ExerciseGroupMemberIden::Id,
+    ExerciseGroupMemberIden::ExerciseId,
+    ExerciseGroupMemberIden::GroupId,
+];
 
 #[cfg(feature = "backend")]
 impl ExerciseGroupMember {
-    pub fn fetch_by_id(conn: &Connection, id: &Uuid) -> Result<ExerciseGroupMember, rusqlite::Error> {
+    pub fn fetch_by_id(
+        conn: &Connection,
+        id: &Uuid,
+    ) -> Result<ExerciseGroupMember, rusqlite::Error> {
         let (sql, values) = Query::select()
-            .columns([
-                ExerciseGroupMemberIden::Id,
-                ExerciseGroupMemberIden::ExerciseId,
-                ExerciseGroupMemberIden::GroupId,
-            ])
+            .columns(EXERCISE_GROUP_MEMBER_STAR)
             .from(ExerciseGroupMemberIden::Table)
             .and_where(Expr::col(ExerciseGroupMemberIden::Id).eq(id))
             .limit(1)

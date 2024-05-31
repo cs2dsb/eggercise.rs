@@ -1,20 +1,19 @@
+use chrono::{DateTime, Utc};
+
+use crate::{api::error::ServerError, feature_model_derives, feature_model_imports, types::Uuid};
+
+feature_model_imports!();
+
 use std::{
     error::Error,
     ops::{Deref, DerefMut},
 };
 
-use chrono::{DateTime, Utc};
-use exemplar::Model;
 use rusqlite::{
     types::{FromSql, FromSqlError, FromSqlResult, ToSqlOutput, ValueRef},
-    Connection, ToSql,
+    ToSql,
 };
-use sea_query::{enum_def, Expr, Query, SqliteQueryBuilder};
-use sea_query_rusqlite::RusqliteBinder;
-use serde::{Deserialize, Serialize};
 use webauthn_rs::prelude::{CredentialID as WebauthnCredentialId, Passkey as WebauthnPasskey};
-
-use crate::{api::error::ServerError, types::Uuid};
 
 /// Wrapper to implement ToSql and FromSql on
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -98,21 +97,34 @@ impl FromSql for CredentialId {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Model)]
-#[table("credential")]
-#[check("../../../server/migrations/002-credential/up.sql")]
-#[enum_def]
-pub struct Credential {
-    pub id: CredentialId,
-    pub user_id: Uuid,
-    pub passkey: Passkey,
-    pub counter: u32,
-    pub creation_date: DateTime<Utc>,
-    pub last_used_date: Option<DateTime<Utc>>,
-    pub last_updated_date: DateTime<Utc>,
-    pub backup_eligible: bool,
-    pub backup_state: bool,
-}
+feature_model_derives!(
+    "credential",
+    "../../../server/migrations/002-credential/up.sql",
+    pub struct Credential {
+        pub id: CredentialId,
+        pub user_id: Uuid,
+        pub passkey: Passkey,
+        pub counter: u32,
+        pub creation_date: DateTime<Utc>,
+        pub last_used_date: Option<DateTime<Utc>>,
+        pub last_updated_date: DateTime<Utc>,
+        pub backup_eligible: bool,
+        pub backup_state: bool,
+    }
+);
+
+#[cfg(feature = "sea-query-enum")]
+const CREDENTIAL_STAR: [CredentialIden; 9] = [
+    CredentialIden::Id,
+    CredentialIden::UserId,
+    CredentialIden::Passkey,
+    CredentialIden::Counter,
+    CredentialIden::CreationDate,
+    CredentialIden::LastUsedDate,
+    CredentialIden::LastUpdatedDate,
+    CredentialIden::BackupEligible,
+    CredentialIden::BackupState,
+];
 
 impl Credential {
     pub fn fetch<T: Error>(
@@ -121,17 +133,7 @@ impl Credential {
     ) -> Result<Credential, ServerError<T>> {
         let id_value = id.to_json_string()?;
         let (sql, values) = Query::select()
-            .columns([
-                CredentialIden::Id,
-                CredentialIden::UserId,
-                CredentialIden::Passkey,
-                CredentialIden::Counter,
-                CredentialIden::CreationDate,
-                CredentialIden::LastUsedDate,
-                CredentialIden::LastUpdatedDate,
-                CredentialIden::BackupEligible,
-                CredentialIden::BackupState,
-            ])
+            .columns(CREDENTIAL_STAR)
             .from(CredentialIden::Table)
             .and_where(Expr::col(CredentialIden::Id).eq(id_value))
             .limit(1)

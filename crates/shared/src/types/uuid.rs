@@ -1,7 +1,7 @@
 use std::ops::Deref;
-pub use uuid::Error as UuidError;
 
 use serde::{Deserialize, Serialize};
+pub use uuid::Error as UuidError;
 #[cfg(feature = "exemplar-model")]
 use {
     rusqlite::{
