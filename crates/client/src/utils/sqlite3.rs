@@ -2,6 +2,8 @@
 
 use std::{any::type_name, collections::HashMap};
 
+use chrono::{ DateTime, NaiveDateTime, Utc, TimeZone };
+use sea_query::types::Iden;
 use gloo_utils::{
     errors::{JsError, NotJsError},
     format::JsValueSerdeExt,
@@ -9,10 +11,11 @@ use gloo_utils::{
 use leptos::{provide_context, use_context};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use thiserror::Error;
-use tracing::trace;
-use wasm_bindgen::JsValue;
+use tracing::{ trace, error };
+use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
-use web_sys::js_sys::{Function, Promise};
+use web_sys::js_sys::{ self, Function, Promise};
+use shared::types::UuidError;
 
 #[derive(Debug, Clone, Error)]
 pub enum SqlitePromiserError {
@@ -33,8 +36,31 @@ pub enum SqlitePromiserError {
 
     #[error("JsValue wasn't an Error...: {0}")]
     NotJs(String),
+
+    #[error("Column {0} was missing from ExecResult")]
+    MissingColumn(String),
+
+    #[error("Row {0} requested but only {1} rows in ExecResult")]
+    MissingRow(usize, usize),
+
+    #[error("Error parsing Uuid: {0}")]
+    Uuid(UuidError),
+
+    #[error("Error parsing Datetime: {0}")]
+    Chrono(chrono::ParseError),
 }
 
+impl From<chrono::ParseError> for SqlitePromiserError {
+    fn from(value: chrono::ParseError) -> Self {
+        Self::Chrono(value)
+    }
+}
+
+impl From<UuidError> for SqlitePromiserError {
+    fn from(value: UuidError) -> Self {
+        Self::Uuid(value)
+    }
+}
 impl From<NotJsError> for SqlitePromiserError {
     fn from(value: NotJsError) -> Self {
         Self::NotJs(value.to_string())
@@ -56,9 +82,18 @@ impl SqlitePromiserError {
     }
 
     fn from_sqlite(value: JsValue) -> Self {
-        match JsError::try_from(value) {
-            Ok(v) => Self::Sqlite(v.to_string()),
-            Err(e) => Self::NotJs(e.to_string()),
+        // Copied out of gloo_utils because their version panics when the non error isn't a string
+        match value.dyn_into::<js_sys::Error>() {
+            Ok(error) => Self::Sqlite(JsError::from(error).to_string()),
+            Err(js_value) => {
+                match js_value.dyn_into::<js_sys::JsString>() {
+                    Ok(string) => {
+                        let js_to_string = String::from(string);
+                        Self::NotJs(format!("JsValue wasn't JsError, was actually a string: {js_to_string}"))
+                    }, 
+                    Err(js_value) => Self::NotJs(format!("JsValue wasn't JsError or JsString: {:?}", js_value)),
+                }
+            }
         }
     }
 }
@@ -66,6 +101,33 @@ impl SqlitePromiserError {
 #[derive(Debug, Clone)]
 pub struct SqlitePromiser {
     inner: Function,
+}
+
+/// Copied from rusqlite FromSql 
+pub fn parse_datetime(value: &str) -> Result<DateTime<Utc>, SqlitePromiserError> {
+    {
+        // Try to parse value as rfc3339 first.
+        let fmt = if value.len() >= 11 && value.as_bytes()[10] == b'T' {
+            "%FT%T%.f%#z"
+        } else {
+            "%F %T%.f%#z"
+        };
+
+        if let Ok(dt) = DateTime::parse_from_str(value, fmt) {
+            return Ok(dt.with_timezone(&Utc));
+        }
+    }
+
+    // Couldn't parse as rfc3339 - fall back to NaiveDateTime.
+    let fmt = if value.len() >= 11 && value.as_bytes()[10] == b'T' {
+        "%FT%T%.f"
+    } else {
+        "%F %T%.f"
+    };
+
+    Ok(NaiveDateTime::parse_from_str(value, fmt)
+        .map(|dt| Utc.from_utc_datetime(&dt))?)
+    
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
@@ -154,6 +216,42 @@ pub struct ExecResult {
     pub extra_fields: HashMap<String, serde_json::Value>,
 }
 
+impl ExecResult {
+    pub fn get_extractor<T, J>(&self, column: T) -> Result<impl Fn(&Self, usize) -> Result<J, SqlitePromiserError>, SqlitePromiserError> 
+    where
+        T: Iden,
+        J: DeserializeOwned,
+    {
+        let column_name = column.to_string();
+        let (column_index, _) = self.column_names
+            .iter()
+            .enumerate()
+            .find(|(_, cn)| cn == &&column_name)
+            .ok_or(SqlitePromiserError::MissingColumn(column_name.clone()))?;
+
+        Ok(move |r: &Self, row_index| {
+            let row = if r.result_rows.len() > row_index {
+                &r.result_rows[row_index]
+            } else {
+                Err(SqlitePromiserError::MissingRow(row_index, r.result_rows.len()))?
+            };
+
+            let v = if row.len() > column_index {
+                &row[column_index]
+            } else {
+                Err(SqlitePromiserError::MissingColumn(format!("{} column_names contained the column ({}) but it was missing from row {}", 
+                    type_name::<Self>(), 
+                    column_name,
+                    row_index,
+                )))?
+            };
+
+            let r = serde_json::from_value(v.clone())?;
+            Ok(r)
+        })
+    }
+}
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OpfsTreeResults {
@@ -237,13 +335,10 @@ impl SqlitePromiser {
             .call1(&this, &cmd_value)
             .map_err(SqlitePromiserError::from_promiser)?
             .into();
-
         let result: CommandResult = JsValueSerdeExt::into_serde(
-            &JsFuture::from(promise)
-                .await
+            &JsFuture::from(promise).await
                 .map_err(SqlitePromiserError::from_sqlite)?,
         )?;
-
         trace!("Result: {:#?}", result);
         let ret_type = result.result.type_();
 

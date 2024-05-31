@@ -45,7 +45,7 @@
   body {
     padding: calc(0.5em + 0.5vmin);
     margin: 0 auto;
-    max-width: 40em;
+    max-width: 45em;
     background-color: var(--page-bg-color);
     color: var(--text-color);
   

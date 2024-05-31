@@ -27,43 +27,52 @@ VALUES ('f448d7a6-a044-4818-9c98-e9f22f2f1fed', 'Primary exercises');
 INSERT INTO exercise_group (id, name)
 VALUES ('9b358007-2ce7-40c9-8367-497d9c55e50e', 'Accessory exercises');
 
-INSERT INTO exercise_group_member (exercise_id, group_id)
-VALUES ((SELECT id FROM exercise WHERE name = 'Squat, front (barbell)'),
+INSERT INTO exercise_group_member (id, exercise_id, group_id)
+VALUES ('bcc6e371-d866-42cf-9962-d3c2e075d920',
+        (SELECT id FROM exercise WHERE name = 'Squat, front (barbell)'),
         (SELECT id FROM exercise_group WHERE name = 'Primary exercises'));
 
-INSERT INTO exercise_group_member (exercise_id, group_id)
-VALUES ((SELECT id FROM exercise WHERE name = 'Squat, back (barbell)'),
+INSERT INTO exercise_group_member (id, exercise_id, group_id)
+VALUES ('ecdee95e-4998-48bc-9eb8-fc5705517c84',
+        (SELECT id FROM exercise WHERE name = 'Squat, back (barbell)'),
         (SELECT id FROM exercise_group WHERE name = 'Primary exercises'));
 
-INSERT INTO exercise_group_member (exercise_id, group_id)
-VALUES ((SELECT id FROM exercise WHERE name = 'Deadlift, rdl (barbell)'),
+INSERT INTO exercise_group_member (id, exercise_id, group_id)
+VALUES ('26851e25-f98e-40a5-aa8d-9fd349717780',
+        (SELECT id FROM exercise WHERE name = 'Deadlift, rdl (barbell)'),
         (SELECT id FROM exercise_group WHERE name = 'Primary exercises'));
 
-INSERT INTO exercise_group_member (exercise_id, group_id)
-VALUES ((SELECT id FROM exercise WHERE name = 'Benchpress (barbell)'),
+INSERT INTO exercise_group_member (id, exercise_id, group_id)
+VALUES ('33e80e20-7d68-4ef9-9909-a95cad063983',
+        (SELECT id FROM exercise WHERE name = 'Benchpress (barbell)'),
         (SELECT id FROM exercise_group WHERE name = 'Primary exercises'));
 
-INSERT INTO exercise_group_member (exercise_id, group_id)
-VALUES ((SELECT id FROM exercise WHERE name = 'Benchpress (dumbbell)'),
+INSERT INTO exercise_group_member (id, exercise_id, group_id)
+VALUES ('a549d1be-a2fd-4cb4-8aa9-32efdf14ebd1',
+        (SELECT id FROM exercise WHERE name = 'Benchpress (dumbbell)'),
         (SELECT id FROM exercise_group WHERE name = 'Primary exercises'));
 
-INSERT INTO exercise_group_member (exercise_id, group_id)
-VALUES ((SELECT id FROM exercise WHERE name = 'Lat pulldown'),
+INSERT INTO exercise_group_member (id, exercise_id, group_id)
+VALUES ('640eda9c-db75-4934-8c17-9bb8d56f7d9b',
+        (SELECT id FROM exercise WHERE name = 'Lat pulldown'),
         (SELECT id FROM exercise_group WHERE name = 'Accessory exercises'));
 
-INSERT INTO exercise_group_member (exercise_id, group_id)
-VALUES ((SELECT id FROM exercise WHERE name = 'Overhead press (barbell)'),
+INSERT INTO exercise_group_member (id, exercise_id, group_id)
+VALUES ('4e72646c-824d-4f13-92de-4507573308ca',
+        (SELECT id FROM exercise WHERE name = 'Overhead press (barbell)'),
         (SELECT id FROM exercise_group WHERE name = 'Accessory exercises'));
 
-INSERT INTO exercise_group_member (exercise_id, group_id)
-VALUES ((SELECT id FROM exercise WHERE name = 'Bicep curl (dumbbell)'),
+INSERT INTO exercise_group_member (id, exercise_id, group_id)
+VALUES ('d425c5d1-3a54-4d81-a468-d32a217d0bad',
+        (SELECT id FROM exercise WHERE name = 'Bicep curl (dumbbell)'),
         (SELECT id FROM exercise_group WHERE name = 'Accessory exercises'));
 
-INSERT INTO exercise_group_member (exercise_id, group_id)
-VALUES ((SELECT id FROM exercise WHERE name = 'Calf raise'),
+INSERT INTO exercise_group_member (id, exercise_id, group_id)
+VALUES ('429ec3b4-d974-4d90-95b7-89103f463731',
+        (SELECT id FROM exercise WHERE name = 'Calf raise'),
         (SELECT id FROM exercise_group WHERE name = 'Accessory exercises'));
 
-INSERT INTO exercise_group_member (exercise_id, group_id)
-VALUES ((SELECT id FROM exercise WHERE name = 'Skullcrushers (barbell)'),
+INSERT INTO exercise_group_member (id, exercise_id, group_id)
+VALUES ('b499094a-273f-4d5f-8e88-193bb7f80318',
+        (SELECT id FROM exercise WHERE name = 'Skullcrushers (barbell)'),
         (SELECT id FROM exercise_group WHERE name = 'Accessory exercises'));
-

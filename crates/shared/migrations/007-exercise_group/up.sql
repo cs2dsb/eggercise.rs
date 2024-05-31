@@ -7,7 +7,7 @@ CREATE TABLE exercise_group (
 );
 
 CREATE TABLE exercise_group_member (
-    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    id                  TEXT PRIMARY KEY NOT NULL,
     exercise_id         TEXT NOT NULL,
     group_id            TEXT NOT NULL,
     FOREIGN KEY (exercise_id) REFERENCES exercise(id) ON DELETE CASCADE,

@@ -4,9 +4,40 @@ edition.workspace = true
 version.workspace = true
 
 [features]
-backend = [ "rusqlite/serde_json", "serde_json", "exemplar", "sea-query", "sea-query-rusqlite", "uuid/v4", "webauthn-rs", "axum", "deadpool-sqlite" ]
-frontend = [ "web-sys", "wasm-bindgen", "gloo-net", "leptos" ]
+backend = [ 
+    "rusqlite/serde_json", 
+    "serde_json", 
+    "exemplar", 
+    "sea-query", 
+    "sea-query-rusqlite", 
+    "uuid/v4", 
+    "webauthn-rs", 
+    "axum", 
+    "deadpool-sqlite", 
+
+    "sea-query-enum", 
+    "exemplar-model",
+]
+frontend = [ 
+    "web-sys", 
+    "wasm-bindgen", 
+    "gloo-net", 
+    "leptos", 
+    "exemplar", 
+    "sea-query", 
+
+    "sea-query-enum",
+]
 build = [ "anyhow" ]
+
+# These exist to remove the any(frontend, backend) scattered through the code
+# Enable sea query enum derives
+sea-query-enum = []
+# Enable the examplar model derive for from_row
+exemplar-model = [
+    "rusqlite/chrono",
+    "rusqlite/uuid",
+]
 
 [dependencies]
 tracing.workspace = true

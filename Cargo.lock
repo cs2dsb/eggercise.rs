@@ -489,6 +489,7 @@ dependencies = [
  "leptos",
  "leptos_router",
  "mime",
+ "sea-query",
  "serde",
  "serde_json",
  "shared",
@@ -2286,6 +2287,7 @@ dependencies = [
  "serde_json",
  "smallvec",
  "time",
+ "uuid",
 ]
 
 [[package]]
