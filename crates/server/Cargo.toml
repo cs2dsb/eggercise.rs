@@ -20,16 +20,16 @@ anyhow.workspace = true
 leptos.workspace = true
 tracing.workspace = true
 chrono.workspace = true
-rusqlite.workspace = true
 sea-query.workspace = true
 sea-query-rusqlite.workspace = true
-webauthn-rs = { workspace = true, features = [ "danger-allow-state-serialisation" ] }
 axum.workspace = true
 deadpool.workspace = true
 deadpool-sqlite.workspace = true
 mime.workspace = true
 thiserror.workspace = true
 include_dir.workspace = true
+rusqlite = { workspace = true, features = [ "bundled" ] }
+webauthn-rs = { workspace = true, features = [ "danger-allow-state-serialisation" ] }
 
 # QR Code generation
 qrcodegen = "1.8.0"

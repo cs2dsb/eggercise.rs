@@ -1,52 +1,50 @@
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
+
+use crate::{feature_model_derives, feature_model_imports, types::Uuid};
+
+feature_model_imports!();
+
 #[cfg(feature = "backend")]
 use {
     crate::{
         api::error::{ServerError, ServerErrorContext},
         model::{Credential, NewCredential, NewUser, TemporaryLogin},
     },
-    exemplar::Model,
-    rusqlite::{Connection, OptionalExtension},
-    sea_query::{enum_def, Expr, Query, SqliteQueryBuilder},
-    sea_query_rusqlite::RusqliteBinder,
+    rusqlite::OptionalExtension,
     std::error::Error,
     webauthn_rs::prelude::Passkey,
 };
 
-use crate::types::Uuid;
+feature_model_derives!(
+    "user",
+    "../../../../server/migrations/001-user/up.sql",
+    pub struct User {
+        pub id: Uuid,
+        pub username: String,
+        pub email: Option<String>,
+        pub display_name: Option<String>,
+        pub registration_date: DateTime<Utc>,
+        pub last_updated_date: DateTime<Utc>,
+        pub last_login_date: Option<DateTime<Utc>>,
+    }
+);
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "backend", derive(Model))]
-#[cfg_attr(feature = "backend", table("user"))]
-#[cfg_attr(
-    feature = "backend",
-    check("../../../../server/migrations/001-user/up.sql")
-)]
-#[cfg_attr(feature = "backend", enum_def)]
-pub struct User {
-    pub id: Uuid,
-    pub username: String,
-    pub email: Option<String>,
-    pub display_name: Option<String>,
-    pub registration_date: DateTime<Utc>,
-    pub last_updated_date: DateTime<Utc>,
-    pub last_login_date: Option<DateTime<Utc>>,
-}
+#[cfg(feature = "sea-query-enum")]
+const USER_STAR: [UserIden; 7] = [
+    UserIden::Id,
+    UserIden::Username,
+    UserIden::Email,
+    UserIden::DisplayName,
+    UserIden::RegistrationDate,
+    UserIden::LastUpdatedDate,
+    UserIden::LastLoginDate,
+];
 
 #[cfg(feature = "backend")]
 impl User {
     pub fn fetch_by_id(conn: &Connection, id: &Uuid) -> Result<User, rusqlite::Error> {
         let (sql, values) = Query::select()
-            .columns([
-                UserIden::Id,
-                UserIden::Username,
-                UserIden::Email,
-                UserIden::DisplayName,
-                UserIden::RegistrationDate,
-                UserIden::LastUpdatedDate,
-                UserIden::LastLoginDate,
-            ])
+            .columns(USER_STAR)
             .from(UserIden::Table)
             .and_where(Expr::col(UserIden::Id).eq(id))
             .limit(1)
@@ -62,15 +60,7 @@ impl User {
         username: T,
     ) -> Result<Option<User>, rusqlite::Error> {
         let (sql, values) = Query::select()
-            .columns([
-                UserIden::Id,
-                UserIden::Username,
-                UserIden::Email,
-                UserIden::DisplayName,
-                UserIden::RegistrationDate,
-                UserIden::LastUpdatedDate,
-                UserIden::LastLoginDate,
-            ])
+            .columns(USER_STAR)
             .from(UserIden::Table)
             .and_where(Expr::col(UserIden::Username).eq(username.as_ref()))
             .limit(1)

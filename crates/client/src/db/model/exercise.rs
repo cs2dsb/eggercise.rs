@@ -1,53 +1,45 @@
 use leptos::{create_local_resource, Resource};
+use shared::{
+    model::{Exercise, ExerciseIden},
+    types::Uuid,
+};
 
-use crate::utils::sqlite3::{SqlitePromiser, SqlitePromiserError};
-
-#[derive(Debug, Clone)]
-pub struct Exercise {
-    pub id: String,
-    pub name: String,
-    pub creation_date: String,
-    pub last_updated_date: String,
-}
+use crate::utils::sqlite3::{parse_datetime, SqlitePromiser, SqlitePromiserError};
 
 pub fn get_exercises() -> Resource<(), Result<Vec<Exercise>, SqlitePromiserError>> {
     create_local_resource(
         || (),
-        |_| {
-            async {
-                let promiser = SqlitePromiser::use_promiser();
+        |_| async {
+            let promiser = SqlitePromiser::use_promiser();
 
-                let result = promiser
-                    .exec("SELECT id, name, creation_date, last_updated_date FROM exercise")
-                    .await?;
-                // TODO: automate this kind of check
-                if result.column_names.len() != 4
-                    || result.column_names[0] != "id"
-                    || result.column_names[1] != "name"
-                    || result.column_names[2] != "creation_date"
-                    || result.column_names[3] != "last_updated_date"
-                {
-                    Err(SqlitePromiserError::ExecResult(format!(
-                        "Expected id, name, creation_date, last_updated_date but got {:?}",
-                        result.column_names
-                    )))?
-                }
+            let result = promiser
+                .exec(shared::model::Exercise::fetch_all_get_sql())
+                .await?;
 
-                let rows = result
-                    .result_rows
-                    .into_iter()
-                    .map(|mut r| {
-                        Ok::<_, serde_json::Error>(Exercise {
-                            id: serde_json::from_value(r.remove(0))?,
-                            name: serde_json::from_value(r.remove(0))?,
-                            creation_date: serde_json::from_value(r.remove(0))?,
-                            last_updated_date: serde_json::from_value(r.remove(0))?,
-                        })
-                    })
-                    .collect::<Result<Vec<_>, _>>()?;
+            let id_e = result.get_extractor(ExerciseIden::Id)?;
+            let name_e = result.get_extractor(ExerciseIden::Name)?;
+            let description_e = result.get_extractor(ExerciseIden::Description)?;
+            let creation_date_e = result.get_extractor(ExerciseIden::CreationDate)?;
+            let last_updated_date_e = result.get_extractor(ExerciseIden::LastUpdatedDate)?;
 
-                Ok(rows)
-            }
+            let rows = (0..result.result_rows.len())
+                .into_iter()
+                .map(|i| {
+                    let res = Exercise {
+                        id: id_e(&result, i).and_then(|s: String| Ok(Uuid::parse(&s)?))?,
+                        name: name_e(&result, i)?,
+                        description: description_e(&result, i)?,
+                        creation_date: creation_date_e(&result, i)
+                            .and_then(|s: String| Ok(parse_datetime(&s)?))?,
+                        last_updated_date: last_updated_date_e(&result, i)
+                            .and_then(|s: String| Ok(parse_datetime(&s)?))?,
+                    };
+
+                    Ok::<_, SqlitePromiserError>(res)
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+
+            Ok(rows)
         },
     )
 }

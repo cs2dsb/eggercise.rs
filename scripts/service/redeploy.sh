@@ -81,6 +81,9 @@ sudo docker run -d \
 	-p 9090:9090 \
 	"$docker_image"
 
+# Prune any unused images
+sudo docker image prune --force --all
+
 if [ "$restart_services" == "true" ]; then
 	# Restart the services
 	echo "Restarting services"
