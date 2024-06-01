@@ -2723,6 +2723,7 @@ dependencies = [
  "http 1.1.0",
  "http-serde",
  "leptos",
+ "paste",
  "percent-encoding",
  "rusqlite",
  "sea-query",

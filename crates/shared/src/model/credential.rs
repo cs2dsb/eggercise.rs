@@ -167,6 +167,7 @@ impl Credential {
         Ok(passkeys)
     }
 
+    #[cfg(feature = "exemplar-model")]
     pub fn create<T: Error>(
         conn: &mut Connection,
         new_credential: NewCredential,

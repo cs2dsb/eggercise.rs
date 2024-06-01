@@ -28,9 +28,7 @@ const EXERCISE_STAR: [ExerciseIden; 5] = [
 #[cfg(feature = "backend")]
 impl Exercise {
     pub fn fetch_by_id(conn: &Connection, id: &Uuid) -> Result<Exercise, rusqlite::Error> {
-        let (sql, values) = Query::select()
-            .columns(EXERCISE_STAR)
-            .from(ExerciseIden::Table)
+        let (sql, values) = Self::select_star()
             .and_where(Expr::col(ExerciseIden::Id).eq(id))
             .limit(1)
             .build_rusqlite(SqliteQueryBuilder);
@@ -41,25 +39,12 @@ impl Exercise {
     }
 
     pub fn fetch_all(conn: &Connection) -> Result<Vec<Exercise>, rusqlite::Error> {
-        let (sql, values) = Query::select()
-            .columns(EXERCISE_STAR)
-            .from(ExerciseIden::Table)
-            .build_rusqlite(SqliteQueryBuilder);
+        let (sql, values) = Self::select_star().build_rusqlite(SqliteQueryBuilder);
 
         let mut stmt = conn.prepare_cached(&sql)?;
         let res = stmt
             .query_map(&*values.as_params(), Exercise::from_row)?
             .collect::<Result<_, _>>()?;
         Ok(res)
-    }
-}
-
-#[cfg(feature = "frontend")]
-impl Exercise {
-    pub fn fetch_all_get_sql() -> String {
-        Query::select()
-            .columns(EXERCISE_STAR)
-            .from(ExerciseIden::Table)
-            .to_string(SqliteQueryBuilder)
     }
 }
