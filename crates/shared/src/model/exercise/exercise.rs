@@ -16,15 +16,6 @@ feature_model_derives!(
     }
 );
 
-#[cfg(feature = "sea-query-enum")]
-const EXERCISE_STAR: [ExerciseIden; 5] = [
-    ExerciseIden::Id,
-    ExerciseIden::Name,
-    ExerciseIden::Description,
-    ExerciseIden::CreationDate,
-    ExerciseIden::LastUpdatedDate,
-];
-
 #[cfg(feature = "backend")]
 impl Exercise {
     pub fn fetch_by_id(conn: &Connection, id: &Uuid) -> Result<Exercise, rusqlite::Error> {

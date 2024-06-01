@@ -14,19 +14,10 @@ feature_model_derives!(
     }
 );
 
-#[cfg(feature = "sea-query-enum")]
-const SESSION_STAR: [SessionIden; 3] = [
-    SessionIden::Id,
-    SessionIden::CreationDate,
-    SessionIden::LastUpdatedDate,
-];
-
 #[cfg(feature = "backend")]
 impl Session {
     pub fn fetch_by_id(conn: &Connection, id: &Uuid) -> Result<Session, rusqlite::Error> {
-        let (sql, values) = Query::select()
-            .columns(SESSION_STAR)
-            .from(SessionIden::Table)
+        let (sql, values) = Self::select_star()
             .and_where(Expr::col(SessionIden::Id).eq(id))
             .limit(1)
             .build_rusqlite(SqliteQueryBuilder);

@@ -19,14 +19,6 @@ feature_model_derives!(
     }
 );
 
-#[cfg(feature = "sea-query-enum")]
-const TEMPORARY_LOGIN_STAR: [TemporaryLoginIden; 4] = [
-    TemporaryLoginIden::Id,
-    TemporaryLoginIden::UserId,
-    TemporaryLoginIden::ExpiryDate,
-    TemporaryLoginIden::Url,
-];
-
 impl TemporaryLogin {
     pub fn qr_code_url(&self) -> String {
         Object::QrCode.id_path().replace(
@@ -43,9 +35,7 @@ impl TemporaryLogin {
 #[cfg(feature = "backend")]
 impl TemporaryLogin {
     pub fn fetch<T: Error>(conn: &Connection, id: &Uuid) -> Result<TemporaryLogin, ServerError<T>> {
-        let (sql, values) = Query::select()
-            .columns(TEMPORARY_LOGIN_STAR)
-            .from(TemporaryLoginIden::Table)
+        let (sql, values) = Self::select_star()
             .and_where(Expr::col(TemporaryLoginIden::Id).eq(id))
             .limit(1)
             .build_rusqlite(SqliteQueryBuilder);
@@ -60,9 +50,7 @@ impl TemporaryLogin {
         conn: &Connection,
         id: &Uuid,
     ) -> Result<Option<TemporaryLogin>, ServerError<T>> {
-        let (sql, values) = Query::select()
-            .columns(TEMPORARY_LOGIN_STAR)
-            .from(TemporaryLoginIden::Table)
+        let (sql, values) = Self::select_star()
             .and_where(Expr::col(TemporaryLoginIden::Id).eq(id))
             .limit(1)
             .build_rusqlite(SqliteQueryBuilder);
@@ -79,9 +67,7 @@ impl TemporaryLogin {
         conn: &Connection,
         id: &Uuid,
     ) -> Result<Option<TemporaryLogin>, ServerError<T>> {
-        let (sql, values) = Query::select()
-            .columns(TEMPORARY_LOGIN_STAR)
-            .from(TemporaryLoginIden::Table)
+        let (sql, values) = Self::select_star()
             .and_where(Expr::col(TemporaryLoginIden::UserId).eq(id))
             .limit(1)
             .build_rusqlite(SqliteQueryBuilder);

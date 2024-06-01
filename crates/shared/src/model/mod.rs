@@ -49,7 +49,9 @@ macro_rules! feature_model_imports {
 
 #[macro_export]
 macro_rules! feature_model_derives {
-    ($table_name:literal, $migration_path:literal, pub struct $struct_name:ident { $($struct_body_tt:tt)* }) => {
+    ($table_name:literal, $migration_path:literal, pub struct $struct_name:ident {
+        $(pub $field_name:ident: $field_type:ty,)*
+    }) => {
 
         #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
         #[cfg_attr(feature = "exemplar-model", derive(Model))]
@@ -59,7 +61,7 @@ macro_rules! feature_model_derives {
             check($migration_path))]
         #[cfg_attr(feature = "sea-query-enum", enum_def)]
         pub struct $struct_name {
-            $($struct_body_tt)*
+            $(pub $field_name: $field_type,)*
         }
 
         #[cfg(feature = "sea-query-enum")]
@@ -67,7 +69,11 @@ macro_rules! feature_model_derives {
             fn select_star() -> SelectStatement {
                 paste::paste! {
                     Query::select()
-                        .columns([<$struct_name:snake:upper _STAR>])
+                        .columns([
+                            $(
+                                [<$struct_name Iden>]::[<$field_name:camel>],
+                            )*
+                        ])
                         .from([<$struct_name Iden>]::Table)
                         .take()
                 }
@@ -77,17 +83,30 @@ macro_rules! feature_model_derives {
             }
         }
 
+
         #[cfg(test)]
         paste::paste! {
-            mod [<$struct_name:lower _tests>] {
+            mod [<$struct_name:snake:lower _tests>] {
                 #[allow(unused_imports)]
                 use super::*;
 
                 #[test]
                 #[cfg(feature = "sea-query-enum")]
-                fn [<test_ $struct_name:lower _fetch_all_sql>]() {
-                    let sql = $struct_name::fetch_all_sql();
-                    assert!(sql.starts_with("SELECT "));
+                fn [<test_ $struct_name:snake:lower _fetch_all_sql>]() {
+                    let sql = $struct_name::fetch_all_sql()
+                        .to_lowercase();
+
+                    assert!(sql.starts_with("select "));
+
+                    let mut fields = String::new();
+                    $(
+                        fields.push('"');
+                        fields.push_str(stringify!($field_name));
+                        fields.push_str("\", ");
+                    )*
+                    fields.truncate(fields.len() - 2);
+
+                    assert!(sql.contains(&fields));
                 }
             }
         }

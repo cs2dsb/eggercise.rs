@@ -113,28 +113,13 @@ feature_model_derives!(
     }
 );
 
-#[cfg(feature = "sea-query-enum")]
-const CREDENTIAL_STAR: [CredentialIden; 9] = [
-    CredentialIden::Id,
-    CredentialIden::UserId,
-    CredentialIden::Passkey,
-    CredentialIden::Counter,
-    CredentialIden::CreationDate,
-    CredentialIden::LastUsedDate,
-    CredentialIden::LastUpdatedDate,
-    CredentialIden::BackupEligible,
-    CredentialIden::BackupState,
-];
-
 impl Credential {
     pub fn fetch<T: Error>(
         conn: &Connection,
         id: &CredentialId,
     ) -> Result<Credential, ServerError<T>> {
         let id_value = id.to_json_string()?;
-        let (sql, values) = Query::select()
-            .columns(CREDENTIAL_STAR)
-            .from(CredentialIden::Table)
+        let (sql, values) = Self::select_star()
             .and_where(Expr::col(CredentialIden::Id).eq(id_value))
             .limit(1)
             .build_rusqlite(SqliteQueryBuilder);

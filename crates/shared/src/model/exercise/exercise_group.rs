@@ -16,21 +16,10 @@ feature_model_derives!(
     }
 );
 
-#[cfg(feature = "sea-query-enum")]
-const EXERCISE_GROUP_STAR: [ExerciseGroupIden; 5] = [
-    ExerciseGroupIden::Id,
-    ExerciseGroupIden::Name,
-    ExerciseGroupIden::Description,
-    ExerciseGroupIden::CreationDate,
-    ExerciseGroupIden::LastUpdatedDate,
-];
-
 #[cfg(feature = "backend")]
 impl ExerciseGroup {
     pub fn fetch_by_id(conn: &Connection, id: &Uuid) -> Result<ExerciseGroup, rusqlite::Error> {
-        let (sql, values) = Query::select()
-            .columns(EXERCISE_GROUP_STAR)
-            .from(ExerciseGroupIden::Table)
+        let (sql, values) = Self::select_star()
             .and_where(Expr::col(ExerciseGroupIden::Id).eq(id))
             .limit(1)
             .build_rusqlite(SqliteQueryBuilder);
