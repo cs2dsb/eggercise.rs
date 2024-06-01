@@ -29,23 +29,10 @@ feature_model_derives!(
     }
 );
 
-#[cfg(feature = "sea-query-enum")]
-const USER_STAR: [UserIden; 7] = [
-    UserIden::Id,
-    UserIden::Username,
-    UserIden::Email,
-    UserIden::DisplayName,
-    UserIden::RegistrationDate,
-    UserIden::LastUpdatedDate,
-    UserIden::LastLoginDate,
-];
-
 #[cfg(feature = "backend")]
 impl User {
     pub fn fetch_by_id(conn: &Connection, id: &Uuid) -> Result<User, rusqlite::Error> {
-        let (sql, values) = Query::select()
-            .columns(USER_STAR)
-            .from(UserIden::Table)
+        let (sql, values) = Self::select_star()
             .and_where(Expr::col(UserIden::Id).eq(id))
             .limit(1)
             .build_rusqlite(SqliteQueryBuilder);
@@ -59,9 +46,7 @@ impl User {
         conn: &Connection,
         username: T,
     ) -> Result<Option<User>, rusqlite::Error> {
-        let (sql, values) = Query::select()
-            .columns(USER_STAR)
-            .from(UserIden::Table)
+        let (sql, values) = Self::select_star()
             .and_where(Expr::col(UserIden::Username).eq(username.as_ref()))
             .limit(1)
             .build_rusqlite(SqliteQueryBuilder);

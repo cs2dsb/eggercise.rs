@@ -1,6 +1,6 @@
 use leptos::{create_local_resource, Resource};
 use shared::{
-    model::{Exercise, ExerciseIden},
+    model::{Exercise, ExerciseIden, Model},
     types::Uuid,
 };
 
@@ -13,7 +13,7 @@ pub fn get_exercises() -> Resource<(), Result<Vec<Exercise>, SqlitePromiserError
             let promiser = SqlitePromiser::use_promiser();
 
             let result = promiser
-                .exec(shared::model::Exercise::fetch_all_get_sql())
+                .exec(shared::model::Exercise::fetch_all_sql())
                 .await?;
 
             let id_e = result.get_extractor(ExerciseIden::Id)?;
