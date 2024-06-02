@@ -1,3 +1,5 @@
+#![feature(macro_metavar_expr)]
+
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
