@@ -1,12 +1,12 @@
 use leptos::{create_local_resource, Resource};
 use shared::{
-    model::{Exercise, ExerciseIden, Model},
+    model::{model_into_view::ListOfModel, Exercise, ExerciseIden, Model},
     types::Uuid,
 };
 
 use crate::utils::sqlite3::{parse_datetime, SqlitePromiser, SqlitePromiserError};
 
-pub fn get_exercises() -> Resource<(), Result<Vec<Exercise>, SqlitePromiserError>> {
+pub fn get_exercises() -> Resource<(), Result<ListOfModel<Exercise>, SqlitePromiserError>> {
     create_local_resource(
         || (),
         |_| async {
@@ -39,7 +39,9 @@ pub fn get_exercises() -> Resource<(), Result<Vec<Exercise>, SqlitePromiserError
                 })
                 .collect::<Result<Vec<_>, _>>()?;
 
-            Ok(rows)
+            let model_rows = ListOfModel(rows);
+
+            Ok(model_rows)
         },
     )
 }

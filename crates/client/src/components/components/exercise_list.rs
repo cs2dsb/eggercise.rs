@@ -35,11 +35,12 @@ pub fn ExerciseList() -> impl IntoView {
             }>
                 <ul>
                 { move || {
-                    exercises.and_then(|l| l.iter().map(|e| view! {
-                        <li>
-                            <ExerciseListItem e />
-                        </li>
-                    }).collect_view())
+                    // exercises.and_then(|l| l.iter().map(|e| view! {
+                    //     <li>
+                    //         <ExerciseListItem e />
+                    //     </li>
+                    // }).collect_view())
+                    exercises.and_then(|l| l.into_view()).collect_view()
                 }}
                 </ul>
             </ErrorBoundary>
