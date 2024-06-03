@@ -12,6 +12,9 @@ feature_model_derives!(
     }
 );
 
+#[cfg(feature = "frontend")]
+impl crate::model::model_into_view::UseDefaultModelView for ExerciseGroupMember {}
+
 #[cfg(feature = "backend")]
 impl ExerciseGroupMember {
     pub fn fetch_by_id(

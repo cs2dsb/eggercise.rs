@@ -16,6 +16,9 @@ feature_model_derives!(
     }
 );
 
+#[cfg(feature = "frontend")]
+impl crate::model::model_into_view::UseDefaultModelView for SessionExercise {}
+
 #[cfg(feature = "backend")]
 impl SessionExercise {
     pub fn fetch_by_id(conn: &Connection, id: &Uuid) -> Result<SessionExercise, rusqlite::Error> {

@@ -16,6 +16,9 @@ feature_model_derives!(
     }
 );
 
+#[cfg(feature = "frontend")]
+impl crate::model::model_into_view::UseDefaultModelView for ExerciseGroup {}
+
 #[cfg(feature = "backend")]
 impl ExerciseGroup {
     pub fn fetch_by_id(conn: &Connection, id: &Uuid) -> Result<ExerciseGroup, rusqlite::Error> {
