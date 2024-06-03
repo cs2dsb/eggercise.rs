@@ -1,11 +1,17 @@
 use leptos::{component, view, IntoView};
 
-use crate::components::ExerciseList;
+use crate::components::{
+    ExerciseGroupList, ExerciseGroupMemberList, ExerciseList, SessionExerciseList, SessionList,
+};
 
 #[component]
 pub fn Today() -> impl IntoView {
     view! {
-        <p>"Today"</p>
+        <h2>"Today"</h2>
         <ExerciseList />
+        <ExerciseGroupMemberList />
+        <ExerciseGroupList />
+        <SessionExerciseList />
+        <SessionList />
     }
 }

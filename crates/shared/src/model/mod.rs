@@ -25,6 +25,7 @@ pub trait Model {
     const NUM_FIELDS: usize;
     type Iden: sea_query::Iden;
     fn iden_for_field(field: usize) -> Self::Iden;
+    fn field_idens() -> &'static [Self::Iden];
     fn select_star() -> sea_query::SelectStatement;
     fn fetch_all_sql() -> String;
 }
@@ -168,6 +169,14 @@ macro_rules! feature_model_derives {
                         )*
                         _ => [<$struct_name Iden>]::Table,
                     }
+                }
+
+                fn field_idens() -> &'static [Self::Iden] {
+                    &[
+                        $(
+                            [<$struct_name Iden>]::[<$field_name:camel>],
+                        )*
+                    ]
                 }
 
                 fn select_star() -> SelectStatement {
