@@ -48,7 +48,6 @@ jobs:
               "target": "/server/target",
               "cargo_registry": "/usr/local/cargo/registry"
             }
-          skip-extraction: ${{ steps.cache.outputs.cache-hit }}
 
       - name: 🧹 Sweep caches
         run: |

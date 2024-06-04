@@ -13,7 +13,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
     steps:
       - name: 🔧 Setup buildx
         uses: docker/setup-buildx-action@v3
@@ -45,10 +44,12 @@ jobs:
         id: cache
         uses: actions/cache@v4
         with:
-          key: ${{ env.REPO_NAME }}_target_cache
+          key: ${{ env.REPO_NAME }}_target_cache-${{ hashFiles('**/Cargo.toml') }}
           path: |
             target
             cargo_registry
+          restore-keys: |
+            ${{ env.REPO_NAME }}_target_cache-
           save-always: true
 
       - name: 🪲 Cache debug
@@ -126,3 +127,55 @@ jobs:
           overwrite: true
           promote: true
           prerelease: false
+
+  docs:
+    needs: build
+    runs-on: ubuntu-latest
+    
+    permissions:
+      pages: write 
+      id-token: write 
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: 🔍 Set build suffix 
+        run: |
+          REPO=${GITHUB_REPOSITORY#$GITHUB_REPOSITORY_OWNER/}
+          echo "REPO_NAME=$REPO" | tee -a $GITHUB_ENV
+
+      - name: 🛒 Checkout repo
+        uses: actions/checkout@master
+
+      - name: 🎯 Cache target dir (restore)
+        id: cache
+        uses: actions/cache@v4
+        with:
+          key: ${{ env.REPO_NAME }}_target_cache-${{ hashFiles('**/Cargo.toml') }}
+          path: |
+            target
+            cargo_registry
+          restore-keys: |
+            ${{ env.REPO_NAME }}_target_cache-
+          save-always: true
+
+      - name: 🪲 Cache debug
+        run: |
+          echo "Cache hit: ${{ steps.cache.outputs.cache-hit }}"
+          echo "du -sh target: `du -sh target`"
+          echo "du -sh target/docs: `du -sh target/docs`"
+
+      - name: Setup pages
+        id: pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: target/doc
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
