@@ -26,7 +26,7 @@ RUN \
         --document-private-items \
     && echo '<meta http-equiv="refresh" content="0;url=server/index.html">' | tee target/doc/index.html \
     && rm target/doc/.lock \
-    && && du -sh target/*
+    && du -sh target/*
 
 FROM ghcr.io/cs2dsb/eggercise.rs/rust/nightly-slim:latest AS runtime
 RUN apt-get update && apt-get install -y openssl
