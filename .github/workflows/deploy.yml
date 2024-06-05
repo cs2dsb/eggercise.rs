@@ -69,6 +69,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
           image: ghcr.io/cs2dsb/eggercise.rs/rust/nightly:latest
           options: |
+            -e RUSTUP_PERMIT_COPY_RENAME=false
             -v ${{ github.workspace }}/:/server
             -v ${{ github.workspace }}/cargo_registry:/usr/local/cargo/registry
             -w /server
@@ -87,6 +88,7 @@ jobs:
             cp -r ../crates/server/assets .
             cd /server
             cargo doc \
+                --release \
                 --no-deps \
                 --workspace \
                 --all-features \
@@ -98,7 +100,6 @@ jobs:
             (cd target; du -sh * || true)
             echo $CARGO_HOME after:
             (cd $CARGO_HOME; du -sh * || true)
-
       
       - name: Fix the permissions after docker mucked them up
         run: |
