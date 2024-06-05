@@ -7,14 +7,12 @@ RUN RUSTUP_PERMIT_COPY_RENAME=false rustup show
 COPY . .
 
 # Build application
-ARG CARGO_HOME=/cargo_home
+ARG CARGO_HOME=/server/target/cargo_home
 RUN \
     --mount=type=cache,target=/server/target,sharing=locked \
-    --mount=type=cache,target=/cargo_home,sharing=locked \
-    mkdir -p $CARGO_HOME \
-    && tree $CARGO_HOME \
+    && du -sh target/* \
     && cargo build --release --bin server \
-    && tree $CARGO_HOME \
+    && du -sh target/* \
     && cd /server \
     && mkdir dist \
     && cd dist \
@@ -27,7 +25,8 @@ RUN \
         --all-features \
         --document-private-items \
     && echo '<meta http-equiv="refresh" content="0;url=server/index.html">' | tee target/doc/index.html \
-    && rm target/doc/.lock
+    && rm target/doc/.lock \
+    && du -sh target/*
 
 FROM ghcr.io/cs2dsb/eggercise.rs/rust/nightly-slim:latest AS runtime
 RUN apt-get update && apt-get install -y openssl

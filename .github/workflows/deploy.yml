@@ -47,26 +47,22 @@ jobs:
           key: ${{ env.REPO_NAME }}_target_cache-${{ hashFiles('**/Cargo.toml') }}
           path: |
             target
-            cargo_home
           restore-keys: |
             ${{ env.REPO_NAME }}_target_cache-
           save-always: true
 
       - name: 🪲 Cache debug
         run: |
-          mkdir -p cargo_home
           mkdir -p target
           echo "Cache hit: ${{ steps.cache.outputs.cache-hit }}"
-          echo "du -sh target: `du -sh target`"
-          echo "du -sh cargo_home: `du -sh cargo_home`"
+          echo "du -sh target/*: `du -sh target/*`"
 
       - name: 💉 Inject cache into docker
         uses: reproducible-containers/buildkit-cache-dance@v3.1.0
         with:
           cache-map: |
             {
-              "target": "/server/target",
-              "cargo_home": "/cargo_home"
+              "target": "/server/target"
             }
           skip-extraction: ${{ steps.cache.outputs.cache-hit }}
 
@@ -85,12 +81,6 @@ jobs:
           push: true
           tags: ${{ env.IMAGE_TAG }}
           platforms: linux/amd64
-      
-      - name: 🪲 Cache debug after
-        run: |
-          echo "ls -lh target: `ls -lh target`"
-          echo "tree:"
-          tree
 
       - name: 🗜️ Package output 
         if: github.ref == 'refs/heads/deploy'
@@ -156,16 +146,15 @@ jobs:
           key: ${{ env.REPO_NAME }}_target_cache-${{ hashFiles('**/Cargo.toml') }}
           path: |
             target
-            cargo_home
           restore-keys: |
             ${{ env.REPO_NAME }}_target_cache-
           save-always: true
 
       - name: 🪲 Cache debug
         run: |
+          mkdir -p target
           echo "Cache hit: ${{ steps.cache.outputs.cache-hit }}"
-          echo "du -sh target: `du -sh target`"
-          echo "du -sh target/docs: `du -sh target/docs`"
+          echo "du -sh target/*: `du -sh target/*`"
 
       - name: Setup pages
         id: pages
