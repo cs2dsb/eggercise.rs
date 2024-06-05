@@ -7,10 +7,14 @@ RUN RUSTUP_PERMIT_COPY_RENAME=false rustup show
 COPY . .
 
 # Build application
+ARG CARGO_HOME=/cargo_home
 RUN \
     --mount=type=cache,target=/server/target,sharing=locked \
-    --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
-    cargo build --release --bin server \
+    --mount=type=cache,target=/cargo_home,sharing=locked \
+    mkdir -p $CARGO_HOME \
+    && tree $CARGO_HOME \
+    && cargo build --release --bin server \
+    && tree $CARGO_HOME \
     && cd /server \
     && mkdir dist \
     && cd dist \
