@@ -163,8 +163,11 @@ jobs:
 
       - name: 🪲 Cache debug
         run: |
+          mkdir -p cargo_home
+          mkdir -p target
           echo "Cache hit: ${{ steps.cache.outputs.cache-hit }}"
           echo "du -sh target: `du -sh target`"
+          echo "du -sh cargo_home: `du -sh cargo_home`"
           echo "du -sh target/docs: `du -sh target/docs`"
 
       - name: Setup pages
