@@ -1,7 +1,5 @@
 FROM rustlang/rust:nightly AS builder
-RUN apt-get  update
-RUN apt-get install \
-    tree
+RUN apt-get update && apt-get install -y tree
 WORKDIR /server
 COPY rust-toolchain.toml .
 # Force rustup to install the toolchain specified in rust-toolchain.toml
