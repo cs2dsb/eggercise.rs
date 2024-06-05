@@ -34,11 +34,12 @@ jobs:
         id: cache
         uses: actions/cache@v4
         with:
-          key: ${{ env.REPO_NAME }}_target_cache
+          key: ${{ env.REPO_NAME }}_target_cache-${{ hashFiles('**/Cargo.toml') }}
           path: |
             target
-            cargo_registry
-          save-always: true
+            cargo_home
+          restore-keys: |
+            ${{ env.REPO_NAME }}_target_cache-
 
       - name: 💉 Inject cache into docker
         uses: reproducible-containers/buildkit-cache-dance@v3.1.0
@@ -46,7 +47,7 @@ jobs:
           cache-map: |
             {
               "target": "/server/target",
-              "cargo_registry": "/usr/local/cargo/registry"
+              "cargo_home": "/cargo_home"
             }
 
       - name: 🧹 Sweep caches
