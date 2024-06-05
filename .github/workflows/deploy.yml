@@ -44,7 +44,7 @@ jobs:
         id: cache
         uses: actions/cache@v4
         with:
-          key: ${{ env.REPO_NAME }}_target_and_registry__cache-${{ hashFiles('**/Cargo.toml') }}
+          key: ${{ env.REPO_NAME }}_target_and_registry_cache-${{ hashFiles('**/Cargo.toml') }}
           path: |
             target
             cargo_registry
@@ -58,8 +58,8 @@ jobs:
           mkdir -p target
           mkdir -p cargo_registry
           echo "Cache hit: ${{ steps.cache.outputs.cache-hit }}"
-          echo "du -sh target/*: `du -sh target/*`"
-          echo "du -sh cargo_registry/*: `du -sh cargo_registry/*`"
+          echo "du -sh target/*: `(cd target; du -sh *)`"
+          echo "du -sh cargo_registry/*: `(cd cargo_registry; du -sh *)`"
 
       - name: Try it with just run...
         uses: addnab/docker-run-action@v3
@@ -75,16 +75,18 @@ jobs:
           run: |
             echo "Running Script"
             set -e
-            echo $CARGO_HOME
-            du -sh target/*
+            echo $CARGO_HOME:
+            (cd $CARGO_HOME; du -sh *)
+            echo target before:
+            (cd target; du -sh *)
             cargo build --release --bin server
-            du -sh target/*
-            cd /server
-            mkdir dist
-            cd dist
+            echo target after:
+            (cd target; du -sh *)
+            mkdir -p /server/dist
+            cd /server/dist
             cp ../target/release/server .
             cp -r ../crates/server/assets .
-            cd ..
+            cd /server
             cargo doc \
                 --no-deps \
                 --workspace \
@@ -93,15 +95,18 @@ jobs:
             echo '<meta http-equiv="refresh" content="0;url=server/index.html">' \
                 | tee target/doc/index.html
             rm target/doc/.lock
-            du -sh target/*
+            echo target after doc:
+            (cd target; du -sh *)
+            echo $CARGO_HOME after:
+            (cd $CARGO_HOME; du -sh *)
 
       - name: 🪲 Cache debug after run
         run: |
           mkdir -p target
           mkdir -p cargo_registry
           echo "Cache hit: ${{ steps.cache.outputs.cache-hit }}"
-          echo "du -sh target/*: `du -sh target/*`"
-          echo "du -sh cargo_registry/*: `du -sh cargo_registry/*`"
+          echo "du -sh target/*: `(cd target; du -sh *)`"
+          echo "du -sh cargo_registry/*: `(cd cargo_registry; du -sh *)`"
 
       - name: 💉 Inject cache into docker
         if: false
