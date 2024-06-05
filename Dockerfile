@@ -11,7 +11,19 @@ RUN \
     --mount=type=cache,target=/server/target,sharing=locked \
     --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
     cargo build --release --bin server \
-    && cd /server && mkdir dist && cd dist && cp ../target/release/server . && cp -r ../crates/server/assets .
+    && cd /server \
+    && mkdir dist \
+    && cd dist \
+    && cp ../target/release/server . \
+    && cp -r ../crates/server/assets . \
+    && cd .. \
+    && cargo doc \
+        --no-deps \
+        --workspace \
+        --all-features \
+        --document-private-items \
+    && echo '<meta http-equiv="refresh" content="0;url=server/index.html">' | tee target/doc/index.html \
+    && rm target/doc/.lock
 
 FROM ghcr.io/cs2dsb/eggercise.rs/rust/nightly-slim:latest AS runtime
 RUN apt-get update && apt-get install -y openssl
