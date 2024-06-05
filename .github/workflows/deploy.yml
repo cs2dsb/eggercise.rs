@@ -44,20 +44,67 @@ jobs:
         id: cache
         uses: actions/cache@v4
         with:
-          key: ${{ env.REPO_NAME }}_target_cache-${{ hashFiles('**/Cargo.toml') }}
+          key: ${{ env.REPO_NAME }}_target_and_registry__cache-${{ hashFiles('**/Cargo.toml') }}
           path: |
             target
+            cargo_registry
           restore-keys: |
+            ${{ env.REPO_NAME }}_target_and_registry_cache-
             ${{ env.REPO_NAME }}_target_cache-
           save-always: true
 
       - name: 🪲 Cache debug
         run: |
           mkdir -p target
+          mkdir -p cargo_registry
           echo "Cache hit: ${{ steps.cache.outputs.cache-hit }}"
           echo "du -sh target/*: `du -sh target/*`"
+          echo "du -sh cargo_registry/*: `du -sh cargo_registry/*`"
+
+      - name: Try it with just run...
+        uses: addnab/docker-run-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+          image: cs2dsb/eggercise.rs/rust/nightly:latest
+          options: |
+            -v ${{ github.workspace }}/target:/server/target 
+            -v ${{ github.workspace }}/cargo_registry:/usr/local/cargo/registry
+            -w /server
+          run: |
+            echo "Running Script"
+            set -e
+            echo $CARGO_HOME
+            du -sh target/*
+            cargo build --release --bin server
+            du -sh target/*
+            cd /server
+            mkdir dist
+            cd dist
+            cp ../target/release/server .
+            cp -r ../crates/server/assets .
+            cd ..
+            cargo doc \
+                --no-deps \
+                --workspace \
+                --all-features \
+                --document-private-items
+            echo '<meta http-equiv="refresh" content="0;url=server/index.html">' \
+                | tee target/doc/index.html
+            rm target/doc/.lock
+            du -sh target/*
+
+      - name: 🪲 Cache debug after run
+        run: |
+          mkdir -p target
+          mkdir -p cargo_registry
+          echo "Cache hit: ${{ steps.cache.outputs.cache-hit }}"
+          echo "du -sh target/*: `du -sh target/*`"
+          echo "du -sh cargo_registry/*: `du -sh cargo_registry/*`"
 
       - name: 💉 Inject cache into docker
+        if: false
         uses: reproducible-containers/buildkit-cache-dance@v3.1.0
         with:
           cache-map: |
@@ -75,15 +122,18 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: 📦 Build docker 
+        if: false
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
           tags: ${{ env.IMAGE_TAG }}
           platforms: linux/amd64
+          file: ./docker/Dockerfile
 
       - name: 🗜️ Package output 
-        if: github.ref == 'refs/heads/deploy'
+        if: false
+        # if: github.ref == 'refs/heads/deploy'
         id: package_image
         run: |
           set -euo pipefail
@@ -118,53 +168,53 @@ jobs:
           promote: true
           prerelease: false
 
-  docs:
-    needs: build
-    runs-on: ubuntu-latest
+  # docs:
+  #   needs: build
+  #   runs-on: ubuntu-latest
     
-    permissions:
-      pages: write 
-      id-token: write 
+  #   permissions:
+  #     pages: write 
+  #     id-token: write 
 
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  #   environment:
+  #     name: github-pages
+  #     url: ${{ steps.deployment.outputs.page_url }}
 
-    steps:
-      - name: 🔍 Set build suffix 
-        run: |
-          REPO=${GITHUB_REPOSITORY#$GITHUB_REPOSITORY_OWNER/}
-          echo "REPO_NAME=$REPO" | tee -a $GITHUB_ENV
+  #   steps:
+  #     - name: 🔍 Set build suffix 
+  #       run: |
+  #         REPO=${GITHUB_REPOSITORY#$GITHUB_REPOSITORY_OWNER/}
+  #         echo "REPO_NAME=$REPO" | tee -a $GITHUB_ENV
 
-      - name: 🛒 Checkout repo
-        uses: actions/checkout@master
+  #     - name: 🛒 Checkout repo
+  #       uses: actions/checkout@master
 
-      - name: 🎯 Cache target dir (restore)
-        id: cache
-        uses: actions/cache@v4
-        with:
-          key: ${{ env.REPO_NAME }}_target_cache-${{ hashFiles('**/Cargo.toml') }}
-          path: |
-            target
-          restore-keys: |
-            ${{ env.REPO_NAME }}_target_cache-
-          save-always: true
+  #     - name: 🎯 Cache target dir (restore)
+  #       id: cache
+  #       uses: actions/cache@v4
+  #       with:
+  #         key: ${{ env.REPO_NAME }}_target_cache-${{ hashFiles('**/Cargo.toml') }}
+  #         path: |
+  #           target
+  #         restore-keys: |
+  #           ${{ env.REPO_NAME }}_target_cache-
+  #         save-always: true
 
-      - name: 🪲 Cache debug
-        run: |
-          mkdir -p target
-          echo "Cache hit: ${{ steps.cache.outputs.cache-hit }}"
-          echo "du -sh target/*: `du -sh target/*`"
+  #     - name: 🪲 Cache debug
+  #       run: |
+  #         mkdir -p target
+  #         echo "Cache hit: ${{ steps.cache.outputs.cache-hit }}"
+  #         echo "du -sh target/*: `du -sh target/*`"
 
-      - name: Setup pages
-        id: pages
-        uses: actions/configure-pages@v4
+  #     - name: Setup pages
+  #       id: pages
+  #       uses: actions/configure-pages@v4
 
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: target/doc
+  #     - name: Upload artifact
+  #       uses: actions/upload-pages-artifact@v3
+  #       with:
+  #         path: target/doc
 
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+  #     - name: Deploy to GitHub Pages
+  #       id: deployment
+  #       uses: actions/deploy-pages@v4
