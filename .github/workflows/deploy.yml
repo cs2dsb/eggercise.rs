@@ -67,7 +67,7 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-          image: cs2dsb/eggercise.rs/rust/nightly:latest
+          image: ghcr.io/cs2dsb/eggercise.rs/rust/nightly:latest
           options: |
             -v ${{ github.workspace }}/target:/server/target 
             -v ${{ github.workspace }}/cargo_registry:/usr/local/cargo/registry
