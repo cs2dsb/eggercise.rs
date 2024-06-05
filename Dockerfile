@@ -13,6 +13,7 @@ RUN \
     --mount=type=cache,target=/cargo_home,sharing=locked \
     mkdir -p $CARGO_HOME \
     && tree $CARGO_HOME \
+    && tree target \
     && cargo build --release --bin server \
     && tree $CARGO_HOME \
     && cd /server \
