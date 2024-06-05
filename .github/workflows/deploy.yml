@@ -75,12 +75,12 @@ jobs:
           run: |
             set -e
             echo $CARGO_HOME:
-            (cd $CARGO_HOME; du -sh * | true)
+            (cd $CARGO_HOME; du -sh * || true)
             echo target before:
-            (cd target; du -sh * | true)
+            (cd target; du -sh * || true)
             cargo build --release --bin server
             echo target after:
-            (cd target; du -sh * | true)
+            (cd target; du -sh * || true)
             mkdir -p /server/dist
             cd /server/dist
             cp ../target/release/server .
@@ -95,17 +95,19 @@ jobs:
                 | tee target/doc/index.html
             rm target/doc/.lock
             echo target after doc:
-            (cd target; du -sh * | true)
+            (cd target; du -sh * || true)
             echo $CARGO_HOME after:
-            (cd $CARGO_HOME; du -sh * | true)
+            (cd $CARGO_HOME; du -sh * || true)
+
+      
+      - name: Fix the permissions after docker mucked them up
+        run: |
+          sudo chown -R $USER:$USER "${{ github.workspace }}"
 
       - name: 🪲 Cache debug after run
         run: |
-          mkdir -p target
-          mkdir -p cargo_registry
-          echo "Cache hit: ${{ steps.cache.outputs.cache-hit }}"
-          echo "du -sh target/*: `(cd target; du -sh * | true)`"
-          echo "du -sh cargo_registry/*: `(cd cargo_registry; du -sh * | true)`"
+          echo "du -sh target/*: `(cd target; du -sh * || true)`"
+          echo "du -sh cargo_registry/*: `(cd cargo_registry; du -sh * || true)`"
 
       - name: 💉 Inject cache into docker
         if: false
