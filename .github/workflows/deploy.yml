@@ -73,7 +73,12 @@ jobs:
           echo "du -sh target/*: `(cd target; du -sh *)`"
           echo "du -sh cargo_registry/*: `(cd cargo_registry; du -sh *)`"
 
-      - name: Build the project in docker
+      - name: 🧻 npm install & postcss build
+        run: |
+          npm install
+          ./scripts/build_css
+
+      - name: 🏗️ Build the project in docker
         uses: addnab/docker-run-action@v3
         with:
           registry: ${{ env.REGISTRY }}
@@ -113,7 +118,7 @@ jobs:
             echo $CARGO_HOME after:
             (cd $CARGO_HOME; du -sh * || true)
       
-      - name: Fix the permissions after docker mucked them up
+      - name: 🔒 Fix the permissions after docker mucked them up
         run: |
           sudo chown -R $USER:$USER "${{ github.workspace }}"
 
@@ -175,15 +180,15 @@ jobs:
           promote: true
           prerelease: false
 
-      - name: Setup pages
+      - name: 🗒️ Setup pages
         id: pages
         uses: actions/configure-pages@v4
 
-      - name: Upload pages artifact
+      - name: 🚠 Upload pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: target/doc
 
-      - name: Deploy to GitHub Pages
+      - name: ✅ Deploy to GitHub Pages
         id: deploy_pages
         uses: actions/deploy-pages@v4

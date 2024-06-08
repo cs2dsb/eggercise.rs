@@ -1,3 +1,2 @@
 assets/wasm/
-# Commit it for now until CI build is updated to run postcss
-# assets/css/*_output.css
+assets/css/*_output.css
