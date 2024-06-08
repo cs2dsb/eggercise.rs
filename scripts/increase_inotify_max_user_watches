@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+
+# Exit when any command fails
+set -o errexit
+
+# Exit when an undeclared variable is used
+set -o nounset
+
+# Exit when a piped command returns a non-zero exit code
+set -o pipefail
+
+# This script might need to be run if you are using the watch script
+# This will only work on debian based systems.
+
+readonly key=fs.inotify.max_user_watches;
+readonly value=524288;
+readonly file=/etc/sysctl.conf;
+
+if ! sudo grep -q "$key=" $file; then
+    echo "Adding config value"
+    echo "$key=$value" | sudo tee -a $file
+    sudo sysctl -p
+else 
+    echo "Value already present in $file. Update it to a higher value if it is not sufficient"
+fi

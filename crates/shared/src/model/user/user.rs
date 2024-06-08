@@ -10,7 +10,6 @@ use {
         api::error::{ServerError, ServerErrorContext},
         model::{Credential, NewCredential, NewUser, TemporaryLogin},
     },
-    rusqlite::OptionalExtension,
     std::error::Error,
     webauthn_rs::prelude::Passkey,
 };
@@ -39,22 +38,6 @@ impl User {
 
         let mut stmt = conn.prepare_cached(&sql)?;
         let user = stmt.query_row(&*values.as_params(), User::from_row)?;
-        Ok(user)
-    }
-
-    pub fn fetch_by_username<T: AsRef<str>>(
-        conn: &Connection,
-        username: T,
-    ) -> Result<Option<User>, rusqlite::Error> {
-        let (sql, values) = Self::select_star()
-            .and_where(Expr::col(UserIden::Username).eq(username.as_ref()))
-            .limit(1)
-            .build_rusqlite(SqliteQueryBuilder);
-
-        let mut stmt = conn.prepare_cached(&sql)?;
-        let user = stmt
-            .query_row(&*values.as_params(), User::from_row)
-            .optional()?;
         Ok(user)
     }
 

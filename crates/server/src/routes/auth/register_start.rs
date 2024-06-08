@@ -1,7 +1,7 @@
 use axum::Json;
 use shared::{
     api::{error::ServerError, response_errors::RegisterError},
-    model::{RegistrationUser, User},
+    model::{Model, RegistrationUser, User, UserIden},
 };
 use webauthn_rs::prelude::{CreationChallengeResponse, Uuid};
 
@@ -27,7 +27,8 @@ pub async fn register_start(
         let username = reg_user.username.clone();
         conn.interact(move |conn| {
             // Get the uuid associated with the given username, if any
-            let user_id = User::fetch_by_username(conn, username)?.map(|u| u.id);
+            let user_id =
+                User::fetch_by_column_maybe(conn, &username, UserIden::Username)?.map(|u| u.id);
 
             Ok::<_, ServerError<_>>(match user_id {
                 None => (false, Uuid::new_v4().into()),

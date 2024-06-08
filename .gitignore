@@ -22,3 +22,6 @@ target/
 
 # Sqlite database files
 *.sqlite*
+
+node_modules/
+third_party/tools/

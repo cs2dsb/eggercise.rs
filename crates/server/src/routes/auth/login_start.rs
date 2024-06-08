@@ -1,7 +1,7 @@
 use axum::Json;
 use shared::{
     api::{error::ServerError, response_errors::LoginError},
-    model::{Credential, LoginUser, User},
+    model::{Credential, LoginUser, Model, User, UserIden},
 };
 use webauthn_rs::prelude::RequestChallengeResponse;
 
@@ -26,7 +26,7 @@ pub async fn login_start(
         let username = login_user.username.clone();
         conn.interact(move |conn| {
             // First get the user associated with the given username, if any
-            let user = User::fetch_by_username(conn, username)?;
+            let user = User::fetch_by_column_maybe(conn, &username, UserIden::Username)?;
 
             // Then fetch the existing passkeys if the user exists
             Ok::<_, ServerError<_>>(match user {

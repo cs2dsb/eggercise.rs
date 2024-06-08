@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+
+# Changes path to use repo installed version of node:
+# source ./export_node_path
+
+# Not using 'repo_dir' because it causes conflicts when sourcing this from other scripts
+readonly third_party_tools_dir="$( cd $(dirname ${BASH_SOURCE}); cd ..; pwd )/third_party/tools";
+
+readonly node_dir="${third_party_tools_dir}/node"
+readonly node_bin_dir="${node_dir}/bin"
+
+export PATH="$node_bin_dir:$PATH"

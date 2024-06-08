@@ -21,13 +21,44 @@ pub trait ValidateModel {
 }
 
 #[cfg(feature = "sea-query-enum")]
-pub trait Model {
+pub trait Model: Sized {
     const NUM_FIELDS: usize;
     type Iden: sea_query::Iden;
     fn iden_for_field(field: usize) -> Self::Iden;
     fn field_idens() -> &'static [Self::Iden];
     fn select_star() -> sea_query::SelectStatement;
+    #[cfg(feature = "frontend")]
     fn fetch_all_sql() -> String;
+    #[cfg(feature = "backend")]
+    fn fetch_all(conn: &rusqlite::Connection) -> Result<Vec<Self>, rusqlite::Error>;
+    #[cfg(feature = "backend")]
+    fn fetch_by_id<T: Into<sea_query::Value>>(
+        conn: &rusqlite::Connection,
+        id: T,
+    ) -> Result<Self, rusqlite::Error>;
+    #[cfg(feature = "backend")]
+    fn fetch_by_column<T: Into<sea_query::Value>>(
+        conn: &rusqlite::Connection,
+        id: T,
+        column: Self::Iden,
+    ) -> Result<Self, rusqlite::Error>;
+    #[cfg(feature = "backend")]
+    fn fetch_by_id_maybe<T: Into<sea_query::Value>>(
+        conn: &rusqlite::Connection,
+        id: T,
+    ) -> Result<Option<Self>, rusqlite::Error>;
+    #[cfg(feature = "backend")]
+    fn fetch_by_column_maybe<T: Into<sea_query::Value>>(
+        conn: &rusqlite::Connection,
+        id: T,
+        column: Self::Iden,
+    ) -> Result<Option<Self>, rusqlite::Error>;
+    #[cfg(feature = "backend")]
+    fn fetch_all_by_column<T: Into<sea_query::Value>>(
+        conn: &rusqlite::Connection,
+        id: T,
+        column: Self::Iden,
+    ) -> Result<Vec<Self>, rusqlite::Error>;
 }
 
 #[cfg(feature = "frontend")]
@@ -190,8 +221,81 @@ macro_rules! feature_model_derives {
                         .take()
                 }
 
+                #[cfg(feature = "frontend")]
                 fn fetch_all_sql() -> String {
                     Self::select_star().to_string(SqliteQueryBuilder)
+                }
+
+                #[cfg(feature = "backend")]
+                fn fetch_all(conn: &rusqlite::Connection) -> Result<Vec<Self>, rusqlite::Error> {
+                    let (sql, values) = Self::select_star()
+                        .build_rusqlite(SqliteQueryBuilder);
+
+                    let mut stmt = conn.prepare_cached(&sql)?;
+
+                    let results = stmt
+                        .query_and_then(&*values.as_params(), Self::from_row)?
+                        .collect::<Result<Vec<_>, _>>()?;
+
+                    Ok(results)
+                }
+
+                #[cfg(feature = "backend")]
+                fn fetch_by_id<T: Into<sea_query::Value>>(conn: &rusqlite::Connection, id: T) -> Result<Self, rusqlite::Error> {
+                    Self::fetch_by_column(conn, id, [<$struct_name Iden>]::Id)
+                }
+
+                #[cfg(feature = "backend")]
+                fn fetch_by_column<T: Into<sea_query::Value>>(conn: &rusqlite::Connection, id: T, column: Self::Iden) -> Result<Self, rusqlite::Error> {
+                    let (sql, values) = Self::select_star()
+                        .and_where(Expr::col(column).eq(id.into()))
+                        .limit(1)
+                        .build_rusqlite(SqliteQueryBuilder);
+
+                    let mut stmt = conn.prepare_cached(&sql)?;
+
+                    let result = stmt
+                        .query_row(&*values.as_params(), Self::from_row)?;
+
+                    Ok(result)
+                }
+
+                #[cfg(feature = "backend")]
+                fn fetch_by_id_maybe<T: Into<sea_query::Value>>(conn: &rusqlite::Connection, id: T) -> Result<Option<Self>, rusqlite::Error> {
+                    Self::fetch_by_column_maybe(conn, id, [<$struct_name Iden>]::Id)
+                }
+
+                #[cfg(feature = "backend")]
+                fn fetch_by_column_maybe<T: Into<sea_query::Value>>(conn: &rusqlite::Connection, id: T, column: Self::Iden) -> Result<Option<Self>, rusqlite::Error> {
+                    use rusqlite::OptionalExtension;
+
+                    let (sql, values) = Self::select_star()
+                        .and_where(Expr::col(column).eq(id.into()))
+                        .limit(1)
+                        .build_rusqlite(SqliteQueryBuilder);
+
+                    let mut stmt = conn.prepare_cached(&sql)?;
+
+                    let result = stmt
+                        .query_row(&*values.as_params(), Self::from_row)
+                        .optional()?;
+
+                    Ok(result)
+                }
+
+                #[cfg(feature = "backend")]
+                fn fetch_all_by_column<T: Into<sea_query::Value>>(conn: &rusqlite::Connection, id: T, column: Self::Iden) -> Result<Vec<Self>, rusqlite::Error> {
+                    let (sql, values) = Self::select_star()
+                        .and_where(Expr::col(column).eq(id.into()))
+                        .build_rusqlite(SqliteQueryBuilder);
+
+                    let mut stmt = conn.prepare_cached(&sql)?;
+
+                    let results = stmt
+                        .query_and_then(&*values.as_params(), Self::from_row)?
+                        .collect::<Result<Vec<_>, _>>()?;
+
+                    Ok(results)
                 }
             }
         }
