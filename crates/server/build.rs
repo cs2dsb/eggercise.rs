@@ -10,7 +10,7 @@ use std::{
     time::{Instant, SystemTime},
 };
 
-use anyhow::{bail, Context};
+use anyhow::{bail, ensure, Context};
 use base64::{display::Base64Display, engine::general_purpose::STANDARD};
 use chrono::{DateTime, Utc};
 use glob::glob;
@@ -21,8 +21,7 @@ use shared::{
 };
 use wasm_opt::{OptimizationOptions, Pass};
 
-const WASM_DEV_PROFILE: &str = "dev-min-size";
-const USE_DEV_PROFILE: bool = true;
+const WASM_PROFILE: &str = "wasm-release";
 
 macro_rules! p {
     ($($tokens: tt)*) => {
@@ -49,35 +48,73 @@ fn path_filename_to_str<'a>(path: &'a Path) -> &'a str {
         .expect(&format!("Path \"{:?}\" cannot be converted to utf8", path))
 }
 
-fn modificiation_date<P: AsRef<Path>>(package_dir: P) -> Result<DateTime<Utc>, anyhow::Error> {
-    let package_dir = package_dir.as_ref();
+fn modificiation_date<P: AsRef<Path>>(path: P) -> Result<DateTime<Utc>, anyhow::Error> {
+    let path = path.as_ref();
 
-    let newest_file = glob(&format!("{}/**/*", path_to_str(package_dir),))?
-        .into_iter()
-        .flat_map(|f| f.map(|f| f.metadata()))
-        .flat_map(|f| f.map(|m| m.modified()))
-        .collect::<Result<Vec<_>, _>>()?
-        .into_iter()
-        .max();
+    let newest_file = if !path.exists() {
+        None
+    } else if path.is_file() {
+        Some(path.metadata()?.modified()?)
+    } else {
+        glob(&format!("{}/**/*", path_to_str(path),))?
+            .into_iter()
+            .flat_map(|f| f.map(|f| f.metadata()))
+            .flat_map(|f| f.map(|m| m.modified()))
+            .collect::<Result<Vec<_>, _>>()?
+            .into_iter()
+            .max()
+    };
 
     let mod_date = newest_file.unwrap_or(SystemTime::now());
 
     Ok(mod_date.into())
 }
 
+fn build_css<'a>(
+    infile: &'a Path,
+    outfile: &'a Path,
+    workspace_root: &'a Path,
+) -> Result<(), anyhow::Error> {
+    ensure!(infile.exists(), "Infile ({:?}) does not exist", infile);
+
+    let in_modtime = modificiation_date(infile)?;
+    let out_modtime = modificiation_date(outfile)?;
+
+    if outfile.exists() && in_modtime < out_modtime {
+        return Ok(());
+    }
+
+    let mut cmd = Command::new("bash");
+    cmd.current_dir(workspace_root);
+    cmd.args(["-c", "scripts/install_npm_deps && scripts/build_css"]);
+
+    let output = cmd.output()?;
+    if !output.status.success() {
+        let std_out = String::from_utf8_lossy(&output.stdout);
+        let std_err = String::from_utf8_lossy(&output.stderr);
+        bail!(
+            "Command failed: {:?}\n{}\n{}",
+            output.status,
+            std_out,
+            std_err
+        );
+    }
+
+    Ok(())
+}
+
 // Runs cargo rustc to build the wasm lib
 fn build_wasm(
     package: &str,
     out_dir: &str,
-    release: bool,
     modified_time: DateTime<Utc>,
 ) -> Result<(), anyhow::Error> {
-    let mut cargo_cmd = Command::new("cargo");
-    cargo_cmd.env(
+    let mut cmd = Command::new("cargo");
+    cmd.env(
         "BUILD_TIME",
         modified_time.format("%Y%m%d %H%M%S").to_string(),
     );
-    cargo_cmd.args([
+    cmd.args([
         "rustc",
         "--package",
         package,
@@ -88,16 +125,21 @@ fn build_wasm(
         "wasm32-unknown-unknown",
         "--target-dir",
         out_dir,
+        "--profile",
+        WASM_PROFILE,
     ]);
 
-    if release {
-        cargo_cmd.arg("--release");
-    } else if USE_DEV_PROFILE {
-        // Apply the custom profile to the wasm build
-        cargo_cmd.args(["--profile", WASM_DEV_PROFILE]);
+    let output = cmd.output()?;
+    if !output.status.success() {
+        let std_out = String::from_utf8_lossy(&output.stdout);
+        let std_err = String::from_utf8_lossy(&output.stderr);
+        bail!(
+            "Command failed: {:?}\n{}\n{}",
+            output.status,
+            std_out,
+            std_err
+        );
     }
-
-    assert!(cargo_cmd.status()?.success());
 
     Ok(())
 }
@@ -165,9 +207,7 @@ fn optimize_wasm(input: &Path) -> Result<PathBuf, anyhow::Error> {
 
     // Optimize the wasm
     let mut opt_options = OptimizationOptions::new_optimize_for_size_aggressively();
-    if USE_DEV_PROFILE {
-        opt_options.passes.more_passes.push(Pass::StripDwarf);
-    }
+    opt_options.passes.more_passes.push(Pass::StripDwarf);
     opt_options.run(&input, &wasm_opt_out)?;
 
     // Check the output we were expecting was created
@@ -221,27 +261,6 @@ fn main() -> Result<(), anyhow::Error> {
             path_to_str(&service_worker_info.manifest_dir)
         );
 
-        // Add everything in the assets folder *except* the wasm dir to rerun-if-changed
-        // This won't work for new files in the root but this is an acceptable tradeoff
-        // to prevent rebuilding every time the wasm folder is touched. The alternative
-        // would be to diff the output of this build with the wasm folder and not
-        // update it if it hasn't changed but this still requires running build.rs
-        // every time
-        // We monitor this to trigger creating the service worker package file. It's
-        // unfortunate this restarts the server and does all the other build steps. It
-        // could be split up down the line to reduce rework.
-        for f in glob(&format!(
-            "{}/**/*",
-            assets_dir.to_str().expect("Invalid assets_dir path")
-        ))?
-        .into_iter()
-        .collect::<Result<Vec<_>, _>>()?
-        .into_iter()
-        .filter(|f| !f.starts_with(&server_wasm_dir))
-        {
-            println!("cargo:rerun-if-changed={}", path_to_str(&f));
-        }
-
         p!("Out path: {:?}", out_dir);
         let CrateInfo {
             manifest_dir: service_worker_dir,
@@ -258,6 +277,36 @@ fn main() -> Result<(), anyhow::Error> {
             ..
         } = client_info;
 
+        let in_css = assets_dir.join("css/main_input.css");
+        let out_css = assets_dir.join("css/main_output.css");
+        let workspace_root = service_worker_dir.join("../..");
+
+        // Add everything in the assets folder *except* the wasm dir to rerun-if-changed
+        // This won't work for new files in the root but this is an acceptable tradeoff
+        // to prevent rebuilding every time the wasm folder is touched. The alternative
+        // would be to diff the output of this build with the wasm folder and not
+        // update it if it hasn't changed but this still requires running build.rs
+        // every time
+        // We monitor this to trigger creating the service worker package file. It's
+        // unfortunate this restarts the server and does all the other build steps. It
+        // could be split up down the line to reduce rework.
+        for f in glob(&format!(
+            "{}/**/*",
+            assets_dir.to_str().expect("Invalid assets_dir path")
+        ))?
+        .into_iter()
+        .collect::<Result<Vec<_>, _>>()?
+        .into_iter()
+        .filter(|f| !f.starts_with(&server_wasm_dir) && !f.starts_with(&out_css))
+        {
+            // p!("{:?}", f);
+            println!("cargo:rerun-if-changed={}", path_to_str(&f));
+        }
+
+        time("Building css", 1, || {
+            build_css(&in_css, &out_css, &workspace_root)
+        })?;
+
         let service_worker_register_listeners_js = service_worker_dir.join("register_listeners.js");
         if !service_worker_register_listeners_js.exists() {
             bail!(
@@ -266,13 +315,7 @@ fn main() -> Result<(), anyhow::Error> {
             );
         }
 
-        let profile = match is_release_build {
-            true => "release",
-            false => match USE_DEV_PROFILE {
-                true => WASM_DEV_PROFILE,
-                false => "debug",
-            },
-        };
+        let profile = WASM_PROFILE;
 
         let service_worker_mod_time = time("Find latest change for service worker", 1, || {
             modificiation_date(&service_worker_dir)
@@ -287,20 +330,14 @@ fn main() -> Result<(), anyhow::Error> {
             build_wasm(
                 &service_worker_package_name,
                 wasm_dir_str,
-                is_release_build,
                 service_worker_mod_time,
             )
             .context("build_wasm[service_worker]")
         })?;
 
         time("Build client wasm", 1, || {
-            build_wasm(
-                &client_package_name,
-                wasm_dir_str,
-                is_release_build,
-                client_mod_time,
-            )
-            .context("build_wasm[client]")
+            build_wasm(&client_package_name, wasm_dir_str, client_mod_time)
+                .context("build_wasm[client]")
         })?;
 
         let service_worker_wasm_file =

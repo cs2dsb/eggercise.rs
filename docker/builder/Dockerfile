@@ -1,5 +1,5 @@
 FROM rustlang/rust:nightly AS builder
-RUN apt-get update && apt-get install -y tree
+RUN apt-get update && apt-get install -y tree nodejs
 WORKDIR /server
 COPY rust-toolchain.toml .
 # Force rustup to install the toolchain specified in rust-toolchain.toml

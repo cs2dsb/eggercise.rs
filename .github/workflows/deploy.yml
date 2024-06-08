@@ -73,11 +73,6 @@ jobs:
           echo "du -sh target/*: `(cd target; du -sh *)`"
           echo "du -sh cargo_registry/*: `(cd cargo_registry; du -sh *)`"
 
-      - name: 🧻 npm install & postcss build
-        run: |
-          npm install
-          ./scripts/build_css
-
       - name: 🏗️ Build the project in docker
         uses: addnab/docker-run-action@v3
         with:
@@ -126,6 +121,7 @@ jobs:
         run: |
           echo "du -sh target/*: `(cd target; du -sh * || true)`"
           echo "du -sh cargo_registry/*: `(cd cargo_registry; du -sh * || true)`"
+          echo "du -sh crates/server/assets/wasm/*: `(cd crates/server/assets/wasm; du -sh * || true)`"
 
       - name: 🔑 Log into registry ${{ env.REGISTRY }} 
         if: github.event_name != 'pull_request'
@@ -135,7 +131,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: 📦 Build docker 
+      - name: 📦 Build runner docker image 
         uses: docker/build-push-action@v5
         with:
           context: .

@@ -29,6 +29,7 @@ use tokio::net::TcpListener;
 use tower::ServiceBuilder;
 use tower_http::{
     classify::ServerErrorsFailureClass,
+    compression::CompressionLayer,
     services::{ServeDir, ServeFile},
     set_header::SetResponseHeaderLayer,
     trace::TraceLayer,
@@ -200,6 +201,7 @@ async fn main() -> Result<(), anyhow::Error> {
                         HeaderValue::from_static("require-corp"),
                     )),
             )
+            .layer(CompressionLayer::new())
             .with_state(state),
     )
     .await?;

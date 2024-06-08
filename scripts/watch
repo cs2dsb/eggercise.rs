@@ -18,6 +18,8 @@ cd $repo_dir
 
 readonly bin="${BIN:-server}";
 readonly assets_dir="crates/server/assets";
+readonly wasm_dir="${assets_dir}/wasm";
+readonly css_out="${assets_dir}/css/*_output.css";
 
 release="";
 
@@ -29,5 +31,8 @@ cargo watch \
     -i "*.sqlite*" \
     -i "*.log*" \
     -i "scripts" \
-    -i "${assets_dir}" \
+    -i "${wasm_dir}" \
+    -i "${css_out}" \
+    -i "node_modules" \
+    -i "package-lock.json" \
     -x "run ${release} --bin $bin -- --assets-dir ${assets_dir} $*"
