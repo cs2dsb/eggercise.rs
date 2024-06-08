@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+
+# Exit when any command fails
+set -o errexit
+
+# Exit when an undeclared variable is used
+set -o nounset
+
+# Exit when a piped command returns a non-zero exit code
+set -o pipefail
+
+# Installs the prerequisites for the project
+
+readonly repo_dir="$( cd $(dirname ${BASH_SOURCE}); cd ..; pwd )";
+readonly third_party_tools_dir="${repo_dir}/third_party/tools";
+
+readonly RED='\033[0;31m';
+readonly NC='\033[0m'; # No Color
+
+warn() { echo -e "${RED}$@${NC}" >&2; }
+die() { warn "$@"; exit 1; }
+
+cd $repo_dir
+PATH="${third_party_tools_dir}/node/bin:$PATH" npm install

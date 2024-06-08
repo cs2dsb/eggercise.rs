@@ -16,7 +16,8 @@
 - [x] Improve client-server error situation (see api.rs)
     - It could possibly be simplified. Try using it and see if there is actually any benefit to the enum variants over just returning a string
 - [ ] The service worker mapping unknown URLs to index isn't working in FF
-- [ ] Macro to generate `all_columns` for Iden structs. Failing that a test that checks against a hard-coded list to prevent it going out of sync
+- [x] Macro to generate `all_columns` for Iden structs. Failing that a test that checks against a hard-coded list to prevent it going out of sync
+- [ ] Add postcss step to CI build
 
 ## WebauthN 
 - [x] Register

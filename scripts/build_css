@@ -9,25 +9,15 @@ set -o nounset
 # Exit when a piped command returns a non-zero exit code
 set -o pipefail
 
-# Launches cargo watch to run the main binary 
-# Set BIN to change the binary
+# Launches postcss in watch mode
 # Set RELEASE=true to enable release mode
 
 readonly repo_dir="$( cd $(dirname ${BASH_SOURCE}); cd ..; pwd )";
 cd $repo_dir
+source "${repo_dir}/scripts/export_node_path";
 
-readonly bin="${BIN:-server}";
 readonly assets_dir="crates/server/assets";
 
-release="";
-
-if [ "${RELEASE:-}" == "true" ]; then
-    release="--release";
-fi
-
-cargo watch \
-    -i "*.sqlite*" \
-    -i "*.log*" \
-    -i "scripts" \
-    -i "${assets_dir}" \
-    -x "run ${release} --bin $bin -- --assets-dir ${assets_dir} $*"
+npm exec postcss -- \
+    "${assets_dir}/css/main_input.css" \
+    --output "${assets_dir}/css/main_output.css"
