@@ -6,17 +6,14 @@ resolver = "2"
 edition = "2021"
 version = "0.0.62"
 
-# This is used for the service worker wasm package
-[profile.dev-min-size]
+[profile.wasm-release]
 inherits = "release"
 opt-level = 'z'
 lto = true
 codegen-units = 1
 
-[profile.release]
-opt-level = 2
-
 [workspace.dependencies]
+
 # Panic hook to make debugging wasm easier
 console_error_panic_hook = "0.1.7"
 
