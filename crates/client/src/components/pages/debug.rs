@@ -4,8 +4,8 @@ use crate::db::migrations::{DatabaseVersion, MigrationError};
 
 #[component]
 pub fn Debug() -> impl IntoView {
-    let db_version: Resource<(), Result<DatabaseVersion, MigrationError>> = use_context()
-        .expect("Failed to find DatabaseVersion resource in context"); 
+    let db_version: Resource<(), Result<DatabaseVersion, MigrationError>> =
+        use_context().expect("Failed to find DatabaseVersion resource in context");
 
     view! {
         <h1>"Debug"</h1>

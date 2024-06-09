@@ -16,7 +16,7 @@ use crate::utils::sqlite3::{SqlitePromiser, SqlitePromiserError};
 static MIGRATIONS_DIR: Dir = include_dir!("$CARGO_MANIFEST_DIR/migrations");
 
 #[derive(Debug, Clone, Copy)]
-pub struct DatabaseVersion (usize);
+pub struct DatabaseVersion(usize);
 
 impl IntoView for DatabaseVersion {
     fn into_view(self) -> leptos::View {

@@ -2656,6 +2656,7 @@ dependencies = [
  "base64 0.22.1",
  "chrono",
  "clap",
+ "client",
  "corncobs",
  "croner",
  "deadpool 0.11.2",

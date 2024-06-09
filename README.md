@@ -18,6 +18,7 @@
 - [ ] The service worker mapping unknown URLs to index isn't working in FF
 - [x] Macro to generate `all_columns` for Iden structs. Failing that a test that checks against a hard-coded list to prevent it going out of sync
 - [x] Add postcss step to CI build
+- [ ] Add "Loading..." for the first ping (Currently if you refresh on a page with an offline fallback it flashes up the OFFLINE message for a second)
 
 ## WebauthN 
 - [x] Register

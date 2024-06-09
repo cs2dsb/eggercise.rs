@@ -1,5 +1,6 @@
 use leptos::{
-    component, create_local_resource, provide_context, view, CollectView, ErrorBoundary, IntoView, SignalWith, Transition
+    component, create_local_resource, provide_context, view, CollectView, ErrorBoundary, IntoView,
+    SignalWith, Transition,
 };
 use leptos_router::Router;
 
