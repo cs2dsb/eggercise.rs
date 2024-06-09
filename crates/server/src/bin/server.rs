@@ -17,6 +17,7 @@ use axum::{
     Router,
 };
 use clap::Parser;
+use client::ROUTE_URLS;
 use deadpool_sqlite::{Config, Hook, Runtime};
 use server::{
     cli::Cli,
@@ -109,9 +110,19 @@ async fn main() -> Result<(), anyhow::Error> {
         args: Arc::new(args.clone()),
     };
 
+    // Map all routes the client can handle to the index.html
+    let client_routes = {
+        let mut router = Router::new();
+        for path in ROUTE_URLS.iter().filter(|p| **p != "/") {
+            router = router.nest_service(path, ServeFile::new(args.assets_dir.join("index.html")));
+        }
+        router
+    };
+
     axum::serve(
         listener,
         Router::new()
+            .merge(client_routes)
             .route(api::Auth::RegisterStart.path(), post(register_start))
             .route(api::Auth::RegisterFinish.path(), post(register_finish))
             .route(api::Auth::LoginStart.path(), post(login_start))

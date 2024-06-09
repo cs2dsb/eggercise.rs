@@ -16,6 +16,7 @@ glob = "0.3.1"
 
 [dependencies]
 shared = { path = "../shared", features = [ "backend" ] }
+client = { path = "../client" }
 anyhow.workspace = true
 leptos.workspace = true
 tracing.workspace = true
