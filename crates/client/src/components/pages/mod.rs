@@ -12,3 +12,6 @@ pub use login::*;
 
 mod profile;
 pub use profile::*;
+
+mod debug;
+pub use debug::*;

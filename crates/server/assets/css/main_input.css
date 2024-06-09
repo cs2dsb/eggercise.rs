@@ -2,30 +2,62 @@
 @import 'open-props/buttons.min.css';
 
 body {
-    display: grid;
-    place-content: center;
-    padding: var(--size-7);
-    gap: var(--size-7);
+    overflow-x:hidden;
+    /* display:grid; */
+    justify-items:flex-start;
+    grid-template-columns:var(--size-8) calc(100% - 2 * var(--size-8)) var(--size-8);
 }
-  
-article, 
-section, 
-form, 
-fieldset, 
-header, 
-.page, 
-.spaced, 
-#text__lists > div, 
-#text__code > div, 
-#text__inline > div 
-{
-    display: grid;
+
+@media (max-width: 767px) {
+    body {
+        grid-template-columns:var(--size-3) calc(100% - 2 * var(--size-3)) var(--size-3);
+    }
+}
+
+body > * {
+    grid-column: 2;
+}
+
+body > .full-width {
+    width:100%;
+    grid-column:1 / -1;
+}
+
+.nav {
+    position:sticky;
+    z-index:var(--layer-1);
+    top: 0;
+    overflow-x:auto;
+    background-image:linear-gradient(to bottom,hsl(var(--gray-9-hsl) / 98%) 1ch,75%,hsl(var(--gray-9-hsl) / 0%));
+    padding-block:var(--size-2) var(--size-5);
+    padding-inline:var(--size-2) var(--size-4);
+    padding-inline-start:var(--size-8); 
+    padding-inline-end:var(--size-8); 
+    display:flex;
+    align-items: center;
+    white-space: nowrap;
     gap: var(--size-4);
 }
-  
-nav > ul {
-    display: flex;
-    list-style-type: none;
-    padding-inline-start: 0;
-    gap: var(--size-5);
+
+.nav a[href]:not(:hover,:focus-visible) {
+    color: var(--text-1);
+    text-decoration-color: var(--link);
+}
+
+.nav a.in-view {
+    text-decoration: underline double;
+    text-underline-offset: 4px;
+}
+
+[data-theme=light] .nav {
+    padding-block-start: var(--size-3);
+    background: var(--surface-1);
+}
+
+.nav > li {
+    display: inline-block;
+}
+
+.nav > li#right {
+    margin-left: auto;
 }
