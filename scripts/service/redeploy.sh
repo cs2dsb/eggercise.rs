@@ -13,6 +13,7 @@ readonly repo_dir="$( cd $(dirname ${BASH_SOURCE}); pwd )"
 cd "${repo_dir}"
 
 readonly release_dir="${repo_dir}/releases";
+readonly db_dir="${repo_dir}/database";
 
 readonly docker_image="ghcr.io/cs2dsb/eggercise.rs:latest";
 readonly app_user=web-apps;
@@ -31,6 +32,7 @@ function error_exit() {
 }
 
 cd "${repo_dir}"
+mkdir -p "${db_dir}"
 
 sed \
 	-e "s|\${REDEPLOY_COMMAND}|${repo_dir}/redeploy.sh|g" \
@@ -76,6 +78,8 @@ fi
 sudo docker run -d \
 	--name=eggercise.rs \
 	-e ASSETS_DIR=/opt/server/assets \
+	-e SQLITE_CONNECTION_STRING=/opt/server/database/egg.sqlite \
+	-v "${db_dir}":/opt/server/database \
 	-e WEBAUTHN_ORIGIN=https://egg.ileet.co.uk \
 	-e WEBAUTHN_ID=egg.ileet.co.uk \
 	-p 9090:9090 \
