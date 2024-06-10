@@ -28,7 +28,7 @@
     - [x] Add key from new device
 
 ## Docker build
-- Mount sqlite db 
+- [x] Mount sqlite db 
 
 ## Potentially useful crates
 
