@@ -37,7 +37,7 @@ if [[ "$response" =~ ^(yes|y|)$ ]]; then
     # Delete the local tag
     git tag --delete ${tag}
     # Update the comit
-    git commit -a --amend --no-edit
+    git commit --no-verify -a --amend --no-edit
     # Re-create the tag
     git tag -a "${tag}" -m "${tag_message}"
     # Force push this branch
