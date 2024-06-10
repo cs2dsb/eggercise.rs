@@ -3,12 +3,14 @@
 
 body {}
 
-body > .full-width {
-    /* width:100%; */
-    /* grid-column:1 / -1;
-    place-self: ; */
-    /* align-self: stretch; */
+._chartistry {
+    fill: var(--text-1);
 }
+
+._chartistry ._chartistry_snippet > svg {
+    display: inline;
+}
+
 
 body > .container {
     display: grid;

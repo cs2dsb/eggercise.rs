@@ -15,3 +15,6 @@ pub use profile::*;
 
 mod debug;
 pub use debug::*;
+
+mod chart;
+pub use chart::*;

@@ -46,7 +46,7 @@ read -r -p "About to create and push tag \"${tag}\" with annotation \"${tag_mess
 response=${response,,}    # tolower
 if [[ "$response" =~ ^(yes|y|)$ ]]; then
     if [ "${NOBUMP:-}" != "true" ]; then
-        git commit -a -m "Bumped version number to ${version}"
+        git commit --no-verify -a -m "Bumped version number to ${version}"
     fi
 
     # Push before doing anything else to fail early if there's some conflict
