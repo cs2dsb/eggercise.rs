@@ -16,10 +16,6 @@
 		"git.ignoreLimitWarning": true,
 		"rust-analyzer.checkOnSave": true,
 		"emmet.showExpandedAbbreviation": "never",
-		"tailwindCSS.includeLanguages": {
-			"rust": "html",
-			"*.rs": "html"
-		},
 		"files.associations": {
 			"*.rs": "rust"
 		},
@@ -32,14 +28,15 @@
 		"cssvar.files": [
 			"./node_modules/open-props/open-props.min.css",
 			"./crates/server/assets/css/main_input.css"
-		  ],
-		
-		  // Do not ignore node_modules css files, which is ignored by default
-		  "cssvar.ignore": [],
-		
-		  // add support for autocomplete in JS or JS like files
-		  "cssvar.extensions": [
+		],
+	
+		// Do not ignore node_modules css files, which is ignored by default
+		"cssvar.ignore": [],
+	
+		// add support for autocomplete in JS or JS like files
+		"cssvar.extensions": [
 			"css", "postcss", "jsx", "tsx"
-		  ]
+		],
+		"typescript.validate.enable": false,
 	}
 }

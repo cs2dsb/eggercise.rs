@@ -54,8 +54,9 @@ serde_json = "1.0.116"
 
 sha2 = "0.10.8"
 
-leptos = { version = "0.6.11", features = ["nightly", "csr"] }
-leptos_router = { version = "0.6.11", features = ["nightly", "csr"] }
+leptos = { version = "0.6.12", features = ["nightly", "csr"] }
+leptos_router = { version = "0.6.12", features = ["nightly", "csr"] }
+leptos_reactive = "=0.6.5"
 
 # SQLite lib
 rusqlite = { version = "0.30.0", features = ["bundled", "serde_json", "trace"] }
