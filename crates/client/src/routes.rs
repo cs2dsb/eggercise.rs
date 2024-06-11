@@ -1,31 +1,19 @@
 use leptos::{component, view, IntoView};
 use leptos_router::{Route, Routes, A};
 
-use crate::components::{Chart, Debug, Login, OnlineCheck, Plan, Profile, Register, Today};
+use crate::components::{Chart, Debug, Login, Plan, Profile, Register, Today};
 
 macro_rules! routes {
     ($(($path:literal, $view:ident, $ui_text:literal),)+) => {
         #[component]
         pub fn AppNav() -> impl IntoView {
             view! {
-                <ul class="nav full-width">
+                <ul class="nav">
                 $(
                     <li>
                         <A href=$path>$ui_text</A>
                     </li>
                 )+
-                    <li id="right">
-                        <small>{
-                            format!("Version: {}{}",
-                                env!("CARGO_PKG_VERSION"),
-                                option_env!("BUILD_TIME")
-                                    .map(|v| format!(" - {v}"))
-                                    .unwrap_or("".to_string()))
-                        }</small>
-                    </li>
-                    <li>
-                        <OnlineCheck />
-                    </li>
                 </ul>
             }
         }

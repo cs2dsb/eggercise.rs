@@ -15,3 +15,6 @@ pub use session_list::*;
 
 mod container;
 pub use container::*;
+
+mod footer;
+pub use footer::*;

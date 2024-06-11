@@ -1,12 +1,14 @@
+const postcssAtImport = require("postcss-import")
 const postcssJitProps = require('postcss-jit-props');
+const postcssCustomMedia = require('postcss-custom-media');
 
-const atImport = require("postcss-import")
 const OpenProps = require('open-props');
 
 module.exports = {
     plugins: [
-        atImport,
+        postcssAtImport(),
         // only vars used are in build output
+        postcssCustomMedia(),
         postcssJitProps(OpenProps),
     ],
 };

@@ -1,7 +1,10 @@
 @import 'open-props/normalize.min.css';
 @import 'open-props/buttons.min.css';
+@import 'open-props/media.min.css';
 
-body {}
+body, html {
+    margin: 0;
+}
 
 ._chartistry {
     fill: var(--text-1);
@@ -11,21 +14,26 @@ body {}
     display: inline;
 }
 
-
 body > .container {
     display: grid;
-    place-content: center;
+    place-content: safe center;
+    overflow-x: auto;
 }
 
 .nav {
     position:sticky;
+    margin: 0;
     z-index:var(--layer-1);
     top: 0;
     overflow-x:auto;
     padding-block:var(--size-2) var(--size-5);
     padding-inline:var(--size-2) var(--size-4);
-    padding-inline-start:var(--size-8); 
-    padding-inline-end:var(--size-8); 
+    
+    @media (--md-n-above) {
+        padding-inline-start:var(--size-8); 
+        padding-inline-end:var(--size-8); 
+    }
+
     display:flex;
     align-items: center;
     white-space: nowrap;
@@ -58,4 +66,33 @@ body > .container {
 
 .nav > li#right {
     margin-left: auto;
+}
+
+.footer {
+    position:sticky;
+    margin: 0;
+    z-index:var(--layer-1);
+    bottom: 0;
+    overflow-x:auto;
+    padding-block:var(--size-2) var(--size-5);
+    padding-inline:var(--size-2) var(--size-4);
+    
+    @media (--md-n-above) {
+        padding-inline-start:var(--size-8); 
+        padding-inline-end:var(--size-8); 
+    }
+
+    display:flex;
+    align-items: center;
+    white-space: nowrap;
+    gap: var(--size-4);
+
+    background-image:linear-gradient(to top,hsl(var(--gray-3-hsl) / 98%) 1ch,75%,hsl(var(--gray-3-hsl) / 0%));
+    @media (prefers-color-scheme: dark) {
+        background-image:linear-gradient(to top,hsl(var(--gray-10-hsl) / 98%) 1ch,75%,hsl(var(--gray-10-hsl) / 0%));
+    }
+}
+
+.footer > li {
+    display: inline-block;
 }
