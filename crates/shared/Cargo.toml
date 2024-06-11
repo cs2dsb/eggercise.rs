@@ -48,9 +48,7 @@ chrono.workspace = true
 serde.workspace = true
 thiserror.workspace = true
 const_format.workspace = true
-webauthn-rs-proto.workspace = true
 http.workspace = true
-serde_with.workspace = true
 http-serde.workspace = true
 paste.workspace = true
 

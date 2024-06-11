@@ -26,7 +26,6 @@ mime = "0.3.17"
 
 # Connection pooling for rusqlite
 deadpool-sqlite = { version = "0.7.0", features = [ "tracing" ] }
-deadpool = "^0.11.0"
 
 # Helper attributes for serde
 serde_with = "3.8.1"
