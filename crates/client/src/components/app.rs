@@ -5,7 +5,7 @@ use leptos::{
 use leptos_router::Router;
 
 use crate::{
-    components::Container,
+    components::{Container, Footer},
     db::migrations::{self, MigrationError},
     utils::sqlite3::SqlitePromiser,
     AppNav, AppRoutes,
@@ -47,6 +47,7 @@ pub fn App() -> impl IntoView {
                     </ErrorBoundary>
                 </Transition>
             </Container>
+            <Footer/>
         </Router>
     }
 }
