@@ -14,17 +14,26 @@ body, html {
     display: inline;
 }
 
+body {
+    display:grid;
+}
+
 body > .container {
     display: grid;
     place-content: safe center;
     overflow-x: auto;
+    padding-block:var(--size-8) var(--size-8);
+    margin-bottom: auto;
+    flex-grow: 1;
 }
 
 .nav {
-    position:sticky;
+    position:absolute;
     margin: 0;
     z-index:var(--layer-1);
     top: 0;
+    right: 0;
+    left: 0;
     overflow-x:auto;
     padding-block:var(--size-2) var(--size-5);
     padding-inline:var(--size-2) var(--size-4);
@@ -70,11 +79,15 @@ body > .container {
 
 .footer {
     position:sticky;
+    height: fit-content;
     margin: 0;
+    margin-top: auto;
     z-index:var(--layer-1);
     bottom: 0;
+    right: 0;
+    left: 0;
     overflow-x:auto;
-    padding-block:var(--size-2) var(--size-5);
+    padding-block:var(--size-3) var(--size-1);
     padding-inline:var(--size-2) var(--size-4);
     
     @media (--md-n-above) {
