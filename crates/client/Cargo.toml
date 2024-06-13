@@ -37,5 +37,7 @@ web-sys = { workspace = true, features = [
 
 shared = { path = "../shared", features = [ "frontend" ] }
 time = { version = "0.3.36", features = ["wasm-bindgen"] }
+meval = "0.2.0"
+asciimath-rs = "0.6.2"
 #TODO: this rev fixes nightly compile. Swap to crates.io once it is released
 leptos-chartistry = { git = "https://github.com/feral-dot-io/leptos-chartistry" , rev = "9b65512" }

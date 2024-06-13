@@ -32,11 +32,12 @@ impl fmt::Display for Nothing {
 #[cfg(feature = "frontend")]
 mod frontend {
     use std::{
+        any::type_name,
         fmt::{self, Display},
         ops::Deref,
     };
 
-    use leptos::IntoView;
+    use leptos::{view, IntoView};
     use thiserror::Error;
     use wasm_bindgen::{JsCast, JsValue};
     use web_sys::js_sys::{
@@ -115,6 +116,14 @@ mod frontend {
         WithContext { context: String, inner: Box<Self> },
     }
 
+    impl<T: Display> FrontendError<T> {
+        pub fn map_display(inner: T) -> Self {
+            Self::Inner {
+                inner,
+            }
+        }
+    }
+
     #[derive(Debug, Clone, Error)]
     pub struct FrontendErrorOnly(FrontendError<Nothing>);
 
@@ -181,13 +190,32 @@ mod frontend {
         }
     }
 
-    impl<T: Display> IntoView for FrontendError<T> {
+    impl<T: Display> IntoView for &FrontendError<T> {
         fn into_view(self) -> leptos::View {
-            todo!()
+            use FrontendError::*;
+            match self {
+                Inner { inner } => {
+                    let name = type_name::<T>();
+                    view! { <li>{ format!("{name} Error:\n{inner}") }</li> }.into_view()
+                },
+                Client { message } => view! { <li>{ format!("ClientError:\n{message}") }</li> }.into_view(),
+                Js { inner } => view! { <li>{ format!("JsError:\n{inner}") }</li> }.into_view(),
+                Validation { inner } => {
+                    let errors = inner.error_messages.join(", ");
+                    view! { <li>{ format!("ValidationErrors:\n{errors}") }</li> }.into_view()
+                },
+                WrongContentType { inner: WrongContentTypeError { expected, got, body } } => {
+                    view! { <li>{ format!("WrongContentTypeError:\nExpected: {expected}\nGot:{:?}\nBody: {body}", got) }</li> }.into_view()
+                },
+                WithContext { context, inner } => {
+                    let inner_view = inner.into_view();
+                    view! { <li>{ format!("{context}\n") } <ul class="error-list">{ inner_view }</ul></li> }.into_view()
+                },
+            }
         }
     }
 
-    impl IntoView for FrontendErrorOnly {
+    impl IntoView for &FrontendErrorOnly {
         fn into_view(self) -> leptos::View {
             todo!()
         }

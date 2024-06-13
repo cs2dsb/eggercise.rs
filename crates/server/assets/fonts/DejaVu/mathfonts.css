@@ -1,0 +1,51 @@
+/*
+Deja Vu is released under a Free License. See the files in this directory
+for details. This fonts is available on most Linux distributions.
+*/
+
+@namespace url('http://www.w3.org/1999/xhtml');
+@namespace m url('http://www.w3.org/1998/Math/MathML');
+
+@font-face {
+    font-family: DejaVu Math TeX Gyre;
+    src: url('DejaVuMathTeXGyre.woff2'), url('DejaVuMathTeXGyre.woff');
+}
+@font-face {
+    font-family: DejaVu Serif;
+    src: url('DejaVuSerif.woff2'), url('DejaVuSerif.woff');
+}
+@font-face {
+    font-family: DejaVu Serif;
+    src: url('DejaVuSerif-Bold.woff2'), url('DejaVuSerif-Bold.woff');
+    font-weight: bold;
+}
+@font-face {
+    font-family: DejaVu Serif;
+    src: url('DejaVuSerif-Italic.woff2'), url('DejaVuSerif-Italic.woff');
+    font-style: italic;
+}
+@font-face {
+    font-family: DejaVu Serif;
+    src: url('DejaVuSerif-BoldItalic.woff2'),
+         url('DejaVuSerif-BoldItalic.woff');
+    font-weight: bold;
+    font-style: italic;
+}
+
+.htmlmathparagraph, m|mtext {
+    font-family: DejaVu Serif;
+}
+m|math {
+    font-family: DejaVu Math TeX Gyre;
+}
+
+.oldstylenumbers {
+    font-variant-numeric: oldstyle-nums;   /* Recommended syntax */
+    font-feature-settings: 'onum';         /* OpenType feature syntax */
+    -moz-font-feature-settings: 'onum';    /* Gecko <= 33 syntax */
+    -webkit-font-feature-settings: 'onum'; /* Blink syntax */
+}
+
+/* Calligraphic letters do not seem to be available */
+m|*.calligraphic {
+}

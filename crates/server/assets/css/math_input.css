@@ -1,0 +1,7 @@
+@import '../fonts/DejaVu/mathfonts.css';
+
+math {
+    display: block;
+    padding: var(--size-5);
+    font-size: var(--font-size-5);
+}

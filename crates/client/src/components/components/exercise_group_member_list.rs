@@ -1,7 +1,9 @@
-use leptos::{component, view, CollectView, ErrorBoundary, IntoView, SignalWith, Transition};
+use leptos::{component, view, CollectView, IntoView, Transition};
 use shared::model::ExerciseGroupMember;
 
-use crate::db::PromiserFetcher;
+use crate::{
+    components::FrontendErrorBoundary, db::PromiserFetcher, utils::sqlite3::SqlitePromiserError,
+};
 
 #[component]
 pub fn ExerciseGroupMemberList() -> impl IntoView {
@@ -9,23 +11,12 @@ pub fn ExerciseGroupMemberList() -> impl IntoView {
 
     view! {
         <Transition fallback=move || view! {  <p>"Loading..."</p>} >
-            <ErrorBoundary fallback=|errors| view! {
-                <div style="color:red">
-                    <p>Error loading Exercise Group Member list:</p>
-                    <ul>
-                    { move || errors.with(|v|
-                        v.iter()
-                        .map(|(_, e)| view! { <li> { format!("{:?}", e) } </li>})
-                        .collect_view())
-                    }
-                    </ul>
-                </div>
-            }>
+            <FrontendErrorBoundary<SqlitePromiserError>>
                 <h3>ExerciseGroupMember:</h3>
                 { move || {
                     exercise_group_members.and_then(|l| l.into_view()).collect_view()
                 }}
-            </ErrorBoundary>
+            </FrontendErrorBoundary<SqlitePromiserError>>
         </Transition>
     }
 }
