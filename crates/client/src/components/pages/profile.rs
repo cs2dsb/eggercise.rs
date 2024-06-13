@@ -1,14 +1,19 @@
 use leptos::{
-    component, create_action, create_local_resource, create_signal, view, Action, CollectView,
-    ErrorBoundary, IntoView, Show, Signal, SignalGet, SignalUpdate, SignalWith,
+    component, create_action, create_local_resource, create_signal, view, Action, IntoView, Show,
+    Signal, SignalGet, SignalUpdate, SignalWith,
 };
-use shared::model::{TemporaryLogin, User};
+use shared::{
+    api::error::{Nothing, ServerError},
+    model::{TemporaryLogin, User},
+};
 use tracing::{debug, warn};
 
 use crate::{
     api::{create_temporary_login, fetch_user},
-    components::{forms::CreateTemporaryLoginForm, OfflineFallback},
+    components::{forms::CreateTemporaryLoginForm, FrontendErrorBoundary, OfflineFallback},
 };
+
+type ServerErrorNothing = ServerError<Nothing>;
 
 #[component]
 fn ProfileWithUser(
@@ -104,18 +109,7 @@ pub fn Profile() -> impl IntoView {
         <h2>"Profile"</h2>
         <OfflineFallback>
             <div>
-                <ErrorBoundary fallback=|errors| view! {
-                    <div style="color:red">
-                        <p>Error:</p>
-                        <ul>
-                        { move || errors.with(|v|
-                            v.iter()
-                            .map(|(_, e)| view! { <li> { format!("{:?}", e) } </li>})
-                            .collect_view())
-                        }
-                        </ul>
-                    </div>
-                }>
+                <FrontendErrorBoundary<ServerErrorNothing>>
                 { move || user_and_temp_login.and_then(|_| {
                     view! {
                         <ProfileWithUser
@@ -125,7 +119,7 @@ pub fn Profile() -> impl IntoView {
                         />
                     }
                 })}
-                </ErrorBoundary>
+                </FrontendErrorBoundary<ServerErrorNothing>>
             </div>
         </OfflineFallback>
     }

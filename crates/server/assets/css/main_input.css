@@ -1,6 +1,7 @@
 @import 'open-props/normalize.min.css';
 @import 'open-props/buttons.min.css';
 @import 'open-props/media.min.css';
+@import './math_input.css';
 
 body, html {
     margin: 0;
@@ -108,4 +109,14 @@ body > .container {
 
 .footer > li {
     display: inline-block;
+}
+
+section {
+    padding-block: var(--size-fluid-1);
+}
+
+ul.error-list {
+    color: var(--red-9);
+    list-style-type: none;
+    padding: var(--size-1);
 }
