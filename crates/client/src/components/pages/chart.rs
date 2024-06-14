@@ -1,7 +1,9 @@
+use std::{collections::HashMap, num::ParseFloatError};
+
 use asciimath_rs::format::mathml::ToMathML;
 use leptos::{
-    component, create_rw_signal, ev::KeyboardEvent, event_target_value, view, IntoView, RwSignal,
-    Signal, SignalGet, SignalUpdate, SignalWith,
+    component, create_rw_signal, create_signal, event_target_value, view, with_owner, For,
+    IntoView, Owner, RwSignal, Signal, SignalGet, SignalUpdate, SignalWith,
 };
 use leptos_chartistry::{
     AspectRatio, AxisMarker, Chart as Chart_, IntoInner, Legend, Line, RotatedLabel, Series,
@@ -9,64 +11,133 @@ use leptos_chartistry::{
 };
 use meval::Error as MevalError;
 use shared::api::error::{FrontendError, ResultContext};
+use wasm_bindgen::JsCast;
 
 use crate::components::FrontendErrorBoundary;
 
 #[component]
 pub fn EquationForm(equation: RwSignal<String>) -> impl IntoView {
+    fn on_change<T: JsCast>(ev: T, signal: RwSignal<String>) {
+        let val = event_target_value(&ev);
+        signal.update(|v| *v = val)
+    }
     view! {
         <section>
-            <form on:submit=|ev| ev.prevent_default()>
-                <input
-                    type="text"
-                    placeholder="Equation"
-                    // Attribute only sets the initial value
-                    value={ equation.get() }
-                    // TODO: Is it possible to dedupe these?
-                    on:keyup=move |ev: KeyboardEvent| {
-                        let val = event_target_value(&ev);
-                        equation.update(|v| *v = val);
-                    }
-                    on:change=move |ev| {
-                        let val = event_target_value(&ev);
-                        equation.update(|v| *v = val);
-                    }
-                />
-            </form>
+            <input
+                type="text"
+                placeholder="Equation"
+                // Attribute only sets the initial value
+                value={ equation.get() }
+                on:keyup=move |ev| on_change(ev, equation)
+                on:change=move |ev| on_change(ev, equation)
+            />
         </section>
     }
 }
 
+// TODO: rejig so binds are in the data entry form
 #[component]
 pub fn EquationDisplay(#[prop(into)] equation: Signal<String>) -> impl IntoView {
+    let (binds, set_binds) = create_signal(HashMap::new());
+
+    // TODO: Is there a neater way of doing this? The counters example doesn't seem
+    // to do this and has a similar setup
+    let owner = Owner::current().unwrap();
+
+    let update_binds = move |vars: &Vec<String>| {
+        set_binds.update(|binds| {
+            binds.retain(|k: &String, _| vars.contains(k));
+            for v in vars.iter() {
+                if !binds.contains_key(v) {
+                    let signal = with_owner(owner, || create_rw_signal(Ok(0_f64)));
+                    binds.insert((*v).to_owned(), signal);
+                }
+            }
+        });
+    };
+
     let output = Signal::derive(move || {
+        use meval::tokenizer::Token;
         let expr: meval::Expr = equation
             .with(|e| e.parse())
             .map_err(FrontendError::map_display)
             .with_context(|| format!("Error parsing \"{}\"", equation.get()))?;
 
-        let eval = expr
-            .eval()
+        let vars = expr
+            .iter()
+            .filter_map(|t| {
+                if let Token::Var(v) = t {
+                    Some(v.clone())
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<String>>();
+
+        update_binds(&vars);
+
+        let values = binds.with(|b| {
+            vars.iter()
+                .map(|v| {
+                    let signal = b[v];
+                    signal.get().unwrap_or_default()
+                })
+                .collect::<Vec<f64>>()
+        });
+
+        let vars = vars.iter().map(|v| v.as_ref()).collect::<Vec<_>>();
+        let bind = expr
+            .bindn(&vars)
             .map_err(FrontendError::map_display)
-            .with_context(|| format!("Error evaluating \"{}\"", equation.get()))?;
+            .with_context(|| format!("Error binding \"{:?}\" in \"{}\"", vars, equation.get()))?;
 
-        let mathml = asciimath_rs::parse(equation.get()).to_mathml();
-
-        Ok::<_, FrontendError<meval::Error>>((expr, eval, mathml))
+        let eval = bind(&values);
+        Ok::<_, FrontendError<meval::Error>>(eval)
     });
+
+    let mathml = Signal::derive(move || equation.with(|e| asciimath_rs::parse(e).to_mathml()));
 
     view! {
         <section>
+            { move || view! { <math inner_html=mathml() /> }}
+            <For
+                each=move || binds.get()
+                key=|(label, _)| label.to_owned()
+                children=move |(label, signal)| view!{ <Bind label signal /> }
+            />
             <FrontendErrorBoundary<MevalError>>
-            { move || output.get().map(|(expr, eval, mathml)| {
-                view! {
-                    <p>{ format!("Parsed expression: \"{:?}\"", expr) }</p>
-                    <p>{ format!("Evaluated expression: \"{:?}\"", eval) }</p>
-                    <math inner_html=mathml />
-                }.into_view()
-            }) }
+                { move || output.get().map(|eval| {
+                    view! {
+                        <p>{ format!("Result: {:?}", eval) }</p>
+                    }.into_view()
+                }) }
             </FrontendErrorBoundary<MevalError>>
         </section>
+    }
+}
+
+#[component]
+pub fn Bind(label: String, signal: RwSignal<Result<f64, ParseFloatError>>) -> impl IntoView {
+    fn on_change<T: JsCast>(ev: T, signal: RwSignal<Result<f64, ParseFloatError>>) {
+        let val = event_target_value(&ev);
+        signal.update(|v| *v = val.parse())
+    }
+
+    view! {
+        <div class="block-wrap" style="padding-block-end: var(--size-1);">
+            <div>{ label }</div>
+            <input
+                type="number"
+                // Attribute only sets the initial value
+                value={ move || signal.get().unwrap_or_default() }
+                on:keyup=move |ev| on_change(ev, signal)
+                on:change=move |ev| on_change(ev, signal)
+            />
+        </div>
+        { move || match signal.get() {
+            Ok(_) => view!{}.into_view(),
+            Err(_) => view!{ <p>"Enter a valid floating point number"</p> }.into_view(),
+        }}
     }
 }
 
@@ -133,7 +204,11 @@ pub fn Chart() -> impl IntoView {
                 tooltip=Tooltip::left_cursor().show_x_ticks(false)
             />
         </section>
-        <EquationForm equation />
-        <EquationDisplay equation />
+
+        <div class="block-wrap">
+            <EquationForm equation />
+            <EquationDisplay equation />
+        </div>
+
     }
 }
