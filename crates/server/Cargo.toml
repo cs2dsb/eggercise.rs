@@ -3,6 +3,10 @@ name = "server"
 edition.workspace = true
 version.workspace = true
 
+[features]
+default = [ "run-test-data-migrations" ]
+run-test-data-migrations = []
+
 [build-dependencies]
 anyhow.workspace = true
 sha2.workspace = true

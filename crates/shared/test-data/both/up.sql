@@ -1,6 +1,9 @@
 -- Note the IDs need to be provided (rather than a generation fn in the db) so they match
 -- between the server and client databases
 
+INSERT INTO user (id, username) 
+VALUES ('cb4d23ae-ac0e-455e-ab70-c16c65894009', 'daniel');
+
 INSERT INTO exercise (id, name) 
 VALUES ('3d551aeb-6294-4634-b138-d29159e1ea5d', 'Squat, front (barbell)');
 INSERT INTO exercise (id, name) 

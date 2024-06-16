@@ -35,6 +35,19 @@ pub fn EquationForm(equation: RwSignal<String>) -> impl IntoView {
     }
 }
 
+fn get_vars(expr: &meval::Expr) -> Vec<String> {
+    use meval::tokenizer::Token;
+
+    expr.iter()
+        .filter_map(|t| {
+            if let Token::Var(v) = t {
+                Some(v.clone())
+            } else {
+                None
+            }
+        })
+        .collect()
+}
 // TODO: rejig so binds are in the data entry form
 #[component]
 pub fn EquationDisplay(#[prop(into)] equation: Signal<String>) -> impl IntoView {
@@ -57,22 +70,12 @@ pub fn EquationDisplay(#[prop(into)] equation: Signal<String>) -> impl IntoView 
     };
 
     let output = Signal::derive(move || {
-        use meval::tokenizer::Token;
         let expr: meval::Expr = equation
             .with(|e| e.parse())
             .map_err(FrontendError::map_display)
             .with_context(|| format!("Error parsing \"{}\"", equation.get()))?;
 
-        let vars = expr
-            .iter()
-            .filter_map(|t| {
-                if let Token::Var(v) = t {
-                    Some(v.clone())
-                } else {
-                    None
-                }
-            })
-            .collect::<Vec<String>>();
+        let vars = get_vars(&expr);
 
         update_binds(&vars);
 
@@ -156,28 +159,83 @@ impl MyData {
     }
 }
 
+// /// Represesnts both a target number of reps and the actual number of reps
+// recorded enum Reps {
+//     /// As many reps as possible
+//     /// For target reps, the contained number is the minimum (usually the
+// same number as the previous non-amrap sets)     /// For actual reps, the
+// contained number is the number achieved     Amrap(u32),
+//     /// Standard rep target
+//     Reps(u32),
+// }
+
+// enum Weight {
+//     Kilograms(f64),
+//     Lbs(f64),
+//     Bodyweight,
+// }
+
+// struct Set {
+//     weight: Weight,
+//     reps: Reps,
+//     notes: Vec<String>,
+// }
+
+// struct PlanConfig {
+//     start_date: (),
+// }
+
+// struct ExerciseConfig {
+//     index_in_group: u32,
+//     initial_weight: Weight,
+//     frequency_per_week: f64,
+// }
+
+// struct ExerciseInput {
+//     last_weight_target: f64,
+//     last_weight_actual: f64,
+//     last_sets_target: Vec<Set>,
+//     last_sets_actual: Vec<Set>,
+// }
+
 #[component]
 pub fn Chart() -> impl IntoView {
+    let equation = create_rw_signal(String::new());
+    let expr: Signal<meval::Expr> = Signal::derive(move || {
+        if let Ok(expr) = equation.with(|v| v.parse()) {
+            // Can contain multiple xs but no other vars
+            if get_vars(&expr).iter().all(|v| v == "x") {
+                return expr;
+            }
+        }
+
+        return "x".parse().unwrap();
+    });
+
     let mut series = Series::new(|data: &MyData| data.x);
-    for y in 0..3 {
-        series = series
-            .line(Line::new(move |data: &MyData| data.y[y]).with_name(format!("Yyyyyyyy {y}")));
+    for y in 0..1 {
+        series = series.line(Line::new(move |data: &MyData| data.y[y]).with_name(format!("Y {y}")));
     }
 
-    let data = Signal::derive(|| {
+    let data = Signal::derive(move || {
+        let expr = expr.get();
+        let vars = get_vars(&expr);
+        let x_count = vars.len();
+
+        let var_refs = vars.iter().map(String::as_ref).collect::<Vec<_>>();
+
+        let bind = expr.bindn(&var_refs).expect("Binding x failed");
+
         let mut data = Vec::new();
         for x in 0..10 {
-            let mut ys = Vec::new();
-            for y in 0..3 {
-                let q = if x % 2 == 0 { -3. } else { x as f64 * 1.5 };
-                ys.push((x + y) as f64 * q);
-            }
-            data.push(MyData::new(x as f64, ys));
+            let x = vec![x as f64];
+            let ys = vec![bind(
+                &x.iter().cycle().take(x_count).cloned().collect::<Vec<_>>(),
+            )];
+            data.push(MyData::new(x[0], ys));
         }
         data
     });
-
-    let equation = create_rw_signal(String::new());
 
     view! {
         <h1>"Chart"</h1>

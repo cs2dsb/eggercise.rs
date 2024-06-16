@@ -9,7 +9,7 @@ use crate::utils::sqlite3::{ExecResult, SqlitePromiser, SqlitePromiserError};
 pub mod migrations;
 pub mod model;
 
-pub(crate) trait PromiserFetcher: Model + Clone + ModelIntoView {
+pub trait PromiserFetcher: Model + Clone + ModelIntoView {
     fn all_resource() -> Resource<(), Result<ListOfModel<Self>, SqlitePromiserError>> {
         create_local_resource(
             || (),
@@ -28,4 +28,62 @@ pub(crate) trait PromiserFetcher: Model + Clone + ModelIntoView {
     }
 
     fn extract_fields(result: ExecResult) -> Result<Vec<Self>, SqlitePromiserError>;
+}
+
+#[cfg(test)]
+mod test {
+    use std::marker::PhantomData;
+
+    use model_into_view::ModelIntoView;
+    use shared::model::*;
+
+    use super::PromiserFetcher;
+
+    #[test]
+    fn test_exercise_is_promiser_fetcher() {
+        fn t1<T: Model + Clone + ModelIntoView>(_t: PhantomData<T>) {}
+        fn t2<T: PromiserFetcher>(_t: PhantomData<T>) {}
+        t1::<Exercise>(PhantomData);
+        t2::<Exercise>(PhantomData);
+    }
+
+    #[test]
+    fn test_exercise_group_is_promiser_fetcher() {
+        fn t1<T: Model + Clone + ModelIntoView>(_t: PhantomData<T>) {}
+        fn t2<T: PromiserFetcher>(_t: PhantomData<T>) {}
+        t1::<ExerciseGroup>(PhantomData);
+        t2::<ExerciseGroup>(PhantomData);
+    }
+
+    #[test]
+    fn test_exercise_group_member_is_promiser_fetcher() {
+        fn t1<T: Model + Clone + ModelIntoView>(_t: PhantomData<T>) {}
+        fn t2<T: PromiserFetcher>(_t: PhantomData<T>) {}
+        t1::<ExerciseGroupMember>(PhantomData);
+        t2::<ExerciseGroupMember>(PhantomData);
+    }
+
+    #[test]
+    fn test_session_is_promiser_fetcher() {
+        fn t1<T: Model + Clone + ModelIntoView>(_t: PhantomData<T>) {}
+        fn t2<T: PromiserFetcher>(_t: PhantomData<T>) {}
+        t1::<Session>(PhantomData);
+        t2::<Session>(PhantomData);
+    }
+
+    #[test]
+    fn test_session_exercise_is_promiser_fetcher() {
+        fn t1<T: Model + Clone + ModelIntoView>(_t: PhantomData<T>) {}
+        fn t2<T: PromiserFetcher>(_t: PhantomData<T>) {}
+        t1::<SessionExercise>(PhantomData);
+        t2::<SessionExercise>(PhantomData);
+    }
+
+    #[test]
+    fn test_user_is_promiser_fetcher() {
+        fn t1<T: Model + Clone + ModelIntoView>(_t: PhantomData<T>) {}
+        fn t2<T: PromiserFetcher>(_t: PhantomData<T>) {}
+        t1::<User>(PhantomData);
+        t2::<User>(PhantomData);
+    }
 }
