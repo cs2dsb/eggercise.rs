@@ -548,7 +548,7 @@ checksum = "4b82cf0babdbd58558212896d1a4272303a57bdb245c2bf1147185fb45640e70"
 
 [[package]]
 name = "client"
-version = "0.0.70"
+version = "0.0.72"
 dependencies = [
  "asciimath-rs",
  "chrono",
@@ -2857,7 +2857,7 @@ dependencies = [
 
 [[package]]
 name = "server"
-version = "0.0.70"
+version = "0.0.72"
 dependencies = [
  "anyhow",
  "axum",
@@ -2943,7 +2943,7 @@ dependencies = [
 
 [[package]]
 name = "service-worker"
-version = "0.0.70"
+version = "0.0.72"
 dependencies = [
  "console_error_panic_hook",
  "gloo-utils",
@@ -2977,7 +2977,7 @@ dependencies = [
 
 [[package]]
 name = "shared"
-version = "0.0.70"
+version = "0.0.72"
 dependencies = [
  "anyhow",
  "axum",

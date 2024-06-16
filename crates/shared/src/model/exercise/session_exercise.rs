@@ -6,7 +6,7 @@ feature_model_imports!();
 
 feature_model_derives!(
     "session_exercise",
-    "../../../migrations/006-session_exercise/up.sql",
+    "../../../migrations/008-session_exercise/up.sql",
     pub struct SessionExercise {
         pub id: Uuid,
         pub exercise_id: Uuid,

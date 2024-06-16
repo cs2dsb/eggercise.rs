@@ -21,3 +21,6 @@ pub use footer::*;
 
 mod frontend_error_boundary;
 pub use frontend_error_boundary::*;
+
+mod user_list;
+pub use user_list::*;

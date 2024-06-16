@@ -103,6 +103,26 @@ fn build_css<'a>(
     Ok(())
 }
 
+fn link_migrations<'a>(workspace_root: &'a Path) -> Result<(), anyhow::Error> {
+    let mut cmd = Command::new("bash");
+    cmd.current_dir(workspace_root);
+    cmd.args(["-c", "scripts/link_migrations"]);
+
+    let output = cmd.output()?;
+    if !output.status.success() {
+        let std_out = String::from_utf8_lossy(&output.stdout);
+        let std_err = String::from_utf8_lossy(&output.stderr);
+        bail!(
+            "Command failed: {:?}\n{}\n{}",
+            output.status,
+            std_out,
+            std_err
+        );
+    }
+
+    Ok(())
+}
+
 // Runs cargo rustc to build the wasm lib
 fn build_wasm(
     package: &str,
@@ -302,6 +322,8 @@ fn main() -> Result<(), anyhow::Error> {
             // p!("{:?}", f);
             println!("cargo:rerun-if-changed={}", path_to_str(&f));
         }
+
+        time("Linking migrations", 1, || link_migrations(&workspace_root))?;
 
         time("Building css", 1, || {
             build_css(&in_css, &out_css, &workspace_root)

@@ -1,2 +1,4 @@
 assets/wasm/
 assets/css/*_output.css
+migrations/
+

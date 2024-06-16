@@ -1,0 +1,97 @@
+#!/usr/bin/env bash
+
+# Exit when any command fails
+set -o errexit
+
+# Exit when an undeclared variable is used
+set -o nounset
+
+# Exit when a piped command returns a non-zero exit code
+set -o pipefail
+
+# Clears out the client & server migration directories and recreates the
+# symbolic links to the shared migrations. It's a bit of a cludge but the
+# client DB is going to be overhauled when OPFS is working for rusqlite so
+# it's probably not worth cleaning up at this point
+
+readonly repo_dir="$( cd $(dirname ${BASH_SOURCE}); cd ..; pwd )";
+cd $repo_dir
+
+readonly shared_mig="${repo_dir}/crates/shared/migrations";
+readonly test_data="${repo_dir}/crates/shared/test-data";
+readonly client_mig="${repo_dir}/crates/client/migrations";
+readonly server_mig="${repo_dir}/crates/server/migrations";
+
+readonly server_exclusions=();
+readonly client_exclusions=(
+    "credential"
+    "temporary_login"
+);
+
+# make sure the target directories exist
+mkdir -p "$client_mig"
+mkdir -p "$server_mig"
+
+# clear them out
+(cd "$client_mig"; rm -f *)
+(cd "$server_mig"; rm -f *)
+
+# get a list of the migrations
+cd "${shared_mig}"
+shopt -s nullglob
+migrations=(*)
+shopt -u nullglob 
+echo "${migrations[@]}"
+
+client_i=1;
+server_i=1;
+
+for i in "${migrations[@]}"; do
+    name="${i#*-}";
+
+    server_prefix=`printf "%03d" $server_i`;
+    client_prefix=`printf "%03d" $client_i`;
+
+    server_name="${server_prefix}-${name}";
+    client_name="${client_prefix}-${name}";
+
+    do_server=true;
+    do_client=true;
+
+    for exl in "${server_exclusions[@]}"; do 
+        if [[ "$i" == *"$exl"* ]]; then
+            do_server=false;
+        fi
+    done
+
+    for exl in "${client_exclusions[@]}"; do 
+        if [[ "$i" == *"$exl"* ]]; then
+            do_client=false;
+        fi
+    done
+
+    if [ "$do_server" == "true" ]; then 
+        echo "Linking $i to server ($server_name)"
+        (cd "$server_mig"; ln -s "../../shared/migrations/${i}" "${server_name}")
+        ((server_i+=1))
+    fi
+    
+    if [ "$do_client" == "true" ]; then 
+        echo "Linking $i to client ($client_name)"
+        (cd "$client_mig"; ln -s "../../shared/migrations/${i}" "${client_name}")
+        ((client_i+=1))
+    fi
+done
+
+
+# link the test data
+server_prefix=`printf "%03d" $server_i`;
+(cd "$server_mig"; ln -s "../../shared/test-data/both" "${server_prefix}-test_data_both")
+((server_i+=1))
+server_prefix=`printf "%03d" $server_i`;
+(cd "$server_mig"; ln -s "../../shared/test-data/server" "${server_prefix}-test_data_server")
+
+client_prefix=`printf "%03d" $client_i`;
+(cd "$client_mig"; ln -s "../../shared/test-data/both" "${client_prefix}-test_data_both")
+
+

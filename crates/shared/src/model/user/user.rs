@@ -16,7 +16,7 @@ use {
 
 feature_model_derives!(
     "user",
-    "../../../../server/migrations/001-user/up.sql",
+    "../../../migrations/001-user/up.sql",
     pub struct User {
         pub id: Uuid,
         pub username: String,
@@ -27,6 +27,9 @@ feature_model_derives!(
         pub last_login_date: Option<DateTime<Utc>>,
     }
 );
+
+#[cfg(feature = "frontend")]
+impl crate::model::model_into_view::UseDefaultModelView for User {}
 
 #[cfg(feature = "backend")]
 impl User {

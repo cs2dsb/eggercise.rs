@@ -4,7 +4,7 @@ feature_model_imports!();
 
 feature_model_derives!(
     "exercise_group_member",
-    "../../../migrations/007-exercise_group/up.sql",
+    "../../../migrations/005-exercise_group/up.sql",
     pub struct ExerciseGroupMember {
         pub id: Uuid,
         pub exercise_id: Uuid,

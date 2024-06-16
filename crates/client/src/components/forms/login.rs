@@ -1,7 +1,8 @@
 use leptos::{
-    component, create_signal, ev::KeyboardEvent, event_target_value, view, Action, IntoView,
-    Signal, SignalGet, SignalUpdate, SignalWith,
+    component, create_signal, event_target_value, view, Action, IntoView, Signal, SignalGet,
+    SignalUpdate, SignalWith, WriteSignal,
 };
+use wasm_bindgen::JsCast;
 
 #[component]
 pub fn LoginForm(
@@ -15,6 +16,11 @@ pub fn LoginForm(
 
     let button_disabled = Signal::derive(move || disabled.get() || name.with(|n| n.is_empty()));
 
+    fn on_change<T: JsCast>(ev: T, signal: WriteSignal<String>) {
+        let val = event_target_value(&ev);
+        signal.update(|v| *v = val)
+    }
+
     view! {
         <form on:submit=|ev| ev.prevent_default()>
             {move || error.with(|e| e.as_ref().map(|e| view! {
@@ -26,15 +32,8 @@ pub fn LoginForm(
                 required
                 placeholder="Username"
                 prop:disabled=move || disabled.get()
-                // TODO: Is it possible to dedupe these?
-                on:keyup=move |ev: KeyboardEvent| {
-                    let val = event_target_value(&ev);
-                    set_name.update(|v| *v = val);
-                }
-                on:change=move |ev| {
-                    let val = event_target_value(&ev);
-                    set_name.update(|v| *v = val);
-                }
+                on:keyup=move |ev| on_change(ev, set_name)
+                on:change=move |ev| on_change(ev, set_name)
             />
 
             <button
