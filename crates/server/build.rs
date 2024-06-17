@@ -3,7 +3,7 @@
 use std::{
     env,
     fmt::Display,
-    fs::{copy, create_dir_all, read_to_string, remove_dir_all, remove_file, File, OpenOptions},
+    fs::{self, copy, create_dir_all, read_to_string, remove_dir_all, remove_file, File, OpenOptions},
     io::{self, Read, Write},
     path::{Path, PathBuf},
     process::Command,
@@ -84,6 +84,12 @@ fn build_css<'a>(
         return Ok(());
     }
 
+    if outfile.exists() {
+        // Remove the output file to make sure it gets a new modificiation date
+        // as postcss seems to only update the file if the output materially changes
+        remove_file(outfile)?;
+    }
+
     let mut cmd = Command::new("bash");
     cmd.current_dir(workspace_root);
     cmd.args(["-c", "scripts/install_npm_deps && scripts/build_css"]);
@@ -103,14 +109,38 @@ fn build_css<'a>(
     Ok(())
 }
 
-fn link_migrations<'a>(workspace_root: &'a Path) -> Result<(), anyhow::Error> {
+fn link_migrations<'a>(workspace_root: &'a Path, out_dir: &'a Path) -> Result<(), anyhow::Error> {
+    let last_hash_file = out_dir.join("migrations_hash");
+    let last_hash = if last_hash_file.is_file() {
+        read_to_string(&last_hash_file)
+            .unwrap_or_default()
+    } else {
+        Default::default()
+    };
+
     let mut cmd = Command::new("bash");
     cmd.current_dir(workspace_root);
-    cmd.args(["-c", "scripts/link_migrations"]);
+    cmd.args(["-c", "find crates/shared/migrations -type f -print0 | sort -z | xargs -0 sha1sum | sha1sum"]);
 
+    let new_hash = time("Hashing migrations", 2, || run_cmd_and_log_errors(cmd))?;
+    if last_hash != new_hash {
+        fs::write(&last_hash_file, &new_hash)?;
+
+        let mut cmd = Command::new("bash");
+        cmd.current_dir(workspace_root);
+        cmd.args(["-c", "scripts/link_migrations"]);
+
+        run_cmd_and_log_errors(cmd)?;
+    }
+
+    Ok(())
+}
+
+fn run_cmd_and_log_errors(mut cmd: Command) -> Result<String, anyhow::Error> {
     let output = cmd.output()?;
+    let std_out = String::from_utf8_lossy(&output.stdout);
+
     if !output.status.success() {
-        let std_out = String::from_utf8_lossy(&output.stdout);
         let std_err = String::from_utf8_lossy(&output.stderr);
         bail!(
             "Command failed: {:?}\n{}\n{}",
@@ -119,8 +149,7 @@ fn link_migrations<'a>(workspace_root: &'a Path) -> Result<(), anyhow::Error> {
             std_err
         );
     }
-
-    Ok(())
+    Ok(std_out.into())
 }
 
 // Runs cargo rustc to build the wasm lib
@@ -323,7 +352,7 @@ fn main() -> Result<(), anyhow::Error> {
             println!("cargo:rerun-if-changed={}", path_to_str(&f));
         }
 
-        time("Linking migrations", 1, || link_migrations(&workspace_root))?;
+        time("Linking migrations", 1, || link_migrations(&workspace_root, &out_dir))?;
 
         time("Building css", 1, || {
             build_css(&in_css, &out_css, &workspace_root)
