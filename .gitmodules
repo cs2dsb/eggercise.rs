@@ -1,0 +1,3 @@
+[submodule "third_party/sqlite-schema-diagram"]
+	path = third_party/sqlite-schema-diagram
+	url = git@github.com:o0101/sqlite-schema-diagram.git

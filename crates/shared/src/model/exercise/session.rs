@@ -6,7 +6,7 @@ feature_model_imports!();
 
 feature_model_derives!(
     "session",
-    "../../../migrations/007-session/up.sql",
+    "../../../migrations/009-session/up.sql",
     pub struct Session {
         pub id: Uuid,
         pub creation_date: DateTime<Utc>,

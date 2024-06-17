@@ -3,7 +3,9 @@
 use std::{
     env,
     fmt::Display,
-    fs::{self, copy, create_dir_all, read_to_string, remove_dir_all, remove_file, File, OpenOptions},
+    fs::{
+        self, copy, create_dir_all, read_to_string, remove_dir_all, remove_file, File, OpenOptions,
+    },
     io::{self, Read, Write},
     path::{Path, PathBuf},
     process::Command,
@@ -112,15 +114,17 @@ fn build_css<'a>(
 fn link_migrations<'a>(workspace_root: &'a Path, out_dir: &'a Path) -> Result<(), anyhow::Error> {
     let last_hash_file = out_dir.join("migrations_hash");
     let last_hash = if last_hash_file.is_file() {
-        read_to_string(&last_hash_file)
-            .unwrap_or_default()
+        read_to_string(&last_hash_file).unwrap_or_default()
     } else {
         Default::default()
     };
 
     let mut cmd = Command::new("bash");
     cmd.current_dir(workspace_root);
-    cmd.args(["-c", "find crates/shared/migrations -type f -print0 | sort -z | xargs -0 sha1sum | sha1sum"]);
+    cmd.args([
+        "-c",
+        "find crates/shared/migrations -type f -print0 | sort -z | xargs -0 sha1sum | sha1sum",
+    ]);
 
     let new_hash = time("Hashing migrations", 2, || run_cmd_and_log_errors(cmd))?;
     if last_hash != new_hash {
@@ -352,7 +356,9 @@ fn main() -> Result<(), anyhow::Error> {
             println!("cargo:rerun-if-changed={}", path_to_str(&f));
         }
 
-        time("Linking migrations", 1, || link_migrations(&workspace_root, &out_dir))?;
+        time("Linking migrations", 1, || {
+            link_migrations(&workspace_root, &out_dir)
+        })?;
 
         time("Building css", 1, || {
             build_css(&in_css, &out_css, &workspace_root)

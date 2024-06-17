@@ -41,3 +41,7 @@
 - https://crates.io/crates/leptos-chartistry
 - https://crates.io/crates/leptos_form
 - https://thawui.vercel.app/components/calendar
+
+## Database 
+
+![Database ER diagram](doc/database_diagram.svg "Database ER diagram")

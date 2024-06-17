@@ -159,45 +159,6 @@ impl MyData {
     }
 }
 
-// /// Represesnts both a target number of reps and the actual number of reps
-// recorded enum Reps {
-//     /// As many reps as possible
-//     /// For target reps, the contained number is the minimum (usually the
-// same number as the previous non-amrap sets)     /// For actual reps, the
-// contained number is the number achieved     Amrap(u32),
-//     /// Standard rep target
-//     Reps(u32),
-// }
-
-// enum Weight {
-//     Kilograms(f64),
-//     Lbs(f64),
-//     Bodyweight,
-// }
-
-// struct Set {
-//     weight: Weight,
-//     reps: Reps,
-//     notes: Vec<String>,
-// }
-
-// struct PlanConfig {
-//     start_date: (),
-// }
-
-// struct ExerciseConfig {
-//     index_in_group: u32,
-//     initial_weight: Weight,
-//     frequency_per_week: f64,
-// }
-
-// struct ExerciseInput {
-//     last_weight_target: f64,
-//     last_weight_actual: f64,
-//     last_sets_target: Vec<Set>,
-//     last_sets_actual: Vec<Set>,
-// }
-
 #[component]
 pub fn Chart() -> impl IntoView {
     let equation = create_rw_signal(String::new());

@@ -10,7 +10,7 @@ use {crate::api::error::ServerError, rusqlite::OptionalExtension, std::error::Er
 
 feature_model_derives!(
     "temporary_login",
-    "../../../server/migrations/003-temporary_login/up.sql",
+    "../../migrations/003-temporary_login/up.sql",
     pub struct TemporaryLogin {
         pub id: Uuid,
         pub user_id: Uuid,

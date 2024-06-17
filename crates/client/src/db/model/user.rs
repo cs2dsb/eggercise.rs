@@ -14,7 +14,7 @@ impl PromiserFetcher for User {
         let username_e = result.get_extractor(UserIden::Username)?;
         let email_e = result.get_extractor(UserIden::Email)?;
         let display_name_e = result.get_extractor(UserIden::DisplayName)?;
-        let registration_date_e = result.get_extractor(UserIden::RegistrationDate)?;
+        let creation_date_e = result.get_extractor(UserIden::CreationDate)?;
         let last_updated_date_e = result.get_extractor(UserIden::LastUpdatedDate)?;
         let last_login_date_e = result.get_extractor(UserIden::LastLoginDate)?;
 
@@ -26,7 +26,7 @@ impl PromiserFetcher for User {
                     username: username_e(&result, i)?,
                     email: email_e(&result, i)?,
                     display_name: display_name_e(&result, i)?,
-                    registration_date: registration_date_e(&result, i)
+                    creation_date: creation_date_e(&result, i)
                         .and_then(|s: String| Ok(parse_datetime(&s)?))?,
                     last_updated_date: last_updated_date_e(&result, i)
                         .and_then(|s: String| Ok(parse_datetime(&s)?))?,

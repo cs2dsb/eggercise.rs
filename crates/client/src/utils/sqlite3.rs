@@ -84,6 +84,7 @@ impl SqlitePromiserError {
     fn from_sqlite(value: JsValue) -> Self {
         // Copied out of gloo_utils because their version panics when the non error
         // isn't a string
+        // See <https://github.com/rustwasm/gloo/issues/477>
         match value.dyn_into::<js_sys::Error>() {
             Ok(error) => Self::Sqlite(JsError::from(error).to_string()),
             Err(js_value) => match js_value.dyn_into::<js_sys::JsString>() {

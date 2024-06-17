@@ -39,11 +39,9 @@ fi
 install_dep() {
     local name="${1:-}";
     local rc=`(eval $2 >/dev/null 2>&1); echo $?`
-    [ $rc == 0 ] && echo "${name} already installed" && return;
-    if [[ $rc -ne 0 ]]; then
-        echo "Installing $1"
-        eval $3
-    fi
+    [ "$rc" == "0" ] && die "${name} already installed";
+    echo "Installing $1"
+    eval $3
 }
 
 # 1 = tool name (for printing and folder name)
@@ -58,7 +56,7 @@ install_tool() {
     [ "$extract_cmd" == "" ] && die "install_tool requires 4 arguments";
 
     local rc=`(eval ${test_cmd} >/dev/null 2>&1); echo $?`;
-    [ $rc == 0 ] && echo "${name} already installed" && return;
+    [ "$rc" == "0" ] && echo "${name} already installed" && return;
     echo "Installing ${name}";
 
     local tool_dir="${third_party_tools_dir}/${name}";
@@ -70,8 +68,8 @@ install_tool() {
     cd "${tool_dir}";
     curl -O ${url};
 
-    local rc=`(eval ${extract_cmd}); echo $?`;
-    [ $rc == 0 ] && echo "${name} installed" && return;
+    local rc=`(eval ${extract_cmd} >/dev/null 2>&1); echo $?`;
+    [ "$rc" == "0" ] && echo "${name} installed" && return;
     die "Error installing ${name}";
 }
 
@@ -83,6 +81,14 @@ install_tool \
     "test -s ${node_bin_path} && ${node_bin_path} --version | grep -q ${node_version}" \
     "https://nodejs.org/dist/v${node_version}/node-v${node_version}-linux-x64.tar.xz" \
     "tar --strip-components=1 -xf node-v${node_version}-linux-x64.tar.xz; rm node-v${node_version}-linux-x64.tar.xz"
+
+readonly sqlite3_bin_path="${third_party_tools_dir}/sqlite3/sqlite3";
+install_tool \
+    sqlite3 \
+    "test -s ${sqlite3_bin_path}" \
+    "https://sqlite.org/2024/sqlite-tools-linux-x64-3460000.zip" \
+    "unzip sqlite-tools-linux-x64-3460000.zip; rm sqlite-tools-linux-x64-3460000.zip"
+
 
 install_dep "wasm32-unknown-unknown target" "rustup target list | grep -q 'wasm32-unknown-unknown (installed)'" "rustup target add wasm32-unknown-unknown"
 install_dep "wasm-bindgen" "wasm-bindgen -V | grep -q $bindgen_version" "cargo install wasm-bindgen-cli --force --version $bindgen_version"

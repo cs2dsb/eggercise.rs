@@ -1,16 +1,18 @@
 use chrono::{DateTime, Utc};
 
+use super::Sets;
 use crate::{feature_model_derives, feature_model_imports, types::Uuid};
 
 feature_model_imports!();
 
 feature_model_derives!(
     "session_exercise",
-    "../../../migrations/008-session_exercise/up.sql",
+    "../../../migrations/010-session_exercise/up.sql",
     pub struct SessionExercise {
         pub id: Uuid,
         pub exercise_id: Uuid,
         pub session_id: Uuid,
+        pub sets: Sets,
         pub creation_date: DateTime<Utc>,
         pub last_updated_date: DateTime<Utc>,
     }
