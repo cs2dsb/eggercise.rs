@@ -2,6 +2,9 @@ CREATE TABLE session_exercise (
     id                  TEXT PRIMARY KEY,
     exercise_id         TEXT NOT NULL,
     session_id          TEXT NOT NULL,
+
+    sets                TEXT,
+    
     creation_date       TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     last_updated_date   TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
 

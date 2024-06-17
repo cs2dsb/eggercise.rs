@@ -99,7 +99,7 @@ impl FromSql for CredentialId {
 
 feature_model_derives!(
     "credential",
-    "../../../server/migrations/002-credential/up.sql",
+    "../../migrations/002-credential/up.sql",
     pub struct Credential {
         pub id: CredentialId,
         pub user_id: Uuid,

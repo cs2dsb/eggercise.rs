@@ -1,20 +1,24 @@
+use std::{any::type_name, marker::PhantomData};
+
 use leptos::{component, view, CollectView, IntoView, Transition};
-use shared::model::Session;
 
 use crate::{
     components::FrontendErrorBoundary, db::PromiserFetcher, utils::sqlite3::SqlitePromiserError,
 };
 
 #[component]
-pub fn SessionList() -> impl IntoView {
-    let sessions = Session::all_resource();
+pub fn ModelList<T>(#[prop(optional)] _phantom: PhantomData<T>) -> impl IntoView
+where
+    T: PromiserFetcher + 'static,
+{
+    let values = T::all_resource();
 
     view! {
         <Transition fallback=move || view! {  <p>"Loading..."</p>} >
             <FrontendErrorBoundary<SqlitePromiserError>>
-                <h3>SessionList:</h3>
+                <h3>{ type_name::<T>() }:</h3>
                 { move || {
-                    sessions.and_then(|l| l.into_view()).collect_view()
+                    values.and_then(|l| l.into_view()).collect_view()
                 }}
             </FrontendErrorBoundary<SqlitePromiserError>>
         </Transition>

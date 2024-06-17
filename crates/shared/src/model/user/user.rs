@@ -22,7 +22,7 @@ feature_model_derives!(
         pub username: String,
         pub email: Option<String>,
         pub display_name: Option<String>,
-        pub registration_date: DateTime<Utc>,
+        pub creation_date: DateTime<Utc>,
         pub last_updated_date: DateTime<Utc>,
         pub last_login_date: Option<DateTime<Utc>>,
     }
@@ -65,7 +65,7 @@ impl User {
                 (UserIden::Username, self.username.clone().into()),
                 (UserIden::Email, self.email.clone().into()),
                 (UserIden::DisplayName, self.display_name.clone().into()),
-                (UserIden::RegistrationDate, self.registration_date.into()),
+                (UserIden::CreationDate, self.creation_date.into()),
                 (UserIden::LastUpdatedDate, self.last_updated_date.into()),
                 (UserIden::LastLoginDate, self.last_login_date.into()),
             ])

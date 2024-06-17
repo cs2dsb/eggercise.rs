@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+
+# Exit when any command fails
+set -o errexit
+
+# Exit when an undeclared variable is used
+set -o nounset
+
+# Exit when a piped command returns a non-zero exit code
+set -o pipefail
+
+# Generates an ER diagram from the current database in the root of the repo
+# Requires sqlite3 and graphviz
+
+readonly repo_dir="$( cd $(dirname ${BASH_SOURCE}); cd ..; pwd )";
+cd $repo_dir
+
+readonly RED='\033[0;31m';
+readonly NC='\033[0m'; # No Color
+
+warn() { echo -e "${RED}$@${NC}" >&2; }
+die() { warn "$@"; exit 1; }
+
+readonly sqlite_file="${repo_dir}/egg.sqlite";
+readonly script_file="${repo_dir}/third_party/sqlite-schema-diagram/sqlite-schema-diagram.sql";
+readonly sqlite3_bin="${repo_dir}/third_party/tools/sqlite3/sqlite3";
+readonly diagram_path="${repo_dir}/doc/database_diagram.svg";
+
+readonly rc=`(dot -V >/dev/null 2>&1); echo $?`;
+[ "$rc" != "0" ] && die "dot command (from graphviz) not installed. Try 'apt install graphviz'";
+
+mkdir -p "${repo_dir}/doc"
+"$sqlite3_bin" "$sqlite_file" -init "$script_file" "" | dot -Tsvg > "${diagram_path}"
+echo "Image generated at $diagram_path"
+
+firefox "$diagram_path"

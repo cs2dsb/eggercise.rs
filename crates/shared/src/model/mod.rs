@@ -4,6 +4,9 @@ pub use user::*;
 mod exercise;
 pub use exercise::*;
 
+mod plan;
+pub use plan::*;
+
 #[cfg(feature = "backend")]
 mod credential;
 #[cfg(feature = "backend")]
@@ -171,7 +174,7 @@ macro_rules! feature_model_imports {
 
 #[macro_export]
 macro_rules! feature_model_derives {
-    ($table_name:literal, $migration_path:literal, pub struct $struct_name:ident {
+    ($table_name:literal, $migration_path:literal, $(#[$($attrs:tt)*])* pub struct $struct_name:ident {
         $(pub $field_name:ident: $field_type:ty,)*
     }) => {
 
@@ -182,6 +185,7 @@ macro_rules! feature_model_derives {
             feature = "exemplar-model",
             check($migration_path))]
         #[cfg_attr(feature = "sea-query-enum", enum_def)]
+        $(#[$($attrs)*])*
         pub struct $struct_name {
             $(pub $field_name: $field_type,)*
         }

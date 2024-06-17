@@ -1,18 +1,3 @@
-mod exercise_list;
-pub use exercise_list::*;
-
-mod exercise_group_member_list;
-pub use exercise_group_member_list::*;
-
-mod exercise_group_list;
-pub use exercise_group_list::*;
-
-mod session_exercise_list;
-pub use session_exercise_list::*;
-
-mod session_list;
-pub use session_list::*;
-
 mod container;
 pub use container::*;
 
@@ -22,5 +7,5 @@ pub use footer::*;
 mod frontend_error_boundary;
 pub use frontend_error_boundary::*;
 
-mod user_list;
-pub use user_list::*;
+mod model_list;
+pub use model_list::*;

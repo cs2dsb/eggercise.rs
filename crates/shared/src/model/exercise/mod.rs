@@ -12,3 +12,12 @@ pub use session_exercise::*;
 
 mod session;
 pub use session::*;
+
+mod reps;
+pub use reps::*;
+
+mod weight;
+pub use weight::*;
+
+mod set;
+pub use set::*;
