@@ -3,7 +3,8 @@ CREATE TABLE session_exercise (
     exercise_id         TEXT NOT NULL,
     session_id          TEXT NOT NULL,
 
-    sets                TEXT,
+    planned_sets        TEXT NOT NULL,
+    performed_sets      TEXT,
     
     creation_date       TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     last_updated_date   TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,

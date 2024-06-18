@@ -12,7 +12,8 @@ feature_model_derives!(
         pub id: Uuid,
         pub exercise_id: Uuid,
         pub session_id: Uuid,
-        pub sets: Sets,
+        pub planned_sets: Sets,
+        pub performed_sets: Sets,
         pub creation_date: DateTime<Utc>,
         pub last_updated_date: DateTime<Utc>,
     }

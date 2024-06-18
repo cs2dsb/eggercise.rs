@@ -14,6 +14,7 @@ feature_model_derives!(
         pub owner_id: Uuid,
         pub name: String,
         pub description: Option<String>,
+        pub duration_weeks: u32,
         pub creation_date: DateTime<Utc>,
         pub last_updated_date: DateTime<Utc>,
     }

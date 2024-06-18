@@ -25,7 +25,7 @@ pub enum SqlitePromiserError {
     #[error("Error from sqlite (calling promiser promise): {0}")]
     Sqlite(String),
 
-    #[error("Error serializing json: {0}")]
+    #[error("Error de/serializing json: {0}")]
     Json(String),
 
     #[error("Unexpected result. Expected {0:?} but got {1:?}")]

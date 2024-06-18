@@ -24,9 +24,8 @@ impl PromiserFetcher for PlanInstance {
                     id: id_e(&result, i).and_then(|s: String| Ok(Uuid::parse(&s)?))?,
                     plan_id: plan_id_e(&result, i)?,
                     user_id: user_id_e(&result, i)?,
-                    start_date: start_date_e(&result, i).and_then(|s: Option<String>| {
-                        s.map(|s| Ok(parse_datetime(&s)?)).transpose()
-                    })?,
+                    start_date: start_date_e(&result, i)
+                        .and_then(|s: String| Ok(parse_datetime(&s)?))?,
                     creation_date: creation_date_e(&result, i)
                         .and_then(|s: String| Ok(parse_datetime(&s)?))?,
                     last_updated_date: last_updated_date_e(&result, i)

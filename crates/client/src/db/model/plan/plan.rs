@@ -14,6 +14,7 @@ impl PromiserFetcher for Plan {
         let owner_id_e = result.get_extractor(PlanIden::OwnerId)?;
         let name_e = result.get_extractor(PlanIden::Name)?;
         let description_e = result.get_extractor(PlanIden::Description)?;
+        let duration_weeks_e = result.get_extractor(PlanIden::DurationWeeks)?;
         let creation_date_e = result.get_extractor(PlanIden::CreationDate)?;
         let last_updated_date_e = result.get_extractor(PlanIden::LastUpdatedDate)?;
 
@@ -25,6 +26,7 @@ impl PromiserFetcher for Plan {
                     owner_id: owner_id_e(&result, i)?,
                     name: name_e(&result, i)?,
                     description: description_e(&result, i)?,
+                    duration_weeks: duration_weeks_e(&result, i)?,
                     creation_date: creation_date_e(&result, i)
                         .and_then(|s: String| Ok(parse_datetime(&s)?))?,
                     last_updated_date: last_updated_date_e(&result, i)

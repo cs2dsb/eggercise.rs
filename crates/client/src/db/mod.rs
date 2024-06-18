@@ -1,3 +1,5 @@
+use std::{any::type_name, future::Future};
+
 use leptos::{create_local_resource, Resource};
 use shared::model::{
     model_into_view::{ListOfModel, ModelIntoView},
@@ -9,7 +11,7 @@ use crate::utils::sqlite3::{ExecResult, SqlitePromiser, SqlitePromiserError};
 pub mod migrations;
 pub mod model;
 
-pub trait PromiserFetcher: Model + Clone + ModelIntoView {
+pub trait PromiserFetcher: Model + Clone + ModelIntoView + Send {
     fn all_resource() -> Resource<(), Result<ListOfModel<Self>, SqlitePromiserError>> {
         create_local_resource(
             || (),
@@ -28,6 +30,51 @@ pub trait PromiserFetcher: Model + Clone + ModelIntoView {
     }
 
     fn extract_fields(result: ExecResult) -> Result<Vec<Self>, SqlitePromiserError>;
+    fn fetch_by<T: Into<sea_query::Value>>(
+        id: T,
+        column: <Self as Model>::Iden,
+    ) -> impl Future<Output = Result<Vec<Self>, SqlitePromiserError>> {
+        let sql = Self::fetch_by_column_sql(id, column, false);
+
+        let promiser = SqlitePromiser::use_promiser();
+        async move {
+            let result = promiser.exec(sql).await?;
+
+            Self::extract_fields(result)
+        }
+    }
+    fn fetch_one_by<T: Into<sea_query::Value>>(
+        id: T,
+        column: <Self as Model>::Iden,
+    ) -> impl Future<Output = Result<Self, SqlitePromiserError>> {
+        let sql = Self::fetch_by_column_sql(id, column, true);
+
+        let promiser = SqlitePromiser::use_promiser();
+        async move {
+            let result = promiser.exec(sql).await?;
+            let mut results = Self::extract_fields(result)?;
+
+            if results.len() != 1 {
+                Err(SqlitePromiserError::ExecResult(format!(
+                    "Expected exactly 1 {} but got {}",
+                    type_name::<Self>(),
+                    results.len()
+                )))
+            } else {
+                Ok(results.pop().unwrap())
+            }
+        }
+    }
+    fn fetch_all() -> impl Future<Output = Result<Vec<Self>, SqlitePromiserError>> {
+        let sql = Self::fetch_all_sql();
+
+        let promiser = SqlitePromiser::use_promiser();
+        async move {
+            let result = promiser.exec(sql).await?;
+
+            Self::extract_fields(result)
+        }
+    }
 }
 
 #[cfg(test)]

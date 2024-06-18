@@ -32,6 +32,12 @@ pub trait Model: Sized {
     fn select_star() -> sea_query::SelectStatement;
     #[cfg(feature = "frontend")]
     fn fetch_all_sql() -> String;
+    #[cfg(feature = "frontend")]
+    fn fetch_by_column_sql<T: Into<sea_query::Value>>(
+        id: T,
+        column: Self::Iden,
+        limit_1: bool,
+    ) -> String;
     #[cfg(feature = "backend")]
     fn fetch_all(conn: &rusqlite::Connection) -> Result<Vec<Self>, rusqlite::Error>;
     #[cfg(feature = "backend")]
@@ -118,6 +124,12 @@ pub mod model_into_view {
 
     #[derive(Debug, Clone)]
     pub struct ListOfModel<T: ModelIntoView + Clone>(pub Vec<T>);
+
+    impl<T: ModelIntoView + Clone> From<Vec<T>> for ListOfModel<T> {
+        fn from(value: Vec<T>) -> Self {
+            Self(value)
+        }
+    }
 
     impl<T: ModelIntoView + Clone> IntoView for &ListOfModel<T> {
         fn into_view(self) -> leptos::View {
@@ -228,6 +240,18 @@ macro_rules! feature_model_derives {
                 #[cfg(feature = "frontend")]
                 fn fetch_all_sql() -> String {
                     Self::select_star().to_string(SqliteQueryBuilder)
+                }
+
+                #[cfg(feature = "frontend")]
+                fn fetch_by_column_sql<T: Into<sea_query::Value>>(id: T, column: Self::Iden, limit_1: bool) -> String {
+                    let mut stmt = Self::select_star();
+                    stmt.and_where(Expr::col(column).eq(id.into()));
+
+                    if limit_1 {
+                        stmt.limit(1);
+                    }
+
+                    stmt.to_string(SqliteQueryBuilder)
                 }
 
                 #[cfg(feature = "backend")]
