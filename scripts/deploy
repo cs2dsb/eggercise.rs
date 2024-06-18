@@ -30,4 +30,4 @@ if ! cargo +nightly fmt -- --check >/dev/null; then
     exit 1;
 fi
 
-./scripts/deploy_skip_tests
+./scripts/deploy_skip_tests $*
