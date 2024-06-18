@@ -72,8 +72,8 @@ jobs:
           echo "Cache hit: ${{ steps.cache.outputs.cache-hit }}"
           echo "du -sh target/*: `(cd target; du -sh *)`"
           echo "du -sh cargo_registry/*: `(cd cargo_registry; du -sh *)`"
-          echo "tree -du -h target:"
-          tree -du -h target
+          echo "tree --du -h target:"
+          tree --du -h target
 
       - name: 🏗️ Build the project in docker
         uses: addnab/docker-run-action@v3
