@@ -72,8 +72,8 @@ jobs:
           echo "Cache hit: ${{ steps.cache.outputs.cache-hit }}"
           echo "du -sh target/*: `(cd target; du -sh *)`"
           echo "du -sh cargo_registry/*: `(cd cargo_registry; du -sh *)`"
-          echo "tree -sh target:"
-          tree -sh target
+          echo "tree --du -h target:"
+          tree --du -h target
 
       - name: 🏗️ Build the project in docker
         uses: addnab/docker-run-action@v3
@@ -114,6 +114,10 @@ jobs:
             (cd target; du -sh * || true)
             echo $CARGO_HOME after:
             (cd $CARGO_HOME; du -sh * || true)
+            cargo sweep --installed
+            cargo sweep --time 30
+            echo target after sweep:
+            (cd target; du -sh * || true)
       
       - name: 🔒 Fix the permissions after docker mucked them up
         run: |
