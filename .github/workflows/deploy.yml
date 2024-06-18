@@ -114,6 +114,10 @@ jobs:
             (cd target; du -sh * || true)
             echo $CARGO_HOME after:
             (cd $CARGO_HOME; du -sh * || true)
+            cargo sweep --installed
+            cargo sweep --time 30
+            echo target after sweep:
+            (cd target; du -sh * || true)
       
       - name: 🔒 Fix the permissions after docker mucked them up
         run: |
