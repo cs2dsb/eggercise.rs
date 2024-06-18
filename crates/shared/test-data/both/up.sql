@@ -79,3 +79,25 @@ INSERT INTO exercise_group_member (id, exercise_id, group_id)
 VALUES ('b499094a-273f-4d5f-8e88-193bb7f80318',
         (SELECT id FROM exercise WHERE name = 'Skullcrushers (barbell)'),
         (SELECT id FROM exercise_group WHERE name = 'Accessory exercises'));
+
+INSERT INTO plan (id, owner_id, name, duration_weeks) 
+VALUES ('173cbd20-4fa0-4de4-bed8-40eb2111a92d',
+        (SELECT id FROM user WHERE username = 'daniel'),
+        'Weekly Undulating',
+        15);
+
+INSERT INTO plan_exercise_group (id, plan_id, exercise_group_id)
+VALUES ('5f7d726a-a440-4afa-9e20-b5108442a34d',
+        (SELECT id FROM plan WHERE name = 'Weekly Undulating'),
+        (SELECT id FROM exercise_group WHERE name = 'Primary exercises'));
+
+INSERT INTO plan_exercise_group (id, plan_id, exercise_group_id)
+VALUES ('ef1a6ad2-1005-4ed1-ace6-5dbf4634b1d3',
+        (SELECT id FROM plan WHERE name = 'Weekly Undulating'),
+        (SELECT id FROM exercise_group WHERE name = 'Accessory exercises'));
+
+INSERT INTO plan_instance (id, plan_id, user_id, start_date)
+VALUES ('d90f7e50-77f5-49cf-b70a-f98fdfc3a410',
+        (SELECT id FROM plan WHERE name = 'Weekly Undulating'),
+        (SELECT id FROM user WHERE username = 'daniel'),
+        CURRENT_TIMESTAMP);

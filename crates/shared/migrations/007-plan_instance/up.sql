@@ -5,7 +5,7 @@ CREATE TABLE plan_instance (
     plan_id             TEXT NOT NULL,
     user_id             TEXT NOT NULL,
 
-    start_date          TEXT,
+    start_date          TEXT NOT NULL,
 
     creation_date       TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     last_updated_date   TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,

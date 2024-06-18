@@ -15,7 +15,8 @@ impl PromiserFetcher for SessionExercise {
         let id_e = result.get_extractor(SessionExerciseIden::Id)?;
         let exercise_id_e = result.get_extractor(SessionExerciseIden::ExerciseId)?;
         let session_id_e = result.get_extractor(SessionExerciseIden::SessionId)?;
-        let sets_e = result.get_extractor(SessionExerciseIden::Sets)?;
+        let planned_sets_e = result.get_extractor(SessionExerciseIden::PlannedSets)?;
+        let performed_sets_e = result.get_extractor(SessionExerciseIden::PerformedSets)?;
         let creation_date_e = result.get_extractor(SessionExerciseIden::CreationDate)?;
         let last_updated_date_e = result.get_extractor(SessionExerciseIden::LastUpdatedDate)?;
 
@@ -26,7 +27,10 @@ impl PromiserFetcher for SessionExercise {
                     id: id_e(&result, i).and_then(|s: String| Ok(Uuid::parse(&s)?))?,
                     exercise_id: exercise_id_e(&result, i)?,
                     session_id: session_id_e(&result, i)?,
-                    sets: sets_e(&result, i).and_then(|s: String| {
+                    planned_sets: planned_sets_e(&result, i).and_then(|s: String| {
+                        Ok(JsValueSerdeExt::into_serde(&JsValue::from(s))?)
+                    })?,
+                    performed_sets: performed_sets_e(&result, i).and_then(|s: String| {
                         Ok(JsValueSerdeExt::into_serde(&JsValue::from(s))?)
                     })?,
                     creation_date: creation_date_e(&result, i)

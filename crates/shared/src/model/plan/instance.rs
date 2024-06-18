@@ -13,7 +13,7 @@ feature_model_derives!(
         pub id: Uuid,
         pub plan_id: Uuid,
         pub user_id: Uuid,
-        pub start_date: Option<DateTime<Utc>>,
+        pub start_date: DateTime<Utc>,
         pub creation_date: DateTime<Utc>,
         pub last_updated_date: DateTime<Utc>,
     }

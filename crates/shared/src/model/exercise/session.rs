@@ -9,6 +9,9 @@ feature_model_derives!(
     "../../../migrations/009-session/up.sql",
     pub struct Session {
         pub id: Uuid,
+        pub plan_instance_id: Uuid,
+        pub planned_date: DateTime<Utc>,
+        pub performed_date: Option<DateTime<Utc>>,
         pub creation_date: DateTime<Utc>,
         pub last_updated_date: DateTime<Utc>,
     }

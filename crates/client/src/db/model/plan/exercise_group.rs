@@ -25,11 +25,13 @@ impl PromiserFetcher for PlanExerciseGroup {
             .map(|i| {
                 let res = PlanExerciseGroup {
                     id: id_e(&result, i).and_then(|s: String| Ok(Uuid::parse(&s)?))?,
-                    plan_id: plan_id_e(&result, i)?,
-                    exercise_group_id: exercise_group_id(&result, i)?,
+                    plan_id: plan_id_e(&result, i).and_then(|s: String| Ok(Uuid::parse(&s)?))?,
+                    exercise_group_id: exercise_group_id(&result, i)
+                        .and_then(|s: String| Ok(Uuid::parse(&s)?))?,
                     notes: notes_e(&result, i)?,
-                    config: config_e(&result, i).and_then(|s: String| {
-                        Ok(JsValueSerdeExt::into_serde(&JsValue::from(s))?)
+                    config: config_e(&result, i).and_then(|s: Option<String>| {
+                        s.map(|s| Ok(JsValueSerdeExt::into_serde(&JsValue::from(s))?))
+                            .transpose()
                     })?,
                     creation_date: creation_date_e(&result, i)
                         .and_then(|s: String| Ok(parse_datetime(&s)?))?,
