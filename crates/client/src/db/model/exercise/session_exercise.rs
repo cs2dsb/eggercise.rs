@@ -1,13 +1,12 @@
-use gloo_utils::format::JsValueSerdeExt;
+use sea_query::SqliteQueryBuilder;
 use shared::{
-    model::{SessionExercise, SessionExerciseIden},
+    model::{Model, SessionExercise, SessionExerciseIden},
     types::Uuid,
 };
-use wasm_bindgen::JsValue;
 
 use crate::{
-    db::PromiserFetcher,
-    utils::sqlite3::{parse_datetime, ExecResult, SqlitePromiserError},
+    db::{PromiserFetcher, PromiserInserter},
+    utils::sqlite3::{parse_datetime, serde_stringify, ExecResult, SqlitePromiserError},
 };
 
 impl PromiserFetcher for SessionExercise {
@@ -27,12 +26,8 @@ impl PromiserFetcher for SessionExercise {
                     id: id_e(&result, i).and_then(|s: String| Ok(Uuid::parse(&s)?))?,
                     exercise_id: exercise_id_e(&result, i)?,
                     session_id: session_id_e(&result, i)?,
-                    planned_sets: planned_sets_e(&result, i).and_then(|s: String| {
-                        Ok(JsValueSerdeExt::into_serde(&JsValue::from(s))?)
-                    })?,
-                    performed_sets: performed_sets_e(&result, i).and_then(|s: String| {
-                        Ok(JsValueSerdeExt::into_serde(&JsValue::from(s))?)
-                    })?,
+                    planned_sets: planned_sets_e(&result, i)?,
+                    performed_sets: performed_sets_e(&result, i)?,
                     creation_date: creation_date_e(&result, i)
                         .and_then(|s: String| Ok(parse_datetime(&s)?))?,
                     last_updated_date: last_updated_date_e(&result, i)
@@ -42,5 +37,23 @@ impl PromiserFetcher for SessionExercise {
                 Ok::<_, SqlitePromiserError>(res)
             })
             .collect::<Result<Vec<_>, _>>()
+    }
+}
+
+impl PromiserInserter for SessionExercise {
+    fn insert_sql(&self) -> Result<String, SqlitePromiserError> {
+        Ok(Self::insert_query()
+            .values([
+                (&self.id).into(),
+                (&self.exercise_id).into(),
+                (&self.session_id).into(),
+                serde_stringify(&self.planned_sets)?.into(),
+                serde_stringify(&self.performed_sets)?.into(),
+                sea_query::Value::ChronoDateTimeUtc(Some(Box::new(self.creation_date.clone())))
+                    .into(),
+                sea_query::Value::ChronoDateTimeUtc(Some(Box::new(self.last_updated_date.clone())))
+                    .into(),
+            ])?
+            .to_string(SqliteQueryBuilder))
     }
 }

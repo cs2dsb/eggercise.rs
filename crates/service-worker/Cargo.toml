@@ -14,7 +14,7 @@ wasm-bindgen.workspace = true
 gloo-utils.workspace = true
 
 js-sys = "0.3.69"
-shared = { path = "../shared" }
+shared = { path = "../shared", features = [ "wasm" ] }
 web-sys = { workspace = true, features = [ 
     "console", "FetchEvent",  "Request",  
     "ReadableStream",  "ReadableStreamDefaultReader", 

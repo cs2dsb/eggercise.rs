@@ -6,7 +6,7 @@ feature_model_imports!();
 
 feature_model_derives!(
     "exercise_group",
-    "../../../migrations/005-exercise_group/up.sql",
+    "../../../migrations/006-exercise_group/up.sql",
     pub struct ExerciseGroup {
         pub id: Uuid,
         pub name: String,
@@ -16,7 +16,7 @@ feature_model_derives!(
     }
 );
 
-#[cfg(feature = "frontend")]
+#[cfg(feature = "wasm")]
 impl crate::model::model_into_view::UseDefaultModelView for ExerciseGroup {}
 
 #[cfg(feature = "backend")]

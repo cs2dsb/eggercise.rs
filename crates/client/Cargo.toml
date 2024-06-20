@@ -37,7 +37,7 @@ web-sys = { workspace = true, features = [
     "PublicKeyCredentialCreationOptions",
 ] }
 
-shared = { path = "../shared", features = [ "frontend" ] }
+shared = { path = "../shared", features = [ "wasm" ] }
 time = { version = "0.3.36", features = ["wasm-bindgen"] }
 meval = "0.2.0"
 asciimath-rs = "0.6.2"

@@ -14,9 +14,9 @@ where
     let values = T::all_resource();
 
     view! {
+        <h3>{ type_name::<T>() }:</h3>
         <Transition fallback=move || view! {  <p>"Loading..."</p>} >
             <FrontendErrorBoundary<SqlitePromiserError>>
-                <h3>{ type_name::<T>() }:</h3>
                 { move || {
                     values.and_then(|l| l.into_view()).collect_view()
                 }}

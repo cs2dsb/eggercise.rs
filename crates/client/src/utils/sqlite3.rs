@@ -48,8 +48,19 @@ pub enum SqlitePromiserError {
 
     #[error("Error parsing Datetime: {0}")]
     Chrono(chrono::ParseError),
+
+    #[error("Error from sea_query: {0}")]
+    SeaQuery(String),
+
+    #[error("Error from js: {0}")]
+    Js(String),
 }
 
+impl From<sea_query::error::Error> for SqlitePromiserError {
+    fn from(value: sea_query::error::Error) -> Self {
+        Self::SeaQuery(value.to_string())
+    }
+}
 impl From<chrono::ParseError> for SqlitePromiserError {
     fn from(value: chrono::ParseError) -> Self {
         Self::Chrono(value)
@@ -257,8 +268,29 @@ impl ExecResult {
                 )))?
             };
 
-            let r = serde_json::from_value(v.clone())?;
-            Ok(r)
+            // TODO: might be worth replacing this with JSON::parse/stringify to slim down
+            // the binary
+            match serde_json::from_value(v.clone()) {
+                Ok(v) => Ok(v),
+                Err(e) => {
+                    let e = format!(
+                        "Error deserializing {column_name} ({}) from {:?}: {e}",
+                        type_name::<J>(),
+                        v
+                    );
+                    // Attempt to parse the string if the direct from_value failed
+                    if let Some(s) = v.as_str() {
+                        match serde_json::from_str(s) {
+                            Ok(v) => Ok(v),
+                            Err(e2) => Err(SqlitePromiserError::Json(format!(
+                                "{e}\nAlso error parsing from it as a string: {e2}"
+                            ))),
+                        }
+                    } else {
+                        Err(SqlitePromiserError::Json(e))
+                    }
+                }
+            }
         })
     }
 }
@@ -423,4 +455,15 @@ impl SqlitePromiser {
 
         Ok(result)
     }
+}
+
+pub fn serde_stringify<T: Serialize>(v: &T) -> Result<String, SqlitePromiserError> {
+    use js_sys::JSON;
+
+    let js_value = <JsValue as JsValueSerdeExt>::from_serde(v)?;
+    let string = JSON::stringify(&js_value)
+        .map_err(|e| SqlitePromiserError::Js(format!("Error calling JSON.stringify: {:?}", e)))?
+        .into();
+
+    Ok(string)
 }

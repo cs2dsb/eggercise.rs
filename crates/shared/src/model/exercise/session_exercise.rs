@@ -7,7 +7,7 @@ feature_model_imports!();
 
 feature_model_derives!(
     "session_exercise",
-    "../../../migrations/010-session_exercise/up.sql",
+    "../../../migrations/011-session_exercise/up.sql",
     pub struct SessionExercise {
         pub id: Uuid,
         pub exercise_id: Uuid,
@@ -19,7 +19,7 @@ feature_model_derives!(
     }
 );
 
-#[cfg(feature = "frontend")]
+#[cfg(feature = "wasm")]
 impl crate::model::model_into_view::UseDefaultModelView for SessionExercise {}
 
 #[cfg(feature = "backend")]

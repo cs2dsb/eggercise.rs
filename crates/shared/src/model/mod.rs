@@ -30,9 +30,11 @@ pub trait Model: Sized {
     fn iden_for_field(field: usize) -> Self::Iden;
     fn field_idens() -> &'static [Self::Iden];
     fn select_star() -> sea_query::SelectStatement;
-    #[cfg(feature = "frontend")]
+    /// Gets the insert query without values set
+    fn insert_query() -> sea_query::InsertStatement;
+    #[cfg(feature = "wasm")]
     fn fetch_all_sql() -> String;
-    #[cfg(feature = "frontend")]
+    #[cfg(feature = "wasm")]
     fn fetch_by_column_sql<T: Into<sea_query::Value>>(
         id: T,
         column: Self::Iden,
@@ -70,7 +72,7 @@ pub trait Model: Sized {
     ) -> Result<Vec<Self>, rusqlite::Error>;
 }
 
-#[cfg(feature = "frontend")]
+#[cfg(feature = "wasm")]
 pub mod model_into_view {
     use leptos::{
         html::{table, tr, AnyElement},
@@ -166,12 +168,14 @@ macro_rules! feature_model_imports {
         #[cfg(feature = "exemplar-model")]
         #[allow(unused_imports)]
         use exemplar::Model;
-        #[cfg(feature = "frontend")]
+        #[cfg(feature = "wasm")]
         #[allow(unused_imports)]
         use leptos::{view, IntoView};
         #[cfg(feature = "sea-query-enum")]
         #[allow(unused_imports)]
-        use sea_query::{enum_def, Expr, Query, SelectStatement, SqliteQueryBuilder};
+        use sea_query::{
+            enum_def, Expr, InsertStatement, Query, SelectStatement, SqliteQueryBuilder,
+        };
         #[allow(unused_imports)]
         use serde::{Deserialize, Serialize};
         #[cfg(feature = "backend")]
@@ -187,7 +191,7 @@ macro_rules! feature_model_imports {
 #[macro_export]
 macro_rules! feature_model_derives {
     ($table_name:literal, $migration_path:literal, $(#[$($attrs:tt)*])* pub struct $struct_name:ident {
-        $(pub $field_name:ident: $field_type:ty,)*
+        $($(#[$($fattrs:tt)*])* pub $field_name:ident: $field_type:ty,)*
     }) => {
 
         #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -199,7 +203,10 @@ macro_rules! feature_model_derives {
         #[cfg_attr(feature = "sea-query-enum", enum_def)]
         $(#[$($attrs)*])*
         pub struct $struct_name {
-            $(pub $field_name: $field_type,)*
+            $(
+                $(#[$($fattrs)*])*
+                pub $field_name: $field_type,
+            )*
         }
 
         #[cfg(feature = "sea-query-enum")]
@@ -227,22 +234,35 @@ macro_rules! feature_model_derives {
                 }
 
                 fn select_star() -> SelectStatement {
-                    Query::select()
+                    let mut stmt = Query::select();
+                    stmt
                         .columns([
                             $(
                                 [<$struct_name Iden>]::[<$field_name:camel>],
                             )*
                         ])
-                        .from([<$struct_name Iden>]::Table)
-                        .take()
+                        .from([<$struct_name Iden>]::Table);
+                    stmt
                 }
 
-                #[cfg(feature = "frontend")]
+                fn insert_query() -> InsertStatement {
+                    let mut stmt = Query::insert();
+                    stmt
+                        .into_table([<$struct_name Iden>]::Table)
+                        .columns([
+                            $(
+                                [<$struct_name Iden>]::[<$field_name:camel>],
+                            )*
+                        ]);
+                    stmt
+                }
+
+                #[cfg(feature = "wasm")]
                 fn fetch_all_sql() -> String {
                     Self::select_star().to_string(SqliteQueryBuilder)
                 }
 
-                #[cfg(feature = "frontend")]
+                #[cfg(feature = "wasm")]
                 fn fetch_by_column_sql<T: Into<sea_query::Value>>(id: T, column: Self::Iden, limit_1: bool) -> String {
                     let mut stmt = Self::select_star();
                     stmt.and_where(Expr::col(column).eq(id.into()));
@@ -328,7 +348,7 @@ macro_rules! feature_model_derives {
             }
         }
 
-        #[cfg(feature = "frontend")]
+        #[cfg(feature = "wasm")]
         impl crate::model::model_into_view::DefaultModelIntoView for $struct_name {
             fn header_str(iden: <Self as crate::model::Model>::Iden) -> &'static str {
                 paste::paste! {

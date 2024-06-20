@@ -4,7 +4,7 @@ resolver = "2"
 
 [workspace.package]
 edition = "2021"
-version = "0.0.76"
+version = "0.0.77"
 
 [profile.wasm-release]
 inherits = "release"
@@ -61,7 +61,7 @@ leptos_reactive = "=0.6.5"
 rusqlite = { version = "0.30.0", features = ["bundled", "serde_json", "trace"] }
 
 # SQL query builder
-sea-query = { version = "0.30.7", features = [ "derive", "attr" ] }
+sea-query = { version = "0.30.7", features = [ "derive", "attr", "with-chrono" ] }
 sea-query-rusqlite = { version = "0.5.0", features = [ "with-chrono", "with-json", "with-time" ] }
 
 thiserror = "1.0.58"

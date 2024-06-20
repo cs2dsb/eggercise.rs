@@ -11,7 +11,13 @@ use crate::utils::sqlite3::{ExecResult, SqlitePromiser, SqlitePromiserError};
 pub mod migrations;
 pub mod model;
 
-pub trait PromiserFetcher: Model + Clone + ModelIntoView + Send {
+// TODO: should merge with PromiserFetcher once all model structs have it
+// implemented
+pub trait PromiserInserter: Model {
+    fn insert_sql(&self) -> Result<String, SqlitePromiserError>;
+}
+
+pub trait PromiserFetcher: Model + Clone + ModelIntoView {
     fn all_resource() -> Resource<(), Result<ListOfModel<Self>, SqlitePromiserError>> {
         create_local_resource(
             || (),
@@ -62,6 +68,28 @@ pub trait PromiserFetcher: Model + Clone + ModelIntoView + Send {
                 )))
             } else {
                 Ok(results.pop().unwrap())
+            }
+        }
+    }
+    fn fetch_maybe_one_by<T: Into<sea_query::Value>>(
+        id: T,
+        column: <Self as Model>::Iden,
+    ) -> impl Future<Output = Result<Option<Self>, SqlitePromiserError>> {
+        let sql = Self::fetch_by_column_sql(id, column, true);
+
+        let promiser = SqlitePromiser::use_promiser();
+        async move {
+            let result = promiser.exec(sql).await?;
+            let mut results = Self::extract_fields(result)?;
+
+            if results.len() > 1 {
+                Err(SqlitePromiserError::ExecResult(format!(
+                    "Expected exactly 0 or 1 {} but got {}",
+                    type_name::<Self>(),
+                    results.len()
+                )))
+            } else {
+                Ok(results.pop())
             }
         }
     }

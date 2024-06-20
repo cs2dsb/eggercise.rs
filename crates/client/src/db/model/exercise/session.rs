@@ -1,10 +1,11 @@
+use sea_query::SqliteQueryBuilder;
 use shared::{
-    model::{Session, SessionIden},
+    model::{Model, Session, SessionIden},
     types::Uuid,
 };
 
 use crate::{
-    db::PromiserFetcher,
+    db::{PromiserFetcher, PromiserInserter},
     utils::sqlite3::{parse_datetime, ExecResult, SqlitePromiserError},
 };
 
@@ -38,5 +39,26 @@ impl PromiserFetcher for Session {
                 Ok::<_, SqlitePromiserError>(res)
             })
             .collect::<Result<Vec<_>, _>>()
+    }
+}
+
+impl PromiserInserter for Session {
+    fn insert_sql(&self) -> Result<String, SqlitePromiserError> {
+        Ok(Self::insert_query()
+            .values([
+                (&self.id).into(),
+                (&self.plan_instance_id).into(),
+                sea_query::Value::ChronoDateTimeUtc(Some(Box::new(self.planned_date.clone())))
+                    .into(),
+                sea_query::Value::ChronoDateTimeUtc(
+                    self.performed_date.as_ref().map(|d| Box::new(d.clone())),
+                )
+                .into(),
+                sea_query::Value::ChronoDateTimeUtc(Some(Box::new(self.creation_date.clone())))
+                    .into(),
+                sea_query::Value::ChronoDateTimeUtc(Some(Box::new(self.last_updated_date.clone())))
+                    .into(),
+            ])?
+            .to_string(SqliteQueryBuilder))
     }
 }

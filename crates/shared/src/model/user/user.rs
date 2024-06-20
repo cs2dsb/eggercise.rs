@@ -28,7 +28,7 @@ feature_model_derives!(
     }
 );
 
-#[cfg(feature = "frontend")]
+#[cfg(feature = "wasm")]
 impl crate::model::model_into_view::UseDefaultModelView for User {}
 
 #[cfg(feature = "backend")]
