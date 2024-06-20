@@ -1,5 +1,5 @@
 use shared::{
-    model::{Exercise, ExerciseIden},
+    model::{UserExercise, UserExerciseIden},
     types::Uuid,
 };
 
@@ -8,23 +8,23 @@ use crate::{
     utils::sqlite3::{parse_datetime, ExecResult, SqlitePromiserError},
 };
 
-impl PromiserFetcher for Exercise {
+impl PromiserFetcher for UserExercise {
     fn extract_fields(result: ExecResult) -> Result<Vec<Self>, SqlitePromiserError> {
-        let id_e = result.get_extractor(ExerciseIden::Id)?;
-        let name_e = result.get_extractor(ExerciseIden::Name)?;
-        let description_e = result.get_extractor(ExerciseIden::Description)?;
-        let base_recovery_days_e = result.get_extractor(ExerciseIden::BaseRecoveryDays)?;
-        let creation_date_e = result.get_extractor(ExerciseIden::CreationDate)?;
-        let last_updated_date_e = result.get_extractor(ExerciseIden::LastUpdatedDate)?;
+        let id_e = result.get_extractor(UserExerciseIden::Id)?;
+        let exercise_id_e = result.get_extractor(UserExerciseIden::ExerciseId)?;
+        let user_id_e = result.get_extractor(UserExerciseIden::UserId)?;
+        let recovery_days_e = result.get_extractor(UserExerciseIden::RecoveryDays)?;
+        let creation_date_e = result.get_extractor(UserExerciseIden::CreationDate)?;
+        let last_updated_date_e = result.get_extractor(UserExerciseIden::LastUpdatedDate)?;
 
         (0..result.result_rows.len())
             .into_iter()
             .map(|i| {
-                let res = Exercise {
+                let res = UserExercise {
                     id: id_e(&result, i).and_then(|s: String| Ok(Uuid::parse(&s)?))?,
-                    name: name_e(&result, i)?,
-                    description: description_e(&result, i)?,
-                    base_recovery_days: base_recovery_days_e(&result, i)?,
+                    exercise_id: exercise_id_e(&result, i)?,
+                    user_id: user_id_e(&result, i)?,
+                    recovery_days: recovery_days_e(&result, i)?,
                     creation_date: creation_date_e(&result, i)
                         .and_then(|s: String| Ok(parse_datetime(&s)?))?,
                     last_updated_date: last_updated_date_e(&result, i)

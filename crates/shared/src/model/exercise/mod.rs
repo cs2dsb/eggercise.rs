@@ -21,3 +21,6 @@ pub use weight::*;
 
 mod set;
 pub use set::*;
+
+mod user_exercise;
+pub use user_exercise::*;

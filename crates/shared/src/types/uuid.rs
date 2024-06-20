@@ -1,4 +1,4 @@
-use std::ops::Deref;
+use std::{fmt, ops::Deref};
 
 use serde::{Deserialize, Serialize};
 pub use uuid::Error as UuidError;
@@ -12,13 +12,12 @@ use {
 };
 
 /// Wrapper to implement ToSql and FromSql on
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct Uuid(uuid::Uuid);
 
-impl Uuid {
-    #[cfg(feature = "backend")]
-    fn to_string(&self) -> String {
-        format!("{}", &self.0)
+impl fmt::Display for Uuid {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
     }
 }
 
@@ -65,14 +64,10 @@ impl From<Uuid> for sea_query::Value {
     }
 }
 
-#[cfg(feature = "backend")]
 impl Uuid {
     pub fn new_v4() -> Self {
         uuid::Uuid::new_v4().into()
     }
-}
-
-impl Uuid {
     pub fn parse(value: &str) -> Result<Self, uuid::Error> {
         uuid::Uuid::parse_str(value).map(|v| v.into())
     }

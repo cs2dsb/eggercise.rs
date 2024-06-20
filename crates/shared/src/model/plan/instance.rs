@@ -6,7 +6,7 @@ feature_model_imports!();
 
 feature_model_derives!(
     "plan_instance",
-    "../../../migrations/007-plan_instance/up.sql",
+    "../../../migrations/008-plan_instance/up.sql",
     /// A plan instance is an actual execution of a plan on a given start_date.
     /// Local to a certain user. Can be multiple instances of the same plan
     pub struct PlanInstance {
@@ -19,7 +19,7 @@ feature_model_derives!(
     }
 );
 
-#[cfg(feature = "frontend")]
+#[cfg(feature = "wasm")]
 impl crate::model::model_into_view::UseDefaultModelView for PlanInstance {}
 
 #[cfg(feature = "backend")]

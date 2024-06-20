@@ -6,7 +6,7 @@ feature_model_imports!();
 
 feature_model_derives!(
     "plan",
-    "../../../migrations/006-plan/up.sql",
+    "../../../migrations/007-plan/up.sql",
     /// A plan is the a methodology for the exercise programme. Global for all
     /// users
     pub struct Plan {
@@ -20,7 +20,7 @@ feature_model_derives!(
     }
 );
 
-#[cfg(feature = "frontend")]
+#[cfg(feature = "wasm")]
 impl crate::model::model_into_view::UseDefaultModelView for Plan {}
 
 #[cfg(feature = "backend")]

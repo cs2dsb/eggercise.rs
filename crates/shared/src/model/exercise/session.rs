@@ -6,7 +6,7 @@ feature_model_imports!();
 
 feature_model_derives!(
     "session",
-    "../../../migrations/009-session/up.sql",
+    "../../../migrations/010-session/up.sql",
     pub struct Session {
         pub id: Uuid,
         pub plan_instance_id: Uuid,
@@ -17,7 +17,7 @@ feature_model_derives!(
     }
 );
 
-#[cfg(feature = "frontend")]
+#[cfg(feature = "wasm")]
 impl crate::model::model_into_view::UseDefaultModelView for Session {}
 
 #[cfg(feature = "backend")]

@@ -16,8 +16,22 @@ pub struct Set {
     notes: Vec<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg(feature = "backend")]
+impl Set {
+    fn to_json_string(&self) -> Result<String, serde_json::Error> {
+        serde_json::to_string_pretty(self)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct Sets(pub Vec<Set>);
+
+#[cfg(feature = "backend")]
+impl Sets {
+    fn to_json_string(&self) -> Result<String, serde_json::Error> {
+        serde_json::to_string_pretty(self)
+    }
+}
 
 impl Deref for Sets {
     type Target = Vec<Set>;
@@ -35,7 +49,7 @@ impl DerefMut for Sets {
 #[cfg(feature = "backend")]
 impl ToSql for Set {
     fn to_sql(&self) -> rusqlite::Result<ToSqlOutput<'_>> {
-        serde_json::to_string_pretty(self)
+        self.to_json_string()
             .map(ToSqlOutput::from)
             .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
     }
@@ -52,7 +66,7 @@ impl FromSql for Set {
 #[cfg(feature = "backend")]
 impl ToSql for Sets {
     fn to_sql(&self) -> rusqlite::Result<ToSqlOutput<'_>> {
-        serde_json::to_string_pretty(self)
+        self.to_json_string()
             .map(ToSqlOutput::from)
             .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
     }

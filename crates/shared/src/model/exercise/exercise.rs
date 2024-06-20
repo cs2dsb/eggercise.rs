@@ -11,12 +11,14 @@ feature_model_derives!(
         pub id: Uuid,
         pub name: String,
         pub description: Option<String>,
+        /// How many days recovery are required between sets of this exercise
+        pub base_recovery_days: f64,
         pub creation_date: DateTime<Utc>,
         pub last_updated_date: DateTime<Utc>,
     }
 );
 
-#[cfg(feature = "frontend")]
+#[cfg(feature = "wasm")]
 impl crate::model::model_into_view::UseDefaultModelView for Exercise {}
 
 #[cfg(feature = "backend")]

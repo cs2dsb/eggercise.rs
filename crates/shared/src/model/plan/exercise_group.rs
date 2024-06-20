@@ -7,7 +7,7 @@ feature_model_imports!();
 
 feature_model_derives!(
     "plan_exercise_group",
-    "../../../migrations/008-plan_exercise_group/up.sql",
+    "../../../migrations/009-plan_exercise_group/up.sql",
     /// A plan PlanExerciseGroup group is a sub group of PlanExerciseGroups that
     /// are configured on a given plan. This is the level at which
     /// progression is programmed. Group can contain one or many
@@ -23,7 +23,7 @@ feature_model_derives!(
     }
 );
 
-#[cfg(feature = "frontend")]
+#[cfg(feature = "wasm")]
 impl crate::model::model_into_view::UseDefaultModelView for PlanExerciseGroup {}
 
 #[cfg(feature = "backend")]

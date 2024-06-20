@@ -3,7 +3,7 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-#[cfg(feature = "frontend")]
+#[cfg(feature = "wasm")]
 pub use frontend::*;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -15,7 +15,7 @@ use {
     },
     std::fmt::Display,
 };
-#[cfg(any(feature = "backend", feature = "frontend"))]
+#[cfg(any(feature = "backend", feature = "wasm"))]
 use {http::StatusCode, std::error::Error};
 
 use crate::model::ValidateModel;
@@ -29,7 +29,7 @@ impl fmt::Display for Nothing {
     }
 }
 
-#[cfg(feature = "frontend")]
+#[cfg(feature = "wasm")]
 mod frontend {
     use std::{
         any::type_name,
@@ -222,7 +222,7 @@ mod frontend {
     }
 }
 
-#[cfg(any(feature = "backend", feature = "frontend"))]
+#[cfg(any(feature = "backend", feature = "wasm"))]
 #[derive(Debug, Clone, Error, Serialize, Deserialize)]
 #[must_use]
 pub enum ServerError<T: Error> {
