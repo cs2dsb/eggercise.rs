@@ -93,6 +93,8 @@ jobs:
             (cd $CARGO_HOME; du -sh * || true)
             echo target before:
             (cd target; du -sh * || true)
+            # run manually as cache restores the hash check but not the actual output
+            ./scripts/link_migrations
             cargo build --release --bin server
             echo target after:
             (cd target; du -sh * || true)
