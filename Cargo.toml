@@ -20,7 +20,7 @@ console_error_panic_hook = "0.1.7"
 http = "1.1.0"
 
 # Web framework
-axum = {version = "0.7.5", features = [ "macros" ] }
+axum = {version = "0.7.5", features = [ "macros", "ws" ] }
 
 mime = "0.3.17"
 

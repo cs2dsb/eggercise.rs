@@ -11,7 +11,7 @@ use leptos::{view, IntoView};
 use thiserror::Error;
 use tracing::debug;
 
-use crate::utils::sqlite3::{SqlitePromiser, SqlitePromiserError};
+use crate::db::sqlite3::{SqlitePromiser, SqlitePromiserError};
 
 static MIGRATIONS_DIR: Dir = include_dir!("$CARGO_MANIFEST_DIR/migrations");
 

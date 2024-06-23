@@ -7,8 +7,10 @@ pub const API_BASE_PATH: &str = "/api/";
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Object {
     User,
-    QrCode,
+    UserId,
+    QrCodeId,
     Ping,
+    Websocket,
 }
 
 impl Object {
@@ -16,17 +18,10 @@ impl Object {
         use Object::*;
         match self {
             User => concatcp!(API_BASE_PATH, "user"),
-            QrCode => concatcp!(API_BASE_PATH, "qrcode"),
+            QrCodeId => concatcp!(API_BASE_PATH, "qrcode/:id"),
+            UserId => concatcp!(API_BASE_PATH, "user/:id"),
             Ping => concatcp!(API_BASE_PATH, "ping"),
-        }
-    }
-
-    pub const fn id_path(&self) -> &str {
-        use Object::*;
-        match self {
-            User => concatcp!(API_BASE_PATH, "user/:id"),
-            QrCode => concatcp!(API_BASE_PATH, "qrcode/:id"),
-            Ping => concatcp!(API_BASE_PATH, "ping"),
+            Websocket => concatcp!(API_BASE_PATH, "ws"),
         }
     }
 }

@@ -154,6 +154,14 @@ mod frontend {
         }
     }
 
+    impl<T: Display> From<gloo_utils::errors::JsError> for FrontendError<T> {
+        fn from(value: gloo_utils::errors::JsError) -> Self {
+            Self::Js {
+                inner: format!("gloo-utils error: {}", value.to_string()),
+            }
+        }
+    }
+
     impl<T: Display> From<ValidationError> for FrontendError<T> {
         fn from(inner: ValidationError) -> Self {
             Self::Validation {

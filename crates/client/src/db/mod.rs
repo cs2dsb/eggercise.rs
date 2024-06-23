@@ -6,10 +6,11 @@ use shared::model::{
     Model,
 };
 
-use crate::utils::sqlite3::{ExecResult, SqlitePromiser, SqlitePromiserError};
-
 pub mod migrations;
 pub mod model;
+pub mod sqlite3;
+
+use sqlite3::{ExecResult, SqlitePromiser, SqlitePromiserError};
 
 // TODO: should merge with PromiserFetcher once all model structs have it
 // implemented

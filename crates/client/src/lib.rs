@@ -15,7 +15,8 @@ pub mod api;
 pub mod db;
 pub mod utils;
 
-use utils::{sqlite3::SqlitePromiser, tracing::configure_tracing};
+use db::sqlite3::SqlitePromiser;
+use utils::{tracing::configure_tracing, websocket::Websocket};
 
 #[wasm_bindgen]
 pub async fn start_client(sqlite_promiser: Function) {
@@ -23,7 +24,11 @@ pub async fn start_client(sqlite_promiser: Function) {
     configure_tracing();
 
     SqlitePromiser::new(sqlite_promiser).provide_context();
+
     Online::provide_context();
+
+    Websocket::provide_context().unwrap();
+
     mount_to_body(move || {
         view! {
             <App/>

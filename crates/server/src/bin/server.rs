@@ -22,7 +22,7 @@ use deadpool_sqlite::{Config, Hook, Runtime};
 use server::{
     cli::Cli,
     db,
-    routes::{auth::*, ping::ping},
+    routes::{auth::*, ping::ping, websocket::websocket_handler},
     AppError, AppState,
 };
 use shared::{api, configure_tracing, load_dotenv};
@@ -143,7 +143,8 @@ async fn main() -> Result<(), anyhow::Error> {
                 api::Auth::CreateTemporaryLogin.path(),
                 post(create_temporary_login),
             )
-            .route(api::Object::QrCode.id_path(), get(generate_qr_code))
+            .route(api::Object::QrCodeId.path(), get(generate_qr_code))
+            .route(api::Object::Websocket.path(), get(websocket_handler))
             .nest_service(
                 "/wasm/service_worker.js",
                 ServiceBuilder::new()
@@ -213,7 +214,8 @@ async fn main() -> Result<(), anyhow::Error> {
                     )),
             )
             .layer(CompressionLayer::new())
-            .with_state(state),
+            .with_state(state)
+            .into_make_service_with_connect_info::<SocketAddr>(),
     )
     .await?;
 

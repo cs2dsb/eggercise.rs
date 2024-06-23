@@ -6,8 +6,10 @@ use leptos_router::Router;
 
 use crate::{
     components::{Container, Footer},
-    db::migrations::{self, MigrationError},
-    utils::sqlite3::SqlitePromiser,
+    db::{
+        migrations::{self, MigrationError},
+        sqlite3::SqlitePromiser,
+    },
     AppNav, AppRoutes,
 };
 
