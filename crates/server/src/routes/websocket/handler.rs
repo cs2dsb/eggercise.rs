@@ -6,13 +6,12 @@ use axum::{
     extract::{
         connect_info::ConnectInfo,
         ws::{CloseFrame, Message, WebSocket, WebSocketUpgrade},
-    },
-    response::IntoResponse,
+    }, http::HeaderMap, response::IntoResponse
 };
 use axum_extra::TypedHeader;
 // allows to split the websocket stream into separate TX and RX branches
 use futures::{sink::SinkExt, stream::StreamExt};
-use tracing::{error, instrument, warn};
+use tracing::{debug, error};
 
 /// The handler for the HTTP request (this gets called when the HTTP GET lands
 /// at the start of websocket negotiation). After this completes, the actual
@@ -24,6 +23,7 @@ pub async fn websocket_handler(
     ws: WebSocketUpgrade,
     user_agent: Option<TypedHeader<headers::UserAgent>>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
 ) -> impl IntoResponse {
     let user_agent = if let Some(TypedHeader(user_agent)) = user_agent {
         user_agent.to_string()
@@ -31,19 +31,27 @@ pub async fn websocket_handler(
         String::from("Unknown browser")
     };
     println!("`{user_agent}` at {addr} connected.");
+    debug!("Headers: {:?}", headers);
+
+    let ip = headers.get("x-forwarded-for")
+        .map(|v| v.to_str().ok())
+        .flatten()
+        .map(|v| v.to_owned())
+        .unwrap_or(addr.ip().to_string());
+
     // finalize the upgrade process by returning upgrade callback.
     // we can customize the callback by sending additional info such as address.
-    ws.on_upgrade(move |socket| handle_socket(socket, addr))
+    ws.on_upgrade(move |socket| handle_socket(socket, ip, headers))
 }
 
 /// Actual websocket statemachine (one will be spawned per connection)
-async fn handle_socket(mut socket: WebSocket, who: SocketAddr) {
+async fn handle_socket(mut socket: WebSocket, client_ip: String, headers: HeaderMap,) {
     // send a ping (unsupported by some browsers) just to kick things off and get a
     // response
     if socket.send(Message::Ping(vec![1, 2, 3])).await.is_ok() {
-        println!("Pinged {who}...");
+        println!("Pinged {client_ip}...");
     } else {
-        println!("Could not send ping {who}!");
+        println!("Could not send ping {client_ip}!");
         // no Error here since the only thing we can do is to close the connection.
         // If we can not send messages, there is no way to salvage the statemachine
         // anyway.
@@ -56,17 +64,17 @@ async fn handle_socket(mut socket: WebSocket, who: SocketAddr) {
     // will not block other client's connections.
     if let Some(msg) = socket.recv().await {
         if let Ok(msg) = msg {
-            if process_message(msg, who).is_break() {
+            if process_message(msg, client_ip.clone()).is_break() {
                 return;
             }
         } else {
-            println!("client {who} abruptly disconnected");
+            println!("client {client_ip} abruptly disconnected");
             return;
         }
     }
 
     if let Err(e) = socket
-        .send(Message::Text(format!("I think your IP is: {who}")))
+        .send(Message::Text(format!("I think your IP is: {client_ip}. Headers: {:#?}", headers)))
         .await
     {
         error!("Error sending message to ws: {e}");
@@ -83,7 +91,7 @@ async fn handle_socket(mut socket: WebSocket, who: SocketAddr) {
             .await
             .is_err()
         {
-            println!("client {who} abruptly disconnected");
+            println!("client {client_ip} abruptly disconnected");
             return;
         }
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
@@ -96,6 +104,8 @@ async fn handle_socket(mut socket: WebSocket, who: SocketAddr) {
 
     // Spawn a task that will push several messages to the client (does not matter
     // what client does)
+
+    let client_ip_ = client_ip.clone();
     let mut send_task = tokio::spawn(async move {
         let n_msg = 20;
         for i in 0..n_msg {
@@ -111,7 +121,7 @@ async fn handle_socket(mut socket: WebSocket, who: SocketAddr) {
             tokio::time::sleep(std::time::Duration::from_millis(300)).await;
         }
 
-        println!("Sending close to {who}...");
+        println!("Sending close to {client_ip_}...");
         if let Err(e) = sender
             .send(Message::Close(Some(CloseFrame {
                 code: axum::extract::ws::close_code::NORMAL,
@@ -126,12 +136,13 @@ async fn handle_socket(mut socket: WebSocket, who: SocketAddr) {
 
     // This second task will receive messages from client and print them on server
     // console
+    let client_ip_ = client_ip.clone();
     let mut recv_task = tokio::spawn(async move {
         let mut cnt = 0;
         while let Some(Ok(msg)) = receiver.next().await {
             cnt += 1;
             // print message and break if instructed to do so
-            if process_message(msg, who).is_break() {
+            if process_message(msg, client_ip_.clone()).is_break() {
                 break;
             }
         }
@@ -142,7 +153,7 @@ async fn handle_socket(mut socket: WebSocket, who: SocketAddr) {
     tokio::select! {
         rv_a = (&mut send_task) => {
             match rv_a {
-                Ok(a) => println!("{a} messages sent to {who}"),
+                Ok(a) => println!("{a} messages sent to {client_ip}"),
                 Err(a) => println!("Error sending messages {a:?}")
             }
             recv_task.abort();
@@ -157,12 +168,12 @@ async fn handle_socket(mut socket: WebSocket, who: SocketAddr) {
     }
 
     // returning from the handler closes the websocket connection
-    println!("Websocket context {who} destroyed");
+    println!("Websocket context {client_ip} destroyed");
 }
 
 /// helper to print contents of messages to stdout. Has special treatment for
 /// Close.
-fn process_message(msg: Message, who: SocketAddr) -> ControlFlow<(), ()> {
+fn process_message(msg: Message, who: String) -> ControlFlow<(), ()> {
     match msg {
         Message::Text(t) => {
             println!(">>> {who} sent str: {t:?}");
