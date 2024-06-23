@@ -6,13 +6,12 @@ use axum::{
     extract::{
         connect_info::ConnectInfo,
         ws::{CloseFrame, Message, WebSocket, WebSocketUpgrade},
-    },
-    response::IntoResponse,
+    }, http::HeaderMap, response::IntoResponse
 };
 use axum_extra::TypedHeader;
 // allows to split the websocket stream into separate TX and RX branches
 use futures::{sink::SinkExt, stream::StreamExt};
-use tracing::{error, instrument, warn};
+use tracing::{debug, error};
 
 /// The handler for the HTTP request (this gets called when the HTTP GET lands
 /// at the start of websocket negotiation). After this completes, the actual
@@ -24,6 +23,7 @@ pub async fn websocket_handler(
     ws: WebSocketUpgrade,
     user_agent: Option<TypedHeader<headers::UserAgent>>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
 ) -> impl IntoResponse {
     let user_agent = if let Some(TypedHeader(user_agent)) = user_agent {
         user_agent.to_string()
@@ -31,13 +31,14 @@ pub async fn websocket_handler(
         String::from("Unknown browser")
     };
     println!("`{user_agent}` at {addr} connected.");
+    debug!("Headers: {:?}", headers);
     // finalize the upgrade process by returning upgrade callback.
     // we can customize the callback by sending additional info such as address.
-    ws.on_upgrade(move |socket| handle_socket(socket, addr))
+    ws.on_upgrade(move |socket| handle_socket(socket, addr, headers))
 }
 
 /// Actual websocket statemachine (one will be spawned per connection)
-async fn handle_socket(mut socket: WebSocket, who: SocketAddr) {
+async fn handle_socket(mut socket: WebSocket, who: SocketAddr, headers: HeaderMap,) {
     // send a ping (unsupported by some browsers) just to kick things off and get a
     // response
     if socket.send(Message::Ping(vec![1, 2, 3])).await.is_ok() {
@@ -66,7 +67,7 @@ async fn handle_socket(mut socket: WebSocket, who: SocketAddr) {
     }
 
     if let Err(e) = socket
-        .send(Message::Text(format!("I think your IP is: {who}")))
+        .send(Message::Text(format!("I think your IP is: {who}. Headers: {:#?}", headers)))
         .await
     {
         error!("Error sending message to ws: {e}");
