@@ -3,9 +3,9 @@ use shared::{
     types::Uuid,
 };
 
-use crate::{
-    db::PromiserFetcher,
-    utils::sqlite3::{parse_datetime, ExecResult, SqlitePromiserError},
+use crate::db::{
+    sqlite3::{parse_datetime, ExecResult, SqlitePromiserError},
+    PromiserFetcher,
 };
 
 impl PromiserFetcher for UserExercise {

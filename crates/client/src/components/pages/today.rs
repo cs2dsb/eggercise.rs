@@ -18,8 +18,10 @@ use web_time::Instant;
 
 use crate::{
     components::FrontendErrorBoundary,
-    db::{PromiserFetcher, PromiserInserter},
-    utils::sqlite3::{SqlitePromiser, SqlitePromiserError},
+    db::{
+        sqlite3::{SqlitePromiser, SqlitePromiserError},
+        PromiserFetcher, PromiserInserter,
+    },
 };
 
 fn plan() -> Resource<

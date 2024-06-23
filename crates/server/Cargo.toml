@@ -31,6 +31,8 @@ include_dir.workspace = true
 rusqlite = { workspace = true, features = [ "bundled" ] }
 webauthn-rs = { workspace = true, features = [ "danger-allow-state-serialisation" ] }
 
+headers = "0.4.0"
+
 # QR Code generation
 qrcodegen = "1.8.0"
 
@@ -58,3 +60,5 @@ tower-http = { version = "0.5.2", features = [
     "trace", "fs", "set-header", "cors",
     "compression-br", "compression-deflate", "compression-gzip", "compression-zstd" ] }
 tower = "0.4.13"
+tokio-tungstenite = "0.23.1"
+axum-extra = { version = "0.9.3", features = ["typed-header"] }

@@ -3,7 +3,8 @@ use std::{any::type_name, marker::PhantomData};
 use leptos::{component, view, CollectView, IntoView, Transition};
 
 use crate::{
-    components::FrontendErrorBoundary, db::PromiserFetcher, utils::sqlite3::SqlitePromiserError,
+    components::FrontendErrorBoundary,
+    db::{sqlite3::SqlitePromiserError, PromiserFetcher},
 };
 
 #[component]

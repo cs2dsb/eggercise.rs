@@ -21,7 +21,7 @@ feature_model_derives!(
 
 impl TemporaryLogin {
     pub fn qr_code_url(&self) -> String {
-        Object::QrCode.id_path().replace(
+        Object::QrCodeId.path().replace(
             ":id",
             &percent_encode(self.url.as_bytes(), NON_ALPHANUMERIC).to_string(),
         )

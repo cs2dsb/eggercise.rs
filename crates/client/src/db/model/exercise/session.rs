@@ -4,9 +4,9 @@ use shared::{
     types::Uuid,
 };
 
-use crate::{
-    db::{PromiserFetcher, PromiserInserter},
-    utils::sqlite3::{parse_datetime, ExecResult, SqlitePromiserError},
+use crate::db::{
+    sqlite3::{parse_datetime, ExecResult, SqlitePromiserError},
+    PromiserFetcher, PromiserInserter,
 };
 
 impl PromiserFetcher for Session {
