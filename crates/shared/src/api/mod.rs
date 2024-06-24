@@ -3,6 +3,7 @@ pub mod error;
 pub mod response_errors;
 
 pub const API_BASE_PATH: &str = "/api/";
+pub const CSRF_HEADER: &str = "X-CSRF-TOKEN";
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Object {

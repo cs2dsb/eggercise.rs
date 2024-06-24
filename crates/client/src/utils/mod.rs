@@ -4,9 +4,9 @@ use leptos::logging::error;
 use shared::api::error::FrontendError;
 use wasm_bindgen::JsValue;
 
+pub mod csrf;
 pub mod tracing;
 pub mod websocket;
-
 pub trait JsValueIntoOk<R, E>: Sized
 where
     Self: Into<R>,

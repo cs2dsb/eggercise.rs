@@ -14,9 +14,12 @@ serde_json.workspace = true
 chrono.workspace = true
 wasm-bindgen-cli-support = "0.2.92"
 shared = { path = "../shared", features = [ "build" ] }
-base64 = "0.22.0"
+base64.workspace = true
 wasm-opt = "0.116.1"
 glob = "0.3.1"
+
+[dev-dependencies]
+tokio-test = "0.4.4"
 
 [dependencies]
 shared = { path = "../shared", features = [ "backend" ] }
@@ -28,6 +31,8 @@ axum.workspace = true
 deadpool-sqlite.workspace = true
 mime.workspace = true
 include_dir.workspace = true
+base64.workspace = true
+rand.workspace = true
 rusqlite = { workspace = true, features = [ "bundled" ] }
 webauthn-rs = { workspace = true, features = [ "danger-allow-state-serialisation" ] }
 
@@ -62,3 +67,6 @@ tower-http = { version = "0.5.2", features = [
 tower = "0.4.13"
 tokio-tungstenite = "0.23.1"
 axum-extra = { version = "0.9.3", features = ["typed-header"] }
+tower-layer = "0.3.2"
+thiserror.workspace = true
+tower-service = "0.3.2"

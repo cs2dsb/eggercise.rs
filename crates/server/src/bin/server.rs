@@ -22,10 +22,14 @@ use deadpool_sqlite::{Config, Hook, Runtime};
 use server::{
     cli::Cli,
     db,
+    middleware::{CsrfLayer, RegenerateToken},
     routes::{auth::*, ping::ping, websocket::websocket_handler},
     AppError, AppState,
 };
-use shared::{api, configure_tracing, load_dotenv};
+use shared::{
+    api::{self, CSRF_HEADER},
+    configure_tracing, load_dotenv,
+};
 use tokio::net::TcpListener;
 use tower::ServiceBuilder;
 use tower_http::{
@@ -159,6 +163,12 @@ async fn main() -> Result<(), anyhow::Error> {
             )
             .nest_service("/", ServeDir::new(&args.assets_dir))
             .layer(middleware::map_response(fallback_layer))
+            .layer(
+                CsrfLayer::new()
+                    .regenerate(RegenerateToken::PerUse)
+                    .request_header(CSRF_HEADER)
+                    .response_header(CSRF_HEADER),
+            )
             .layer(
                 ServiceBuilder::new()
                     .layer(
