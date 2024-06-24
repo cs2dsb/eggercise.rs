@@ -82,6 +82,7 @@ sudo docker run -d \
 	-v "${db_dir}":/opt/server/database \
 	-e WEBAUTHN_ORIGIN=https://egg.ileet.co.uk \
 	-e WEBAUTHN_ID=egg.ileet.co.uk \
+	-e CORS_ORIGIN=https://egg.ileet.co.uk \
 	-p 9090:9090 \
 	"$docker_image"
 

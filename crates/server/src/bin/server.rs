@@ -31,6 +31,7 @@ use tower::ServiceBuilder;
 use tower_http::{
     classify::ServerErrorsFailureClass,
     compression::CompressionLayer,
+    cors::CorsLayer,
     services::{ServeDir, ServeFile},
     set_header::SetResponseHeaderLayer,
     trace::TraceLayer,
@@ -211,7 +212,12 @@ async fn main() -> Result<(), anyhow::Error> {
                     .layer(SetResponseHeaderLayer::if_not_present(
                         HeaderName::from_static("cross-origin-embedder-policy"),
                         HeaderValue::from_static("require-corp"),
-                    )),
+                    ))
+                    .layer(
+                        CorsLayer::new()
+                            .allow_methods([Method::GET, Method::POST])
+                            .allow_origin(args.cors_origin.parse::<HeaderValue>()?),
+                    ),
             )
             .layer(CompressionLayer::new())
             .with_state(state)
