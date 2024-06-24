@@ -4,7 +4,7 @@ resolver = "2"
 
 [workspace.package]
 edition = "2021"
-version = "0.0.78"
+version = "0.0.79"
 
 [profile.wasm-release]
 inherits = "release"
@@ -13,6 +13,9 @@ lto = true
 codegen-units = 1
 
 [workspace.dependencies]
+
+rand = "0.8.5"
+base64 = "0.22.0"
 
 # Panic hook to make debugging wasm easier
 console_error_panic_hook = "0.1.7"

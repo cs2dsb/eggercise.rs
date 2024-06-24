@@ -22,15 +22,20 @@ use deadpool_sqlite::{Config, Hook, Runtime};
 use server::{
     cli::Cli,
     db,
+    middleware::{CsrfLayer, RegenerateToken},
     routes::{auth::*, ping::ping, websocket::websocket_handler},
     AppError, AppState,
 };
-use shared::{api, configure_tracing, load_dotenv};
+use shared::{
+    api::{self, CSRF_HEADER},
+    configure_tracing, load_dotenv,
+};
 use tokio::net::TcpListener;
 use tower::ServiceBuilder;
 use tower_http::{
     classify::ServerErrorsFailureClass,
     compression::CompressionLayer,
+    cors::CorsLayer,
     services::{ServeDir, ServeFile},
     set_header::SetResponseHeaderLayer,
     trace::TraceLayer,
@@ -159,6 +164,12 @@ async fn main() -> Result<(), anyhow::Error> {
             .nest_service("/", ServeDir::new(&args.assets_dir))
             .layer(middleware::map_response(fallback_layer))
             .layer(
+                CsrfLayer::new()
+                    .regenerate(RegenerateToken::PerUse)
+                    .request_header(CSRF_HEADER)
+                    .response_header(CSRF_HEADER),
+            )
+            .layer(
                 ServiceBuilder::new()
                     .layer(
                         TraceLayer::new_for_http()
@@ -211,7 +222,12 @@ async fn main() -> Result<(), anyhow::Error> {
                     .layer(SetResponseHeaderLayer::if_not_present(
                         HeaderName::from_static("cross-origin-embedder-policy"),
                         HeaderValue::from_static("require-corp"),
-                    )),
+                    ))
+                    .layer(
+                        CorsLayer::new()
+                            .allow_methods([Method::GET, Method::POST])
+                            .allow_origin(args.cors_origin.parse::<HeaderValue>()?),
+                    ),
             )
             .layer(CompressionLayer::new())
             .with_state(state)

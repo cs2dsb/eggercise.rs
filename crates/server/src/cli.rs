@@ -17,9 +17,11 @@ pub struct Cli {
     pub bind_addr: String,
     #[clap(long, env, default_value = "false")]
     pub secure_sessions: bool,
-    #[arg(long, env, default_value = "http://127.0.0.1:8080")]
+    #[arg(long, env, default_value = "http://localhost:8080")]
     pub webauthn_origin: String,
-    #[arg(long, env, default_value = "127.0.0.1")]
+    #[arg(long, env, default_value = "http://localhost:8080")]
+    pub cors_origin: String,
+    #[arg(long, env, default_value = "localhost")]
     pub webauthn_id: String,
     #[arg(long, env, default_value = "30")]
     pub session_expiry_days: i64,

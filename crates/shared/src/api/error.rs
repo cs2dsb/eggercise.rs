@@ -21,13 +21,7 @@ use {http::StatusCode, std::error::Error};
 use crate::model::ValidateModel;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Error)]
-pub struct Nothing {}
-
-impl fmt::Display for Nothing {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "()")
-    }
-}
+pub enum Nothing {}
 
 #[cfg(feature = "wasm")]
 mod frontend {

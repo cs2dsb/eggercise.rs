@@ -17,3 +17,5 @@ pub use state::*;
 pub mod routes;
 
 pub mod cli;
+
+pub mod middleware;

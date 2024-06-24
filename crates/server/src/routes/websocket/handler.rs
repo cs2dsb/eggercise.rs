@@ -6,7 +6,9 @@ use axum::{
     extract::{
         connect_info::ConnectInfo,
         ws::{CloseFrame, Message, WebSocket, WebSocketUpgrade},
-    }, http::HeaderMap, response::IntoResponse
+    },
+    http::HeaderMap,
+    response::IntoResponse,
 };
 use axum_extra::TypedHeader;
 // allows to split the websocket stream into separate TX and RX branches
@@ -33,7 +35,8 @@ pub async fn websocket_handler(
     println!("`{user_agent}` at {addr} connected.");
     debug!("Headers: {:?}", headers);
 
-    let ip = headers.get("x-forwarded-for")
+    let ip = headers
+        .get("x-forwarded-for")
         .map(|v| v.to_str().ok())
         .flatten()
         .map(|v| v.to_owned())
@@ -45,7 +48,7 @@ pub async fn websocket_handler(
 }
 
 /// Actual websocket statemachine (one will be spawned per connection)
-async fn handle_socket(mut socket: WebSocket, client_ip: String, headers: HeaderMap,) {
+async fn handle_socket(mut socket: WebSocket, client_ip: String, headers: HeaderMap) {
     // send a ping (unsupported by some browsers) just to kick things off and get a
     // response
     if socket.send(Message::Ping(vec![1, 2, 3])).await.is_ok() {
@@ -74,7 +77,10 @@ async fn handle_socket(mut socket: WebSocket, client_ip: String, headers: Header
     }
 
     if let Err(e) = socket
-        .send(Message::Text(format!("I think your IP is: {client_ip}. Headers: {:#?}", headers)))
+        .send(Message::Text(format!(
+            "I think your IP is: {client_ip}. Headers: {:#?}",
+            headers
+        )))
         .await
     {
         error!("Error sending message to ws: {e}");

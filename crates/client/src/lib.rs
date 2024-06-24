@@ -1,4 +1,4 @@
-#![feature(error_generic_member_access)]
+#![feature(error_generic_member_access, let_chains)]
 
 use console_error_panic_hook::set_once as set_panic_hook;
 use leptos::{mount_to_body, view};

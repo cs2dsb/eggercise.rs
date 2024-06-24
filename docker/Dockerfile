@@ -9,4 +9,5 @@ ENV RUST_LOG=warn,server=debug,service-worker=debug,shared=debug,sqlite_profilin
 ENV BIND_ADDR=0.0.0.0
 ENV PORT=9090
 ENV ASSETS_DIR=/opt/server/assets
+ENV SECURE_SESSIONS=true
 ENTRYPOINT ["/usr/local/bin/server"]

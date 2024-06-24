@@ -9,7 +9,7 @@ use http::header::{self, ACCEPT};
 use mime::APPLICATION_JSON;
 use serde::{de::DeserializeOwned, Serialize};
 use shared::{
-    api::error::{FrontendError, ResultContext, ServerError, WrongContentTypeError},
+    api::error::{FrontendError, Nothing, ResultContext, ServerError, WrongContentTypeError},
     model::ValidateModel,
 };
 
@@ -31,6 +31,8 @@ pub use create_temporary_login::*;
 mod ping;
 pub use ping::*;
 use tracing::debug;
+
+use crate::utils::csrf::Csrf;
 
 pub trait ResponseContentType: Sized {
     fn content_type(&self) -> Option<String>;
@@ -63,9 +65,18 @@ where
         debug!("json_request::body::validate ok");
     }
 
-    let builder = RequestBuilder::new(url)
+    let mut builder = RequestBuilder::new(url)
         .method(method.clone())
         .header(ACCEPT.as_str(), APPLICATION_JSON.essence_str());
+
+    let csrf = if method == Method::POST || method == Method::PATCH || method == Method::DELETE {
+        // Needs a csrf token
+        let csrf = Csrf::get().await?;
+        builder = csrf.add_to(builder);
+        Some(csrf)
+    } else {
+        None
+    };
 
     // Add the json body or set the releavant headers
     debug!("json_request::request::build");
@@ -83,6 +94,16 @@ where
         .await
         .map_err(FrontendError::from)
         .with_context(|| format!("Sending {:?} to {method} {url}", body))?;
+
+    if response.ok() {
+        if let Some(mut csrf) = csrf {
+            // Update the token
+            csrf.update_from(&response)?;
+        } else {
+            // Still update it on GETs but don't error if it fails
+            let _ = Csrf::provide_from::<Nothing>(&response);
+        }
+    }
 
     // Check the content-type is what we're expecting
     let content_type = response.content_type();

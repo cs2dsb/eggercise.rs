@@ -18,3 +18,6 @@ pub use debug::*;
 
 mod chart;
 pub use chart::*;
+
+mod notifications;
+pub use notifications::*;
