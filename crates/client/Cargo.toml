@@ -35,6 +35,11 @@ web-sys = { workspace = true, features = [
     "Navigator",
     "PublicKeyCredential",
     "PublicKeyCredentialCreationOptions",
+    "PushManager",
+    "ServiceWorkerRegistration",
+    "PushSubscription",
+    "PushSubscriptionOptionsInit",
+    "PushEncryptionKeyName",
 ] }
 
 shared = { path = "../shared", features = [ "wasm" ] }

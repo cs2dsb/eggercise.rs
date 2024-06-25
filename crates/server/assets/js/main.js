@@ -53,7 +53,7 @@ const registerServiceWorker = async () => {
         })
     }
 };
-// TODO Disabled while debugging the web-worker registerServiceWorker();
+registerServiceWorker();
 
 // Clean up the sqlite global
 delete window.sqlite3Worker1Promiser;

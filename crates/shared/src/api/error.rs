@@ -259,6 +259,9 @@ pub enum ServerError<T: Error> {
     #[error("ServerError::Webauthn {{ {message} }}")]
     Webauthn { message: String },
 
+    #[error("ServerError::WebPush {{ {message} }}")]
+    WebPush { message: String },
+
     #[error("ServerError::Other{{ {message} }}")]
     Other { message: String },
 
@@ -342,6 +345,15 @@ impl<T: Error> From<deadpool_sqlite::InteractError> for ServerError<T> {
 impl<T: Error> From<webauthn_rs::prelude::WebauthnError> for ServerError<T> {
     fn from(value: webauthn_rs::prelude::WebauthnError) -> Self {
         Self::Webauthn {
+            message: value.to_string(),
+        }
+    }
+}
+
+#[cfg(feature = "backend")]
+impl<T: Error> From<web_push::WebPushError> for ServerError<T> {
+    fn from(value: web_push::WebPushError) -> Self {
+        Self::WebPush {
             message: value.to_string(),
         }
     }

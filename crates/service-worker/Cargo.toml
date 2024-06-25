@@ -12,6 +12,7 @@ console_error_panic_hook.workspace = true
 wasm-bindgen-futures.workspace = true
 wasm-bindgen.workspace = true
 gloo-utils.workspace = true
+serde_json.workspace = true
 
 js-sys = "0.3.69"
 shared = { path = "../shared", features = [ "wasm" ] }
@@ -21,5 +22,13 @@ web-sys = { workspace = true, features = [
     "Headers",  "ResponseInit",  "Response", 
     "ServiceWorkerGlobalScope", "WorkerGlobalScope", 
     "WorkerLocation", "Clients", "CacheStorage",
-    "Cache", "RequestInit", "MessageEvent", "Url"
+    "Cache", "RequestInit", "MessageEvent", "Url",
+    "PushEvent",
+    "Event",
+    "PushManager",
+    "ServiceWorkerRegistration",
+    "NotificationOptions",
+    "PushSubscriptionOptionsInit",
+    "PushSubscription",
+    "PushEncryptionKeyName",
 ] }

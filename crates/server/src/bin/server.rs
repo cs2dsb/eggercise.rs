@@ -1,5 +1,6 @@
 use std::{
-    fs::remove_file,
+    fs::{read_to_string, remove_file, File},
+    io::Read,
     net::{IpAddr, SocketAddr},
     path::PathBuf,
     str::FromStr,
@@ -16,6 +17,7 @@ use axum::{
     routing::{get, post},
     Router,
 };
+use base64::prelude::{Engine as _, BASE64_URL_SAFE};
 use clap::Parser;
 use client::ROUTE_URLS;
 use deadpool_sqlite::{Config, Hook, Runtime};
@@ -23,12 +25,21 @@ use server::{
     cli::Cli,
     db,
     middleware::{CsrfLayer, RegenerateToken},
-    routes::{auth::*, ping::ping, websocket::websocket_handler},
-    AppError, AppState,
+    routes::{
+        auth::*,
+        notifications::{remove_push_subscription, update_push_subscription, vapid},
+        ping::ping,
+        websocket::websocket_handler,
+    },
+    AppError, AppState, VapidPrivateKey, VapidPubKey,
 };
 use shared::{
-    api::{self, CSRF_HEADER},
+    api::{
+        error::{Nothing, ServerError},
+        Auth, Object, CSRF_HEADER,
+    },
     configure_tracing, load_dotenv,
+    model::{PushNotificationSubscription, User},
 };
 use tokio::net::TcpListener;
 use tower::ServiceBuilder;
@@ -42,7 +53,11 @@ use tower_http::{
 };
 use tower_sessions::{cookie::time::Duration as CookieDuration, Expiry, SessionManagerLayer};
 use tower_sessions_deadpool_sqlite_store::DeadpoolSqliteStore;
-use tracing::{debug, info, info_span, Span};
+use tracing::{debug, error, info, info_span, Span};
+use web_push::{
+    ContentEncoding, IsahcWebPushClient, SubscriptionInfo, VapidSignatureBuilder, WebPushClient,
+    WebPushMessageBuilder,
+};
 use webauthn_rs::{prelude::Url, WebauthnBuilder};
 
 fn build_webauthn(args: &Cli) -> Result<webauthn_rs::Webauthn, anyhow::Error> {
@@ -106,13 +121,31 @@ async fn main() -> Result<(), anyhow::Error> {
 
     let socket = SocketAddr::new(IpAddr::from_str(&args.bind_addr)?, args.port);
 
-    let listener = TcpListener::bind(socket).await?;
-    debug!("listening on {}", listener.local_addr()?);
+    let vapid_pub_key: VapidPubKey = {
+        let base64_key = read_to_string(&args.public_key_path)?;
+        BASE64_URL_SAFE
+            .decode(&base64_key)
+            .context(format!("Decoding {}", args.public_key_path))?
+            .into()
+    };
+
+    let vapid_private_key: VapidPrivateKey = {
+        let mut file = File::open(&args.private_key_path)?;
+        let mut bytes = Vec::new();
+        file.read_to_end(&mut bytes)?;
+        bytes.into()
+    };
+
+    // Grab a connection before we move the pool
+    let notifier_db_connection = pool.get().await?;
+    let notifier_private_key = vapid_private_key.clone();
 
     let state = AppState {
         pool,
         webauthn,
         args: Arc::new(args.clone()),
+        vapid_pub_key,
+        vapid_private_key,
     };
 
     // Map all routes the client can handle to the index.html
@@ -124,32 +157,103 @@ async fn main() -> Result<(), anyhow::Error> {
         router
     };
 
+    // Double task is just to display any panics in the inner task
+    tokio::spawn(async move {
+        let join_handle = tokio::spawn(async move {
+            let notify_users = notifier_db_connection
+                .interact(move |conn| User::fetch_all_with_push_notifications_enabled(conn))
+                .await??;
+
+            if notify_users.len() == 0 {
+                return Ok(());
+            }
+
+            let client = IsahcWebPushClient::new()?;
+
+            for user in notify_users.into_iter() {
+                if let Some(PushNotificationSubscription {
+                    endpoint,
+                    key: p256dh,
+                    auth,
+                }) = user.push_notification_subscription
+                {
+                    debug!(
+                        "Notifying {} we just started version {}",
+                        user.username,
+                        env!("CARGO_PKG_VERSION")
+                    );
+                    let message = format!(
+                        "Hello {}. Eggercise version {} is now available",
+                        user.username,
+                        env!("CARGO_PKG_VERSION")
+                    );
+
+                    let subscription_info = SubscriptionInfo::new(endpoint, p256dh, auth);
+
+                    let sig_builder = VapidSignatureBuilder::from_pem(
+                        notifier_private_key.cursor(),
+                        &subscription_info,
+                    )?
+                    .build()?;
+
+                    let mut message_builder = WebPushMessageBuilder::new(&subscription_info);
+                    let content = message.as_bytes();
+                    message_builder.set_payload(ContentEncoding::Aes128Gcm, content);
+                    message_builder.set_vapid_signature(sig_builder);
+
+                    let message = message_builder.build()?;
+
+                    client.send(message).await?;
+                }
+            }
+
+            Ok::<_, ServerError<Nothing>>(())
+        });
+        match join_handle.await {
+            Err(e) => error!("Join error in notifier task: {e}"),
+            Ok(r) => {
+                if let Err(e) = r {
+                    error!("Error from notifier task: {e}");
+                }
+            }
+        }
+    });
+
+    let listener = TcpListener::bind(socket).await?;
+    debug!("listening on {}", listener.local_addr()?);
+
     axum::serve(
         listener,
         Router::new()
             .merge(client_routes)
-            .route(api::Auth::RegisterStart.path(), post(register_start))
-            .route(api::Auth::RegisterFinish.path(), post(register_finish))
-            .route(api::Auth::LoginStart.path(), post(login_start))
-            .route(api::Auth::LoginFinish.path(), post(login_finish))
+            // User/auth routes
+            .route(Auth::RegisterStart.path(), post(register_start))
+            .route(Auth::RegisterFinish.path(), post(register_finish))
+            .route(Auth::LoginStart.path(), post(login_start))
+            .route(Auth::LoginFinish.path(), post(login_finish))
             .route(
-                api::Auth::RegisterNewKeyStart.path(),
+                Auth::RegisterNewKeyStart.path(),
                 post(register_new_key_start),
             )
             .route(
-                api::Auth::RegisterNewKeyFinish.path(),
+                Auth::RegisterNewKeyFinish.path(),
                 post(register_new_key_finish),
             )
-            .route(api::Auth::TemporaryLogin.path(), get(temporary_login))
-            .route(api::Object::Ping.path(), get(ping))
-            // The following routes require the user to be signed in
-            .route(api::Object::User.path(), get(fetch_user))
+            .route(Auth::TemporaryLogin.path(), get(temporary_login))
+            .route(Object::User.path(), get(fetch_user))
             .route(
-                api::Auth::CreateTemporaryLogin.path(),
+                Auth::CreateTemporaryLogin.path(),
                 post(create_temporary_login),
             )
-            .route(api::Object::QrCodeId.path(), get(generate_qr_code))
-            .route(api::Object::Websocket.path(), get(websocket_handler))
+            .route(Object::QrCodeId.path(), get(generate_qr_code))
+            // Notification routes
+            .route(Object::Vapid.path(), get(vapid))
+            .route(
+                Object::PushSubscription.path(),
+                post(update_push_subscription).delete(remove_push_subscription),
+            )
+            .route(Object::Ping.path(), get(ping))
+            .route(Object::Websocket.path(), get(websocket_handler))
             .nest_service(
                 "/wasm/service_worker.js",
                 ServiceBuilder::new()
@@ -225,7 +329,7 @@ async fn main() -> Result<(), anyhow::Error> {
                     ))
                     .layer(
                         CorsLayer::new()
-                            .allow_methods([Method::GET, Method::POST])
+                            .allow_methods([Method::GET, Method::POST, Method::DELETE])
                             .allow_origin(args.cors_origin.parse::<HeaderValue>()?),
                     ),
             )

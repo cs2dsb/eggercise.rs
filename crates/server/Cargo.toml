@@ -33,6 +33,7 @@ mime.workspace = true
 include_dir.workspace = true
 base64.workspace = true
 rand.workspace = true
+web-push.workspace = true
 rusqlite = { workspace = true, features = [ "bundled" ] }
 webauthn-rs = { workspace = true, features = [ "danger-allow-state-serialisation" ] }
 

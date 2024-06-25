@@ -21,6 +21,9 @@
 - [ ] Add "Loading..." for the first ping (Currently if you refresh on a page with an offline fallback it flashes up the OFFLINE message for a second)
 - [ ] Tweak build.rs bundle creation to only include a subset of files (maybe a blocklist?). Motivation: don't want to include all the font README/licence/etc
 - [ ] Generate the preload/prefetch link tags instead of manually maintaining them
+- [ ] Investigate cleaning up action errors (can they work inside ErrorBoundaries instead of an extra error signal?)
+- [ ] Model last_updated_date should be handled consistently (if it's even needed)
+- [ ] Test what happens when there's an error from a DELETE request (error body?)
 
 ## WebauthN 
 - [x] Register

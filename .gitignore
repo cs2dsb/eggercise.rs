@@ -26,5 +26,8 @@ rustc-ice-*
 # Sqlite database files
 *.sqlite*
 
+# Keys
+*.pem
+
 node_modules/
 third_party/tools/

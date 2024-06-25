@@ -121,10 +121,14 @@ ul.error-list {
     padding: var(--size-1);
 }
 
+.error {
+    color: var(--red-9);
+}
+
 .block-wrap {
     display: flex;
     flex-wrap: wrap;
     flex-basis: var(--size-content-2);
     gap: var(--size-5) var(--size-8);
     align-items: flex-start;
-  }
+}

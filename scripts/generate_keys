@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+
+# Exit when any command fails
+set -o errexit
+
+# Exit when an undeclared variable is used
+set -o nounset
+
+# Exit when a piped command returns a non-zero exit code
+set -o pipefail
+
+# Generates egg_key.pem and egg_key.pub.pem if they don't already exist
+
+readonly repo_dir="$( cd $(dirname ${BASH_SOURCE}); cd ..; pwd )";
+cd $repo_dir
+
+if [[ ! -s "egg_key.pem"  ]]; then
+    rm -f egg_key.pem egg_key.pub.pem
+    openssl ecparam -genkey -name prime256v1 -out egg_key.pem
+    openssl ec -in egg_key.pem -pubout -outform DER|tail -c 65|base64|tr '/+' '_-'|tr -d '\n' > egg_key.pub.pem
+else 
+    echo "Keys already exist"
+fi
