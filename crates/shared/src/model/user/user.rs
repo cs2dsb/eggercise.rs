@@ -14,6 +14,8 @@ use {
     webauthn_rs::prelude::Passkey,
 };
 
+use super::PushNotificationSubscription;
+
 feature_model_derives!(
     "user",
     "../../../migrations/001-user/up.sql",
@@ -22,6 +24,7 @@ feature_model_derives!(
         pub username: String,
         pub email: Option<String>,
         pub display_name: Option<String>,
+        pub push_notification_subscription: Option<PushNotificationSubscription>,
         pub creation_date: DateTime<Utc>,
         pub last_updated_date: DateTime<Utc>,
         pub last_login_date: Option<DateTime<Utc>>,
@@ -65,6 +68,10 @@ impl User {
                 (UserIden::Username, self.username.clone().into()),
                 (UserIden::Email, self.email.clone().into()),
                 (UserIden::DisplayName, self.display_name.clone().into()),
+                (
+                    UserIden::PushNotificationSubscription,
+                    self.push_notification_subscription.clone().into(),
+                ),
                 (UserIden::CreationDate, self.creation_date.into()),
                 (UserIden::LastUpdatedDate, self.last_updated_date.into()),
                 (UserIden::LastLoginDate, self.last_login_date.into()),
@@ -108,5 +115,21 @@ impl User {
         conn: &Connection,
     ) -> Result<Option<TemporaryLogin>, ServerError<T>> {
         TemporaryLogin::fetch_by_user_id(conn, &self.id)
+    }
+
+    pub fn fetch_all_with_push_notifications_enabled(
+        conn: &Connection,
+    ) -> Result<Vec<User>, rusqlite::Error> {
+        let (sql, values) = Self::select_star()
+            .and_where(Expr::col(UserIden::PushNotificationSubscription).is_not_null())
+            .build_rusqlite(SqliteQueryBuilder);
+
+        let mut stmt = conn.prepare_cached(&sql)?;
+
+        let results = stmt
+            .query_and_then(&*values.as_params(), Self::from_row)?
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(results)
     }
 }

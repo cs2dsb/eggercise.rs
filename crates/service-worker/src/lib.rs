@@ -1,13 +1,21 @@
 use console_error_panic_hook::set_once as set_panic_hook;
 use gloo_utils::format::JsValueSerdeExt;
 use serde::{de::DeserializeOwned, Serialize};
-use shared::{api::API_BASE_PATH, ServiceWorkerPackage, SERVICE_WORKER_PACKAGE_URL};
+use shared::{
+    api::{
+        payloads::{UpdateSubscriptionRequest, UpdateSubscriptionResponse},
+        Object, API_BASE_PATH,
+    },
+    model::PushNotificationSubscription,
+    ServiceWorkerPackage, SERVICE_WORKER_PACKAGE_URL,
+};
 use wasm_bindgen::{prelude::wasm_bindgen, JsCast, JsValue};
 use wasm_bindgen_futures::{future_to_promise, JsFuture};
 use web_sys::{
     console::{error_1, log_1},
-    js_sys::{Array, Object, Promise},
-    Cache, CacheStorage, FetchEvent, MessageEvent, Request, RequestInit, Response, ResponseInit,
+    js_sys::{Array, Object as JsObject, Promise},
+    Cache, CacheStorage, Event, FetchEvent, MessageEvent, NotificationOptions, PushEvent,
+    PushSubscription, PushSubscriptionOptionsInit, Request, RequestInit, Response, ResponseInit,
     ServiceWorkerGlobalScope, Url,
 };
 
@@ -83,7 +91,7 @@ async fn fetch_from_cache(
         500
     };
 
-    let headers = Object::new();
+    let headers = JsObject::new();
     js_sys::Reflect::set(
         &headers,
         &JsValue::from_str("Content-Type"),
@@ -120,6 +128,17 @@ async fn fetch_json<T: DeserializeOwned>(
         .map_err(|e| log_and_err::<()>(&format!("Error deserializing json: {}", e)).unwrap_err())
 }
 
+async fn fetch_json_direct<T: DeserializeOwned>(
+    sw: &ServiceWorkerGlobalScope,
+    request: Request,
+) -> Result<T, JsValue> {
+    let response = fetch_direct(sw, request).await?;
+    let json = JsFuture::from(response.json()?).await?;
+
+    JsValueSerdeExt::into_serde(&json)
+        .map_err(|e| log_and_err::<()>(&format!("Error deserializing json: {}", e)).unwrap_err())
+}
+
 #[derive(Serialize)]
 struct CacheHeader {
     cache: String,
@@ -133,8 +152,10 @@ impl CacheHeader {
     }
 }
 
-fn construct_request(url: &str, integrity: Option<&str>) -> Result<Request, JsValue> {
+fn construct_request(url: &str, integrity: Option<&str>, method: &str) -> Result<Request, JsValue> {
     let mut r_init = RequestInit::new();
+    r_init.method(method);
+
     // Make sure we get the live file
     let value = <JsValue as JsValueSerdeExt>::from_serde(&CacheHeader::no_store()).unwrap();
     r_init.headers(&value);
@@ -153,7 +174,7 @@ async fn fetch_package(
     version: &str,
     remote: bool,
 ) -> Result<ServiceWorkerPackage, JsValue> {
-    let request = construct_request(SERVICE_WORKER_PACKAGE_URL, None)?;
+    let request = construct_request(SERVICE_WORKER_PACKAGE_URL, None, "GET")?;
     if remote {
         add_to_cache(sw.caches()?, version, &[request.clone()?]).await?;
     }
@@ -166,7 +187,7 @@ async fn install(sw: ServiceWorkerGlobalScope, version: String) -> Result<JsValu
     let requests = package
         .files
         .iter()
-        .map(|f| construct_request(&f.path, Some(&f.hash)))
+        .map(|f| construct_request(&f.path, Some(&f.hash), "GET"))
         .collect::<Result<Vec<_>, _>>()?;
 
     add_to_cache(sw.caches()?, &version, &requests).await?;
@@ -213,7 +234,10 @@ async fn fetch_cached(
     Ok(response)
 }
 
-async fn fetch_direct(sw: ServiceWorkerGlobalScope, request: Request) -> Result<Response, JsValue> {
+async fn fetch_direct(
+    sw: &ServiceWorkerGlobalScope,
+    request: Request,
+) -> Result<Response, JsValue> {
     let response = JsFuture::from(sw.fetch_with_request(&request)).await?;
 
     if response.is_instance_of::<Response>() {
@@ -226,7 +250,7 @@ async fn fetch_direct(sw: ServiceWorkerGlobalScope, request: Request) -> Result<
         console_error!("{}", e);
 
         // We have to construct some kind of response
-        let headers = Object::new();
+        let headers = JsObject::new();
         js_sys::Reflect::set(
             &headers,
             &JsValue::from_str("Content-Type"),
@@ -258,7 +282,7 @@ async fn fetch(
     let response = if cache {
         fetch_cached(sw, version, request).await?
     } else {
-        fetch_direct(sw, request).await?
+        fetch_direct(&sw, request).await?
     };
 
     Ok(JsValue::from(&response))
@@ -291,4 +315,94 @@ pub fn worker_message(sw: ServiceWorkerGlobalScope, event: MessageEvent) -> Resu
     console_log!("worker_message got unexpected message: {:?}", event.data());
 
     Ok(())
+}
+
+async fn push(
+    sw: ServiceWorkerGlobalScope,
+    _version: String,
+    _event: PushEvent,
+) -> Result<JsValue, JsValue> {
+    let mut options = NotificationOptions::new();
+    options.body("Also goodbye from egg");
+
+    Ok(JsFuture::from(
+        sw.registration()
+            .show_notification_with_options("Hello from egg", &options)?,
+    )
+    .await?)
+}
+#[wasm_bindgen]
+pub fn worker_push(
+    sw: ServiceWorkerGlobalScope,
+    version: String,
+    event: PushEvent,
+) -> Result<Promise, JsValue> {
+    console_log!("worker_push: {:?}", event);
+
+    Ok(future_to_promise(push(sw, version, event)))
+}
+
+async fn push_subscription_change(
+    sw: ServiceWorkerGlobalScope,
+    _version: String,
+    _event: Event,
+) -> Result<JsValue, JsValue> {
+    let push_manager = sw.registration().push_manager()?;
+
+    let mut options = PushSubscriptionOptionsInit::new();
+    options.user_visible_only(true);
+
+    let subscription: PushSubscription =
+        JsFuture::from(push_manager.subscribe_with_options(&options)?)
+            .await?
+            .into();
+
+    // TODO:!
+    let key = "".to_string();
+    let auth = "".to_string();
+    let update_subscription_req = UpdateSubscriptionRequest {
+        subscription: PushNotificationSubscription {
+            endpoint: subscription.endpoint(),
+            key,
+            auth,
+        },
+    };
+
+    let body_string = serde_json::to_string(&update_subscription_req)
+        .map_err(|e| log_and_err::<()>(&format!("Error deserializing json: {}", e)).unwrap_err())?;
+
+    let headers = JsObject::new();
+    js_sys::Reflect::set(
+        &headers,
+        &JsValue::from_str("Content-Type"),
+        &JsValue::from_str("application/json"),
+    )?;
+
+    let mut r_init = RequestInit::new();
+    r_init.method("POST");
+    r_init.headers(&headers);
+    r_init.body(Some(&JsValue::from(body_string)));
+
+    let request = Request::new_with_str_and_init(Object::PushNotification.path(), &r_init)?;
+    let update_subscription_resp: UpdateSubscriptionResponse =
+        fetch_json_direct(&sw, request).await?;
+    console_log!(
+        "Got UpdateSubscriptionResponse: {:?}",
+        update_subscription_resp
+    );
+
+    Ok(JsValue::undefined())
+}
+
+#[wasm_bindgen]
+pub fn worker_push_subscription_change(
+    sw: ServiceWorkerGlobalScope,
+    version: String,
+    event: Event,
+) -> Result<Promise, JsValue> {
+    console_log!("worker_push_subscription_change: {:?}", event);
+
+    Ok(future_to_promise(push_subscription_change(
+        sw, version, event,
+    )))
 }

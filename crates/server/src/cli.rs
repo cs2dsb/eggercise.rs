@@ -27,6 +27,10 @@ pub struct Cli {
     pub session_expiry_days: i64,
     #[arg(long, env, default_value = "10")]
     pub temporary_login_expiry_minutes: u64,
+    #[clap(long, env, default_value = "egg_key.pem")]
+    pub private_key_path: String,
+    #[clap(long, env, default_value = "egg_key.pub.pem")]
+    pub public_key_path: String,
 
     /// Deletes the database before starting the main program for debug purposes
     #[arg(long, env, default_value = "false")]

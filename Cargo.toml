@@ -13,7 +13,7 @@ lto = true
 codegen-units = 1
 
 [workspace.dependencies]
-
+web-push = "0.10.1"
 rand = "0.8.5"
 base64 = "0.22.0"
 

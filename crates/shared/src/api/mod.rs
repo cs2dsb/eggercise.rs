@@ -1,5 +1,6 @@
 use const_format::concatcp;
 pub mod error;
+pub mod payloads;
 pub mod response_errors;
 
 pub const API_BASE_PATH: &str = "/api/";
@@ -12,6 +13,9 @@ pub enum Object {
     QrCodeId,
     Ping,
     Websocket,
+    PushNotification,
+    PushSubscription,
+    Vapid,
 }
 
 impl Object {
@@ -23,6 +27,9 @@ impl Object {
             UserId => concatcp!(API_BASE_PATH, "user/:id"),
             Ping => concatcp!(API_BASE_PATH, "ping"),
             Websocket => concatcp!(API_BASE_PATH, "ws"),
+            PushNotification => concatcp!(API_BASE_PATH, "push_notification"),
+            PushSubscription => concatcp!(API_BASE_PATH, "push_subscription"),
+            Vapid => concatcp!(API_BASE_PATH, "vapid"),
         }
     }
 }

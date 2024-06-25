@@ -458,12 +458,5 @@ impl SqlitePromiser {
 }
 
 pub fn serde_stringify<T: Serialize>(v: &T) -> Result<String, SqlitePromiserError> {
-    use js_sys::JSON;
-
-    let js_value = <JsValue as JsValueSerdeExt>::from_serde(v)?;
-    let string = JSON::stringify(&js_value)
-        .map_err(|e| SqlitePromiserError::Js(format!("Error calling JSON.stringify: {:?}", e)))?
-        .into();
-
-    Ok(string)
+    Ok(serde_json::to_string(v)?)
 }

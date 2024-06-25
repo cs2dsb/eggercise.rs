@@ -28,6 +28,9 @@ pub use add_key::*;
 mod create_temporary_login;
 pub use create_temporary_login::*;
 
+mod notifications;
+pub use notifications::*;
+
 mod ping;
 pub use ping::*;
 use tracing::debug;

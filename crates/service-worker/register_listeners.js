@@ -13,9 +13,18 @@ self.addEventListener('activate', event => {
         .catch(err => console.error(`Error initializing and activating service worker wasm: ${err}`)));
 });
 
-self.addEventListener('fetch', event => {
-    event.waitUntil(wasm_bindgen.worker_fetch(self, self.version, event));
+self.addEventListener('push', event => {
+    event.waitUntil(wasm_bindgen.worker_push(self, self.version, event));
 });
+
+self.addEventListener('pushsubscriptionchange', event => {
+    event.waitUntil(wasm_bindgen.worker_push_subscription_change(self, self.version, event));
+});
+
+// TODO:
+// self.addEventListener('fetch', event => {
+//     event.waitUntil(wasm_bindgen.worker_fetch(self, self.version, event));
+// });
 
 
 self.addEventListener('message', event => {
