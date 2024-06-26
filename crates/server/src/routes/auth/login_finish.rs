@@ -43,7 +43,7 @@ pub async fn login_finish(
         // If the counter is non-zero, we have to check it
         let counter = authentication_result.counter();
         if counter > 0 {
-            ensure_server!(counter > credential.counter, "Stored counter >= authentication result counter. Possible credential clone or re-use");
+            ensure_server!(counter > credential.counter, "Stored counter ({}) >= authentication result counter ({}). Possible credential clone or re-use.", credential.counter, counter);
             credential.counter = counter;
             dirty = true;
         }

@@ -14,6 +14,7 @@ use {
         Json,
     },
     std::fmt::Display,
+    tracing::error,
 };
 #[cfg(any(feature = "backend", feature = "wasm"))]
 use {http::StatusCode, std::error::Error};
@@ -385,6 +386,11 @@ impl<T: Error> ServerError<T> {
 #[cfg(feature = "backend")]
 impl<T: Error + Serialize> IntoResponse for ServerError<T> {
     fn into_response(self) -> Response {
+        error!(
+            display=%self,
+            detail=?self,
+            "ServerError::into_response",
+        );
         let code = self.code();
         let json = Json(self);
         (code, json).into_response()
