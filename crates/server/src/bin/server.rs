@@ -21,6 +21,7 @@ use base64::prelude::{Engine as _, BASE64_URL_SAFE};
 use clap::Parser;
 use client::ROUTE_URLS;
 use deadpool_sqlite::{Config, Hook, Runtime};
+use futures::future::join_all;
 use server::{
     cli::Cli,
     db,
@@ -56,7 +57,7 @@ use tower_sessions_deadpool_sqlite_store::DeadpoolSqliteStore;
 use tracing::{debug, error, info, info_span, Span};
 use web_push::{
     ContentEncoding, IsahcWebPushClient, SubscriptionInfo, VapidSignatureBuilder, WebPushClient,
-    WebPushMessageBuilder,
+    WebPushError, WebPushMessageBuilder,
 };
 use webauthn_rs::{prelude::Url, WebauthnBuilder};
 
@@ -167,15 +168,13 @@ async fn main() -> Result<(), anyhow::Error> {
             if notify_users.len() == 0 {
                 return Ok(());
             }
-
-            let client = IsahcWebPushClient::new()?;
-
-            for user in notify_users.into_iter() {
+            let keyref = &notifier_private_key;
+            let results = join_all(notify_users.iter().map(|user| async move {
                 if let Some(PushNotificationSubscription {
                     endpoint,
                     key: p256dh,
                     auth,
-                }) = user.push_notification_subscription
+                }) = user.push_notification_subscription.clone()
                 {
                     debug!(
                         "Notifying {} we just started version {}",
@@ -190,11 +189,9 @@ async fn main() -> Result<(), anyhow::Error> {
 
                     let subscription_info = SubscriptionInfo::new(endpoint, p256dh, auth);
 
-                    let sig_builder = VapidSignatureBuilder::from_pem(
-                        notifier_private_key.cursor(),
-                        &subscription_info,
-                    )?
-                    .build()?;
+                    let sig_builder =
+                        VapidSignatureBuilder::from_pem(keyref.cursor(), &subscription_info)?
+                            .build()?;
 
                     let mut message_builder = WebPushMessageBuilder::new(&subscription_info);
                     let content = message.as_bytes();
@@ -203,11 +200,57 @@ async fn main() -> Result<(), anyhow::Error> {
 
                     let message = message_builder.build()?;
 
-                    client.send(message).await?;
+                    let client = IsahcWebPushClient::new()?;
+                    client.send(message).await?
                 }
+                Ok::<_, WebPushError>(())
+            }))
+            .await
+            .into_iter()
+            .collect::<Vec<Result<_, _>>>();
+
+            let (user_errors_unknown, user_errors_invalid_sub): (Vec<_>, _) = notify_users
+                .into_iter()
+                .zip(results.into_iter())
+                .filter_map(|(user, r)| r.err().map(|e| (user, e)))
+                .partition(|(_, err)| match err {
+                    // TODO: there might be some other errors this behaviour should apply to
+                    WebPushError::EndpointNotValid => false,
+                    _ => true,
+                });
+
+            if user_errors_invalid_sub.len() > 0 {
+                notifier_db_connection
+                    .interact(move |conn| {
+                        // TODO: move into shared db code
+                        let mut stmt = conn.prepare(
+                            "UPDATE User SET push_notification_subscription = NULL WHERE id = ?1",
+                        )?;
+                        for (user, _) in user_errors_invalid_sub.iter() {
+                            stmt.execute(&[&user.id])?;
+                            // TODO: send a message to the service worker to resubscribe
+                            error!(
+                                "User {} ({}) had an invalid subscription. It's been removed",
+                                user.username, user.id
+                            );
+                        }
+                        Ok::<_, rusqlite::Error>(())
+                    })
+                    .await??;
             }
 
-            Ok::<_, ServerError<Nothing>>(())
+            if user_errors_unknown.len() > 0 {
+                let message = user_errors_unknown
+                    .into_iter()
+                    .map(|(user, err)| format!("(user_id: {}, {:?})", user.id, err))
+                    .collect::<Vec<_>>()
+                    .join(",");
+                Err(ServerError::<Nothing>::Other {
+                    message,
+                })
+            } else {
+                Ok(())
+            }
         });
         match join_handle.await {
             Err(e) => error!("Join error in notifier task: {e}"),

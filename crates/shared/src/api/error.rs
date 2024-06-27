@@ -279,7 +279,7 @@ macro_rules! other_error {
 #[cfg(feature = "backend")]
 #[macro_export]
 macro_rules! ensure_server {
-    ($expr:expr, $($t:tt)*) => (if $expr {
+    ($expr:expr, $($t:tt)*) => (if !$expr {
         Err(ServerError::Other{ message: format!("Assertion failed: {}", format_args!($($t)*)) })?
     })
 }
@@ -355,7 +355,11 @@ impl<T: Error> From<webauthn_rs::prelude::WebauthnError> for ServerError<T> {
 impl<T: Error> From<web_push::WebPushError> for ServerError<T> {
     fn from(value: web_push::WebPushError) -> Self {
         Self::WebPush {
-            message: value.to_string(),
+            // TODO: passing these errors on to the client is bad. Would be nice to have a client
+            // and server version and translate the server version into the client
+            // version before serializing it to send to the client. This could conver the real error
+            // type to it's display value or some placeholder
+            message: format!("{:?}", value),
         }
     }
 }
