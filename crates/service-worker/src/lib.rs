@@ -320,14 +320,20 @@ pub fn worker_message(sw: ServiceWorkerGlobalScope, event: MessageEvent) -> Resu
 async fn push(
     sw: ServiceWorkerGlobalScope,
     _version: String,
-    _event: PushEvent,
+    event: PushEvent,
 ) -> Result<JsValue, JsValue> {
+    let title = event.data().map(|d| d.text()).unwrap_or_else(|| {
+        let msg = "Got PushEvent with no data!";
+        console_error!("{}", msg);
+        msg.to_string()
+    });
+
     let mut options = NotificationOptions::new();
-    options.body("Also goodbye from egg");
+    options.icon("/favicon.ico");
 
     Ok(JsFuture::from(
         sw.registration()
-            .show_notification_with_options("Hello from egg", &options)?,
+            .show_notification_with_options(&title, &options)?,
     )
     .await?)
 }

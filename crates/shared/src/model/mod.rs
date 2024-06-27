@@ -7,6 +7,9 @@ pub use exercise::*;
 mod plan;
 pub use plan::*;
 
+mod service_version;
+pub use service_version::*;
+
 #[cfg(feature = "backend")]
 mod credential;
 #[cfg(feature = "backend")]
@@ -15,9 +18,6 @@ pub use credential::*;
 use crate::api::error::ValidationError;
 
 pub mod constants;
-
-mod temporary_login;
-pub use temporary_login::*;
 
 pub trait ValidateModel {
     fn validate(&self) -> Result<(), ValidationError>;
@@ -167,7 +167,7 @@ macro_rules! feature_model_imports {
     () => {
         #[cfg(feature = "exemplar-model")]
         #[allow(unused_imports)]
-        use exemplar::Model;
+        use exemplar::Model as ExemplarModel;
         #[cfg(feature = "wasm")]
         #[allow(unused_imports)]
         use leptos::{view, IntoView};
@@ -195,7 +195,7 @@ macro_rules! feature_model_derives {
     }) => {
 
         #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-        #[cfg_attr(feature = "exemplar-model", derive(Model))]
+        #[cfg_attr(feature = "exemplar-model", derive(ExemplarModel))]
         #[cfg_attr(feature = "exemplar-model", table($table_name))]
         #[cfg_attr(
             feature = "exemplar-model",

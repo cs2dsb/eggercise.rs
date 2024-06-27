@@ -3474,6 +3474,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d369a96f978623eb3dc28807c4852d6cc617fed53da5d3c400feff1ef34a714a"
 
 [[package]]
+name = "semver"
+version = "1.0.23"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "61697e0a1c7e512e84a621326239844a24d8207b4669b41bc18b32ea5cbf988b"
+
+[[package]]
 name = "send_wrapper"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3771,6 +3777,7 @@ dependencies = [
  "rusqlite",
  "sea-query",
  "sea-query-rusqlite",
+ "semver",
  "serde",
  "serde_json",
  "thiserror",
@@ -4899,6 +4906,13 @@ checksum = "77afa9a11836342370f4817622a2f0f418b134426d91a82dfb48f532d2ec13ef"
 dependencies = [
  "js-sys",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "web-sys_dummy"
+version = "0.0.82"
+dependencies = [
+ "web-sys",
 ]
 
 [[package]]
