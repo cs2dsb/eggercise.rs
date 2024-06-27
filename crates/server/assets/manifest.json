@@ -1,7 +1,7 @@
 {
     "name": "Eggercise",
     "start_url": "https://egg.ileet.co.uk",
-    "display": "browser",
+    "display": "standalone",
     "icons": [
         {
           "src": "favicon512.png",
