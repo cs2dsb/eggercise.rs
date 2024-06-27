@@ -355,9 +355,10 @@ impl<T: Error> From<webauthn_rs::prelude::WebauthnError> for ServerError<T> {
 impl<T: Error> From<web_push::WebPushError> for ServerError<T> {
     fn from(value: web_push::WebPushError) -> Self {
         Self::WebPush {
-            // TODO: passing these errors on to the client is bad. Would be nice to have a client and server version and translate
-            // the server version into the client version before serializing it to send to the client. This could conver the real error type
-            // to it's display value or some placeholder
+            // TODO: passing these errors on to the client is bad. Would be nice to have a client
+            // and server version and translate the server version into the client
+            // version before serializing it to send to the client. This could conver the real error
+            // type to it's display value or some placeholder
             message: format!("{:?}", value),
         }
     }
