@@ -219,10 +219,9 @@ async fn main() -> Result<(), anyhow::Error> {
                     .filter_map(|(user, r)| r.err().map(|e| (user, e)))
                     .partition(|(_, err)| match err {
                         // TODO: there might be some other errors this behaviour should apply to
-                        WebPushError::EndpointNotValid 
+                        WebPushError::EndpointNotValid
                         | WebPushError::InvalidUri
-                        | WebPushError::EndpointNotFound 
-                            => false,
+                        | WebPushError::EndpointNotFound => false,
                         _ => true,
                     });
 

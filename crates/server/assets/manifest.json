@@ -1,0 +1,18 @@
+{
+    "name": "Eggercise",
+    "start_url": "https://egg.ileet.co.uk",
+    "display": "browser",
+    "icons": [
+        {
+          "src": "favicon512.png",
+          "type": "image/png",
+          "sizes": "512x512"
+        },
+        {
+          "src": "favicon192.png",
+          "type": "image/png",
+          "sizes": "192x192"
+        }
+    ]
+  }
+  
