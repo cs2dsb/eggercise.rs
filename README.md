@@ -24,6 +24,8 @@
 - [ ] Investigate cleaning up action errors (can they work inside ErrorBoundaries instead of an extra error signal?)
 - [ ] Model last_updated_date should be handled consistently (if it's even needed)
 - [ ] Test what happens when there's an error from a DELETE request (error body?)
+- [ ] Add option to enroll a new key back in
+- [ ] Make it more obvious a temporary login has happened and you are currently logged in
 
 ## WebauthN 
 - [x] Register
