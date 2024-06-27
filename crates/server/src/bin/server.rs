@@ -97,7 +97,8 @@ async fn main() -> Result<(), anyhow::Error> {
 
     // Run the migrations synchronously before creating the pool or launching the
     // server
-    let ran = db::run_migrations(&args.sqlite_connection_string)?;
+    let (ran, new_version) =
+        db::run_migrations(&args.sqlite_connection_string, env!("CARGO_PKG_VERSION"))?;
     info!("Ran {ran} db migrations");
 
     let webauthn = Arc::new(build_webauthn(&args)?);
@@ -158,109 +159,113 @@ async fn main() -> Result<(), anyhow::Error> {
         router
     };
 
-    // Double task is just to display any panics in the inner task
-    tokio::spawn(async move {
-        let join_handle = tokio::spawn(async move {
-            let notify_users = notifier_db_connection
-                .interact(move |conn| User::fetch_all_with_push_notifications_enabled(conn))
-                .await??;
-
-            if notify_users.len() == 0 {
-                return Ok(());
-            }
-            let keyref = &notifier_private_key;
-            let results = join_all(notify_users.iter().map(|user| async move {
-                if let Some(PushNotificationSubscription {
-                    endpoint,
-                    key: p256dh,
-                    auth,
-                }) = user.push_notification_subscription.clone()
-                {
-                    debug!(
-                        "Notifying {} we just started version {}",
-                        user.username,
-                        env!("CARGO_PKG_VERSION")
-                    );
-                    let message = format!(
-                        "Hello {}. Eggercise version {} is now available",
-                        user.username,
-                        env!("CARGO_PKG_VERSION")
-                    );
-
-                    let subscription_info = SubscriptionInfo::new(endpoint, p256dh, auth);
-
-                    let sig_builder =
-                        VapidSignatureBuilder::from_pem(keyref.cursor(), &subscription_info)?
-                            .build()?;
-
-                    let mut message_builder = WebPushMessageBuilder::new(&subscription_info);
-                    let content = message.as_bytes();
-                    message_builder.set_payload(ContentEncoding::Aes128Gcm, content);
-                    message_builder.set_vapid_signature(sig_builder);
-
-                    let message = message_builder.build()?;
-
-                    let client = IsahcWebPushClient::new()?;
-                    client.send(message).await?
-                }
-                Ok::<_, WebPushError>(())
-            }))
-            .await
-            .into_iter()
-            .collect::<Vec<Result<_, _>>>();
-
-            let (user_errors_unknown, user_errors_invalid_sub): (Vec<_>, _) = notify_users
-                .into_iter()
-                .zip(results.into_iter())
-                .filter_map(|(user, r)| r.err().map(|e| (user, e)))
-                .partition(|(_, err)| match err {
-                    // TODO: there might be some other errors this behaviour should apply to
-                    WebPushError::EndpointNotValid => false,
-                    _ => true,
-                });
-
-            if user_errors_invalid_sub.len() > 0 {
-                notifier_db_connection
-                    .interact(move |conn| {
-                        // TODO: move into shared db code
-                        let mut stmt = conn.prepare(
-                            "UPDATE User SET push_notification_subscription = NULL WHERE id = ?1",
-                        )?;
-                        for (user, _) in user_errors_invalid_sub.iter() {
-                            stmt.execute(&[&user.id])?;
-                            // TODO: send a message to the service worker to resubscribe
-                            error!(
-                                "User {} ({}) had an invalid subscription. It's been removed",
-                                user.username, user.id
-                            );
-                        }
-                        Ok::<_, rusqlite::Error>(())
-                    })
+    if let Some(new_version) = new_version {
+        // Double task is just to display any panics in the inner task
+        tokio::spawn(async move {
+            let join_handle = tokio::spawn(async move {
+                let notify_users = notifier_db_connection
+                    .interact(move |conn| User::fetch_all_with_push_notifications_enabled(conn))
                     .await??;
-            }
 
-            if user_errors_unknown.len() > 0 {
-                let message = user_errors_unknown
+                if notify_users.len() == 0 {
+                    return Ok(());
+                }
+                let keyref = &notifier_private_key;
+                let new_version = &new_version;
+                let results = join_all(notify_users.iter().map(|user| async move {
+                    if let Some(PushNotificationSubscription {
+                        endpoint,
+                        key: p256dh,
+                        auth,
+                    }) = user.push_notification_subscription.clone()
+                    {
+                        debug!(
+                            "Notifying {} ({}) we just started version {}",
+                            user.username, user.id, new_version,
+                        );
+                        let message =
+                            format!("Eggercise version {} is now available", new_version,);
+
+                        let subscription_info = SubscriptionInfo::new(endpoint, p256dh, auth);
+
+                        let sig_builder =
+                            VapidSignatureBuilder::from_pem(keyref.cursor(), &subscription_info)?
+                                .build()?;
+
+                        let mut message_builder = WebPushMessageBuilder::new(&subscription_info);
+                        let content = message.as_bytes();
+                        message_builder.set_payload(ContentEncoding::Aes128Gcm, content);
+                        message_builder.set_vapid_signature(sig_builder);
+
+                        let message = message_builder.build()?;
+
+                        let client = IsahcWebPushClient::new()?;
+                        if let Err(e) = client.send(message).await {
+                            error!("Error sending push notification: {:?}", e);
+                            Err(e)?
+                        } else {
+                            debug!("Push sent ok");
+                        }
+                    }
+                    Ok::<_, WebPushError>(())
+                }))
+                .await
+                .into_iter()
+                .collect::<Vec<Result<_, _>>>();
+
+                let (user_errors_unknown, user_errors_invalid_sub): (Vec<_>, _) = notify_users
                     .into_iter()
-                    .map(|(user, err)| format!("(user_id: {}, {:?})", user.id, err))
-                    .collect::<Vec<_>>()
-                    .join(",");
-                Err(ServerError::<Nothing>::Other {
-                    message,
-                })
-            } else {
-                Ok(())
+                    .zip(results.into_iter())
+                    .filter_map(|(user, r)| r.err().map(|e| (user, e)))
+                    .partition(|(_, err)| match err {
+                        // TODO: there might be some other errors this behaviour should apply to
+                        WebPushError::EndpointNotValid => false,
+                        _ => true,
+                    });
+
+                if user_errors_invalid_sub.len() > 0 {
+                    notifier_db_connection
+                        .interact(move |conn| {
+                            // TODO: move into shared db code
+                            let mut stmt = conn.prepare(
+                                "UPDATE User SET push_notification_subscription = NULL WHERE id = ?1",
+                            )?;
+                            for (user, _) in user_errors_invalid_sub.iter() {
+                                stmt.execute(&[&user.id])?;
+                                // TODO: send a message to the service worker to resubscribe
+                                error!(
+                                    "User {} ({}) had an invalid subscription. It's been removed",
+                                    user.username, user.id
+                                );
+                            }
+                            Ok::<_, rusqlite::Error>(())
+                        })
+                        .await??;
+                }
+
+                if user_errors_unknown.len() > 0 {
+                    let message = user_errors_unknown
+                        .into_iter()
+                        .map(|(user, err)| format!("(user_id: {}, {:?})", user.id, err))
+                        .collect::<Vec<_>>()
+                        .join(",");
+                    Err(ServerError::<Nothing>::Other {
+                        message,
+                    })
+                } else {
+                    Ok(())
+                }
+            });
+            match join_handle.await {
+                Err(e) => error!("Join error in notifier task: {e}"),
+                Ok(r) => {
+                    if let Err(e) = r {
+                        error!("Error from notifier task: {e}");
+                    }
+                }
             }
         });
-        match join_handle.await {
-            Err(e) => error!("Join error in notifier task: {e}"),
-            Ok(r) => {
-                if let Err(e) = r {
-                    error!("Error from notifier task: {e}");
-                }
-            }
-        }
-    });
+    }
 
     let listener = TcpListener::bind(socket).await?;
     debug!("listening on {}", listener.local_addr()?);

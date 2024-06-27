@@ -191,7 +191,7 @@ impl Credential {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Model)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ExemplarModel)]
 #[table("credential")]
 pub struct NewCredential {
     pub id: CredentialId,

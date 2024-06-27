@@ -14,6 +14,15 @@ set -o pipefail
 readonly repo_dir="$( cd $(dirname ${BASH_SOURCE}); cd ..; pwd )";
 cd $repo_dir
 
+# This is to get web-sys with --all-features in the local documentation for ease of working out what
+# features are needed when looking for a property
+echo "Updating web-sys_dummy with all features" >&2
+readonly all_features=`cargo metadata --format-version 1 | jq --raw-output '.packages | .[] | select(.name == "web-sys") | .features | keys .[]' | tr '\n' ','`
+cd "${repo_dir}/crates/web-sys_dummy"
+cargo add web-sys --features ${all_features}
+
+cd $repo_dir
+echo "Documenting eggercise" >&2
 cargo doc \
     --workspace \
     --all-features \

@@ -18,17 +18,13 @@ js-sys = "0.3.69"
 shared = { path = "../shared", features = [ "wasm" ] }
 web-sys = { workspace = true, features = [ 
     "console", "FetchEvent",  "Request",  
-    "ReadableStream",  "ReadableStreamDefaultReader", 
-    "Headers",  "ResponseInit",  "Response", 
+    "ReadableStream", "ReadableStreamDefaultReader", 
+    "Headers", "ResponseInit", "Response", 
     "ServiceWorkerGlobalScope", "WorkerGlobalScope", 
     "WorkerLocation", "Clients", "CacheStorage",
     "Cache", "RequestInit", "MessageEvent", "Url",
-    "PushEvent",
-    "Event",
-    "PushManager",
-    "ServiceWorkerRegistration",
-    "NotificationOptions",
-    "PushSubscriptionOptionsInit",
-    "PushSubscription",
-    "PushEncryptionKeyName",
+    "PushEvent", "Event", "PushManager", 
+    "ServiceWorkerRegistration", "NotificationOptions", 
+    "PushSubscriptionOptionsInit", "PushSubscription", 
+    "PushEncryptionKeyName", "PushMessageData",
 ] }
