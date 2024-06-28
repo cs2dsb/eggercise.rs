@@ -455,8 +455,8 @@ fn main() -> Result<(), anyhow::Error> {
 
         // Copy the output to the assets dir
         time("Copy wasm & js files to output wasm dir", 1, || {
-            // copy(&service_worker_js_file, &service_worker_js_out)
-            //     .context("copy[service_worker_js_file]")?;
+            copy(&service_worker_js_file, &service_worker_js_out)
+                .context("copy[service_worker_js_file]")?;
             copy(&client_bg_opt_file, &client_wasm_out).context("copy[client_bg_opt_file]")?;
             copy(&client_js_file, &client_js_out).context("copy[client_js_file]")
         })?;
