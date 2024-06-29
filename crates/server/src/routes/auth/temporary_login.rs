@@ -3,6 +3,7 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Redirect},
 };
+use client::ClientRoutes;
 use shared::{
     api::error::{Nothing, ServerError},
     bad_request_error,
@@ -56,5 +57,5 @@ pub async fn temporary_login(
     session.set_user_state(&user).await?;
 
     // Redirect the user to the index page
-    Ok(Redirect::to("/"))
+    Ok(Redirect::to(ClientRoutes::Profile.path()))
 }

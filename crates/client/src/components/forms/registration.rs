@@ -34,6 +34,7 @@ pub fn RegistrationForm(
                 type="text"
                 required
                 placeholder="Username"
+                prop:autocomplete="username"
                 prop:disabled=move || disabled.get()
                 on:keyup=move |ev| on_change(ev, set_name)
                 on:change=move |ev| on_change(ev, set_name)

@@ -9,8 +9,10 @@ use shared::{
 use tracing::{debug, warn};
 
 use crate::{
-    api::{create_temporary_login, fetch_user},
-    components::{forms::CreateTemporaryLoginForm, FrontendErrorBoundary, OfflineFallback},
+    api::{add_key, create_temporary_login, fetch_user},
+    components::{
+        forms::CreateTemporaryLoginForm, AddKeyForm, FrontendErrorBoundary, OfflineFallback,
+    },
 };
 
 type ServerErrorNothing = ServerError<Nothing>;
@@ -22,10 +24,12 @@ fn ProfileWithUser(
     update_action: Action<(User, TemporaryLogin), ()>,
 ) -> impl IntoView {
     let (temporary_login_error, set_temporary_login_error) = create_signal(None::<String>);
+    let (add_key_error, set_add_key_error) = create_signal(None::<String>);
+    let (add_key_success, set_add_key_success) = create_signal(None::<String>);
     let (wait_for_response, set_wait_for_response) = create_signal(false);
 
     let create_temporary_login_action = create_action(move |_: &()| {
-        debug!("Adding new key...");
+        debug!("Creating temporary login...");
         async move {
             set_wait_for_response.update(|w| *w = true);
 
@@ -36,8 +40,30 @@ fn ProfileWithUser(
                 }
                 Err(err) => {
                     let msg = format!("{:?}", err);
-                    warn!("Error adding key: {msg}");
+                    warn!("Error creating temporary login: {msg}");
                     set_temporary_login_error.update(|e| *e = Some(msg));
+                }
+            }
+
+            set_wait_for_response.update(|w| *w = false);
+        }
+    });
+
+    let add_key_action = create_action(move |_: &()| {
+        debug!("Adding key...");
+        async move {
+            set_wait_for_response.update(|w| *w = true);
+
+            match add_key().await {
+                Ok(_) => {
+                    set_add_key_success.update(|v| *v = Some("Key added successfully".to_string()));
+                    set_add_key_error.update(|e| *e = None);
+                }
+                Err(err) => {
+                    let msg = format!("{:?}", err);
+                    warn!("Error adding key: {msg}");
+                    set_add_key_success.update(|v| *v = None);
+                    set_add_key_error.update(|e| *e = Some(msg));
                 }
             }
 
@@ -54,6 +80,7 @@ fn ProfileWithUser(
                 }
             }
         >
+            <h3>"You are logged in"</h3>
             <div><span>"Username: "</span><span>{ user.with(move |u| u.as_ref().map(|u| u.username.clone() )) }</span></div>
             <Show
                 when=move || temporary_login.with(|tl| tl.is_some())
@@ -73,8 +100,14 @@ fn ProfileWithUser(
                         <img src={ tl.qr_code_url() }/>
                     }
                 }))}
-                // <div><span>"Temp login: "</span><span>{ temporary_login.with(move |tl| tl.as_ref().map(|tl| tl.url.clone() )) }</span></div>
             </Show>
+
+            <AddKeyForm
+                action=add_key_action
+                error=add_key_error
+                message=add_key_success
+                disabled=wait_for_response
+            />
         </Show>
     }
 }
