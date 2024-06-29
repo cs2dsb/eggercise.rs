@@ -1,19 +1,20 @@
 use gloo_net::http::Method;
-use leptos::window;
 use shared::{
     api::{
         self,
-        error::{FrontendError, NoValidation, ResultContext, ServerError},
+        error::{FrontendError, NoValidation, ServerError},
         response_errors::RegisterError,
     },
     model::RegistrationUser,
 };
 use tracing::debug;
-use wasm_bindgen_futures::JsFuture;
-use web_sys::{CredentialCreationOptions, PublicKeyCredential};
+use web_sys::CredentialCreationOptions;
 use webauthn_rs_proto::{CreationChallengeResponse, RegisterPublicKeyCredential};
 
-use crate::{api::json_request, utils::JsValueIntoOk};
+use crate::{
+    api::{create_credentials, json_request},
+    utils::JsValueIntoOk,
+};
 
 pub async fn register(
     reg_user: &RegistrationUser,
@@ -31,22 +32,9 @@ pub async fn register(
     debug!("register::CreationChallengeResponse => CredentialCreationOptions");
     let credential_creation_options: CredentialCreationOptions = creation_challenge_response.into();
 
-    // Get a promise that returns the credentials
-    debug!("register::window.credentials.create");
-    let create_fut = window()
-        .navigator()
-        .credentials()
-        .create_with_options(&credential_creation_options)
-        .map_err(FrontendError::from)
-        .context("Creating credential create request (window.navigator.credentials.create)")?;
-
-    // Get the credentials
-    debug!("register::window.credentials.create.await");
-    let public_key_credential: PublicKeyCredential = JsFuture::from(create_fut)
-        .await
-        .map_err(FrontendError::from)
-        .context("Awaiting credential create request (window.navigator.credentials.await)")?
-        .into();
+    // Ask the browser to give us a credential
+    debug!("register::create_credentials");
+    let public_key_credential = create_credentials(credential_creation_options).await?;
 
     // Convert to the rust type
     debug!("register::PublicKeyCredentials => RegisterPublicKeyCredential");
