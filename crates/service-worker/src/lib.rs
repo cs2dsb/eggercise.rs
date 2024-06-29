@@ -3,6 +3,7 @@ use gloo_utils::format::JsValueSerdeExt;
 use serde::{de::DeserializeOwned, Serialize};
 use shared::{
     api::{
+        error::JsError,
         payloads::{UpdateSubscriptionRequest, UpdateSubscriptionResponse},
         Object, API_BASE_PATH,
     },
@@ -14,9 +15,9 @@ use wasm_bindgen_futures::{future_to_promise, JsFuture};
 use web_sys::{
     console::{error_1, log_1},
     js_sys::{Array, Object as JsObject, Promise},
-    Cache, CacheStorage, Event, FetchEvent, MessageEvent, NotificationOptions, PushEvent,
-    PushSubscription, PushSubscriptionOptionsInit, Request, RequestInit, Response, ResponseInit,
-    ServiceWorkerGlobalScope, Url,
+    Cache, CacheStorage, Event, FetchEvent, MessageEvent, NotificationEvent, NotificationOptions,
+    PushEvent, PushSubscription, PushSubscriptionOptionsInit, Request, RequestInit, Response,
+    ResponseInit, ServiceWorkerGlobalScope, Url, WindowClient,
 };
 
 const SKIP_WAITING: &str = "SKIP_WAITING";
@@ -184,13 +185,27 @@ async fn fetch_package(
 
 async fn install(sw: ServiceWorkerGlobalScope, version: String) -> Result<JsValue, JsValue> {
     let package = fetch_package(&sw, &version, true).await?;
-    let requests = package
-        .files
-        .iter()
-        .map(|f| construct_request(&f.path, Some(&f.hash), "GET"))
-        .collect::<Result<Vec<_>, _>>()?;
 
-    add_to_cache(sw.caches()?, &version, &requests).await?;
+    for f in package.files.iter() {
+        let request = construct_request(&f.path, Some(&f.hash), "GET")
+            .map_err(JsError::from)
+            .map_err(|e| {
+                log_and_err::<()>(&format!("Error constructing request for {}: {}", f.path, e))
+                    .unwrap_err()
+            })?;
+
+        // Done one at a time so the additional logging context can be added
+        add_to_cache(sw.caches()?, &version, &vec![request])
+            .await
+            .map_err(JsError::from)
+            .map_err(|e| {
+                log_and_err::<()>(&format!(
+                    "Error adding request to cache for {}: {}",
+                    f.path, e
+                ))
+                .unwrap_err()
+            })?;
+    }
 
     Ok(JsValue::undefined())
 }
@@ -204,11 +219,13 @@ pub fn worker_install(sw: ServiceWorkerGlobalScope, version: String) -> Result<P
 }
 
 #[wasm_bindgen]
-pub fn worker_activate(_sw: ServiceWorkerGlobalScope) -> Promise {
+pub fn worker_activate(sw: ServiceWorkerGlobalScope) -> Promise {
     set_panic_hook();
     console_log!("worker_activate called");
 
-    Promise::resolve(&JsValue::undefined())
+    // Claim the clients so we can control them in response to a push notificiation
+    // click
+    sw.clients().claim()
 }
 
 async fn fetch_cached(
@@ -343,7 +360,7 @@ pub fn worker_push(
     version: String,
     event: PushEvent,
 ) -> Result<Promise, JsValue> {
-    console_log!("worker_push: {:?}", event);
+    console_log!("worker_push: {:?}", event.data());
 
     Ok(future_to_promise(push(sw, version, event)))
 }
@@ -411,4 +428,36 @@ pub fn worker_push_subscription_change(
     Ok(future_to_promise(push_subscription_change(
         sw, version, event,
     )))
+}
+
+async fn notification_click(sw: ServiceWorkerGlobalScope) -> Result<JsValue, JsValue> {
+    let clients: Array = JsFuture::from(sw.clients().match_all()).await?.into();
+    if clients.length() > 0 {
+        let client: WindowClient = clients.get(0).into();
+        JsFuture::from(client.focus()?)
+            .await
+            .map_err(JsError::from)
+            .map_err(|e| {
+                log_and_err::<()>(&format!("Error focusing client window: {}", e)).unwrap_err()
+            })?;
+    } else {
+        JsFuture::from(sw.clients().open_window("/"))
+            .await
+            .map_err(JsError::from)
+            .map_err(|e| {
+                log_and_err::<()>(&format!("Error opening new window: {}", e)).unwrap_err()
+            })?;
+    }
+    Ok(JsValue::undefined())
+}
+
+#[wasm_bindgen]
+pub fn worker_notification_click(
+    sw: ServiceWorkerGlobalScope,
+    _version: String,
+    event: NotificationEvent,
+) -> Result<Promise, JsValue> {
+    console_log!("worker_notification_click: {:?}", event.notification());
+
+    Ok(future_to_promise(notification_click(sw)))
 }

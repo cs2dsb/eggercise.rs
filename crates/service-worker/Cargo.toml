@@ -27,4 +27,5 @@ web-sys = { workspace = true, features = [
     "ServiceWorkerRegistration", "NotificationOptions", 
     "PushSubscriptionOptionsInit", "PushSubscription", 
     "PushEncryptionKeyName", "PushMessageData",
+    "NotificationEvent","Notification", "WindowClient",
 ] }
