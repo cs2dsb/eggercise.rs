@@ -4,13 +4,13 @@ self.version = 'SERVICE_WORKER_VERSION';
 self.addEventListener('install', event => {
     event.waitUntil(self.init
         .then(_ => wasm_bindgen.worker_install(self, self.version))
-        .catch(err => console.error(`Error initializing and installing service worker wasm: ${err}`)));
+        .catch(err => console.error(`Error initializing or installing service worker wasm: ${err}`)));
 });
 
 self.addEventListener('activate', event => {
     event.waitUntil(self.init
         .then(_ => wasm_bindgen.worker_activate(self, self.version))
-        .catch(err => console.error(`Error initializing and activating service worker wasm: ${err}`)));
+        .catch(err => console.error(`Error initializing or activating service worker wasm: ${err}`)));
 });
 
 self.addEventListener('push', event => {
@@ -24,6 +24,13 @@ self.addEventListener('pushsubscriptionchange', event => {
         .then(_ => wasm_bindgen.worker_push_subscription_change(self, self.version, event))
         .catch(err => console.error(`Error initializing or calling worker_push_subscription_change: ${err}`)));
 });
+
+self.addEventListener('notificationclick', event => {
+    event.waitUntil(self.init
+        .then(_ => wasm_bindgen.worker_notification_click(self, self.version, event))
+        .catch(err => console.error(`Error initializing or calling worker_notification_click: ${err}`)));
+});
+
 
 // TODO:
 // self.addEventListener('fetch', event => {
