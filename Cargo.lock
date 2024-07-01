@@ -3712,6 +3712,7 @@ dependencies = [
 name = "service-worker"
 version = "0.0.92"
 dependencies = [
+ "chrono",
  "console_error_panic_hook",
  "gloo-utils",
  "js-sys",

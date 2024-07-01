@@ -18,6 +18,7 @@ use axum::{
     Router,
 };
 use base64::prelude::{Engine as _, BASE64_URL_SAFE};
+use chrono::Utc;
 use clap::Parser;
 use client::ROUTE_URLS;
 use deadpool_sqlite::{Config, Hook, Runtime};
@@ -37,6 +38,7 @@ use server::{
 use shared::{
     api::{
         error::{Nothing, ServerError},
+        payloads::Notification,
         Auth, Object, CSRF_HEADER,
     },
     configure_tracing, load_dotenv,
@@ -56,8 +58,8 @@ use tower_sessions::{cookie::time::Duration as CookieDuration, Expiry, SessionMa
 use tower_sessions_deadpool_sqlite_store::DeadpoolSqliteStore;
 use tracing::{debug, error, info, info_span, Span};
 use web_push::{
-    ContentEncoding, IsahcWebPushClient, SubscriptionInfo, VapidSignatureBuilder, WebPushClient,
-    WebPushError, WebPushMessageBuilder,
+    ContentEncoding, IsahcWebPushClient, SubscriptionInfo, Urgency, VapidSignatureBuilder,
+    WebPushClient, WebPushError, WebPushMessageBuilder,
 };
 use webauthn_rs::{prelude::Url, WebauthnBuilder};
 
@@ -183,8 +185,13 @@ async fn main() -> Result<(), anyhow::Error> {
                             "Notifying {} ({}) we just started version {}",
                             user.username, user.id, new_version,
                         );
-                        let message =
-                            format!("Eggercise version {} is now available", new_version,);
+                        let notification = Notification {
+                            title: "Eggercise updated".to_string(),
+                            body: Some(format!("Version {} is now available", new_version)),
+                            icon: None,
+                            sent: Utc::now(),
+                        };
+                        let message_bytes = serde_json::to_vec(&notification)?;
 
                         let subscription_info = SubscriptionInfo::new(endpoint, p256dh, auth);
 
@@ -193,9 +200,9 @@ async fn main() -> Result<(), anyhow::Error> {
                                 .build()?;
 
                         let mut message_builder = WebPushMessageBuilder::new(&subscription_info);
-                        let content = message.as_bytes();
-                        message_builder.set_payload(ContentEncoding::Aes128Gcm, content);
+                        message_builder.set_payload(ContentEncoding::Aes128Gcm, &message_bytes);
                         message_builder.set_vapid_signature(sig_builder);
+                        message_builder.set_urgency(Urgency::High);
 
                         let message = message_builder.build()?;
 

@@ -1,8 +1,11 @@
+use std::fmt::Write;
+
+use chrono::Utc;
 use console_error_panic_hook::set_once as set_panic_hook;
 use gloo_utils::format::JsValueSerdeExt;
 use serde::{de::DeserializeOwned, Serialize};
 use shared::{
-    api::{browser::record_subscription, error::JsError, API_BASE_PATH},
+    api::{browser::record_subscription, error::JsError, payloads::Notification, API_BASE_PATH},
     ServiceWorkerPackage, SERVICE_WORKER_PACKAGE_URL,
 };
 use wasm_bindgen::{prelude::wasm_bindgen, JsCast, JsValue};
@@ -323,14 +326,49 @@ async fn push(
     _version: String,
     event: PushEvent,
 ) -> Result<JsValue, JsValue> {
-    let title = event.data().map(|d| d.text()).unwrap_or_else(|| {
-        let msg = "Got PushEvent with no data!";
-        console_error!("{}", msg);
-        msg.to_string()
-    });
-
     let mut options = NotificationOptions::new();
     options.icon("/favicon.ico");
+    let mut title = "Got PushEvent with no data!".to_string();
+
+    if let Some(data) = event.data() {
+        let json = data.json().map_err(JsError::from).map_err(|e| {
+            log_and_err::<()>(&format!("push::data::json error: {}", e)).unwrap_err()
+        })?;
+
+        let notification: Notification = JsValueSerdeExt::into_serde(&json).map_err(|e| {
+            log_and_err::<()>(&format!("push::data::json deserialize error: {}", e)).unwrap_err()
+        })?;
+
+        title = notification.title;
+
+        if let Some(icon) = notification.icon {
+            options.icon(&icon);
+        }
+
+        options.timestamp(notification.sent.timestamp_millis() as f64);
+
+        let mut body = if let Some(mut body) = notification.body {
+            body.push_str("\n");
+            body
+        } else {
+            String::new()
+        };
+
+        let now = Utc::now();
+
+        if let Err(err) = write!(
+            &mut body,
+            "Sent: {},\n Received: {},\n Elapsed: {}",
+            notification.sent,
+            now,
+            now - notification.sent,
+        ) {
+            console_error!("Error from write!(..): {:?}", err)
+        }
+        options.body(&body);
+    } else {
+        console_error!("{}", title);
+    }
 
     Ok(JsFuture::from(
         sw.registration()
