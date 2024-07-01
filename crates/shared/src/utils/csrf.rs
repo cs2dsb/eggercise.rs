@@ -2,8 +2,9 @@ use std::{error::Error, fmt::Display};
 
 use gloo_net::http::{Request, RequestBuilder, Response};
 use leptos::{provide_context, use_context, Owner};
-use shared::api::{error::FrontendError, Object, CSRF_HEADER};
 use tracing::debug;
+
+use crate::api::{error::FrontendError, Object, CSRF_HEADER};
 
 #[derive(Debug, Clone)]
 pub struct Csrf {

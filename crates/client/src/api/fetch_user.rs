@@ -6,9 +6,8 @@ use shared::{
         response_errors::FetchError,
     },
     model::{TemporaryLogin, User},
+    utils::fetch::json_request,
 };
-
-use super::json_request;
 
 pub async fn fetch_user(
 ) -> Result<(User, Option<TemporaryLogin>), FrontendError<ServerError<FetchError>>> {

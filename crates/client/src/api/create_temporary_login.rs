@@ -6,9 +6,8 @@ use shared::{
         response_errors::TemporaryLoginError,
     },
     model::TemporaryLogin,
+    utils::fetch::json_request,
 };
-
-use super::json_request;
 
 pub async fn create_temporary_login(
 ) -> Result<TemporaryLogin, FrontendError<ServerError<TemporaryLoginError>>> {

@@ -6,12 +6,12 @@ use shared::{
         response_errors::LoginError,
     },
     model::{LoginUser, User},
+    utils::fetch::json_request,
 };
 use tracing::debug;
 use web_sys::CredentialRequestOptions;
 use webauthn_rs_proto::{PublicKeyCredential as WebauthnPublicKey, RequestChallengeResponse};
 
-use super::json_request;
 use crate::{api::get_credentials, utils::JsValueIntoOk};
 
 pub async fn login(login_user: &LoginUser) -> Result<User, FrontendError<ServerError<LoginError>>> {
