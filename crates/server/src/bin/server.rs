@@ -319,7 +319,7 @@ async fn main() -> Result<(), anyhow::Error> {
             .layer(middleware::map_response(fallback_layer))
             .layer(
                 CsrfLayer::new()
-                    .regenerate(RegenerateToken::PerUse)
+                    .regenerate(RegenerateToken::PerSession)
                     .request_header(CSRF_HEADER)
                     .response_header(CSRF_HEADER),
             )
