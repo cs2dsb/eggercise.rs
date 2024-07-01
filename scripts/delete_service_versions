@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+
+# Exit when any command fails
+set -o errexit
+
+# Exit when an undeclared variable is used
+set -o nounset
+
+# Exit when a piped command returns a non-zero exit code
+set -o pipefail
+
+# Clears out the service_version table so the next launch will send out alerts
+
+readonly repo_dir="$( cd $(dirname ${BASH_SOURCE}); cd ..; pwd )";
+cd $repo_dir
+
+sqlite3 egg.sqlite "DELETE FROM service_version"

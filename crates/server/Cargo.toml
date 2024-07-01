@@ -57,7 +57,8 @@ futures = "0.3.30"
 rusqlite_migration = { version = "1.1.0", features = ["from-directory"] }
 
 # Se/deserializing 
-serde = { workspace = true }
+serde.workspace = true
+serde_json.workspace = true
 
 # Async runtime
 tokio = { version = "1.37.0", features = [ "full" ] }

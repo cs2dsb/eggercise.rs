@@ -15,7 +15,7 @@ use std::{
 use anyhow::{bail, ensure, Context};
 use base64::{display::Base64Display, engine::general_purpose::STANDARD};
 use chrono::{DateTime, Utc};
-use glob::glob;
+use glob::{glob, Pattern};
 use sha2::{Digest, Sha384};
 use shared::{
     get_client_info, get_server_info, get_service_worker_info, CrateInfo, HashedFile,
@@ -24,6 +24,14 @@ use shared::{
 use wasm_opt::{OptimizationOptions, Pass};
 
 const WASM_PROFILE: &str = "wasm-release";
+const PACKAGE_BLOCKLIST: &[&str] = &[
+    "**/*_input.css",
+    "**/AUTHORS",
+    "**/*.txt",
+    "**/LICENSE",
+    "**/NEWS",
+    "**/README.md",
+];
 
 macro_rules! p {
     ($($tokens: tt)*) => {
@@ -293,6 +301,12 @@ where
 
 fn main() -> Result<(), anyhow::Error> {
     time("build.rs", 0, || {
+        let package_blocklist = PACKAGE_BLOCKLIST
+            .iter()
+            .map(|pat| Pattern::new(pat))
+            .collect::<Result<Vec<_>, _>>()
+            .context("Converting PACKAGE_BLOCKLIST strings to Pattern")?;
+
         let client_info = get_client_info()?;
         let service_worker_info = get_service_worker_info()?;
         let server_info = get_server_info()?;
@@ -517,6 +531,8 @@ fn main() -> Result<(), anyhow::Error> {
                 .collect::<Result<Vec<_>, _>>()?
                 .into_iter()
                 .filter(|f| f.is_file())
+                // Filter out any that match the blocklist
+                .filter(|f| !package_blocklist.iter().any(|p| p.matches(&path_to_str(f))))
                 {
                     let hash = time(format!("Hashing {:?}", path_filename_to_str(&f)), 2, || {
                         let mut hasher = Sha384::new();
