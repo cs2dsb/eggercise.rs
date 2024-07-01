@@ -1,11 +1,13 @@
 use gloo_net::http::Method;
-use shared::api::{
-    self,
-    error::{FrontendError, ServerError},
-    response_errors::FetchError,
-};
 
-use crate::api::json_request;
+use crate::{
+    api::{
+        self,
+        error::{FrontendError, ServerError},
+        response_errors::FetchError,
+    },
+    utils::fetch::json_request,
+};
 
 pub async fn remove_subscription() -> Result<(), FrontendError<ServerError<FetchError>>> {
     json_request::<_, (), _>(

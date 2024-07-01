@@ -2,3 +2,9 @@
 mod push_subscription_key;
 #[cfg(feature = "wasm")]
 pub use push_subscription_key::*;
+
+#[cfg(feature = "wasm")]
+pub mod fetch;
+
+#[cfg(feature = "wasm")]
+pub mod csrf;

@@ -2,12 +2,7 @@ use console_error_panic_hook::set_once as set_panic_hook;
 use gloo_utils::format::JsValueSerdeExt;
 use serde::{de::DeserializeOwned, Serialize};
 use shared::{
-    api::{
-        error::JsError,
-        payloads::{UpdateSubscriptionRequest, UpdateSubscriptionResponse},
-        Object, API_BASE_PATH,
-    },
-    model::PushNotificationSubscription,
+    api::{browser::record_subscription, error::JsError, API_BASE_PATH},
     ServiceWorkerPackage, SERVICE_WORKER_PACKAGE_URL,
 };
 use wasm_bindgen::{prelude::wasm_bindgen, JsCast, JsValue};
@@ -16,8 +11,8 @@ use web_sys::{
     console::{error_1, log_1},
     js_sys::{Array, Object as JsObject, Promise},
     Cache, CacheStorage, Event, FetchEvent, MessageEvent, NotificationEvent, NotificationOptions,
-    PushEvent, PushSubscription, PushSubscriptionOptionsInit, Request, RequestInit, Response,
-    ResponseInit, ServiceWorkerGlobalScope, Url, WindowClient,
+    PushEvent, Request, RequestInit, Response, ResponseInit, ServiceWorkerGlobalScope, Url,
+    WindowClient,
 };
 
 const SKIP_WAITING: &str = "SKIP_WAITING";
@@ -123,17 +118,6 @@ async fn fetch_json<T: DeserializeOwned>(
     request: Request,
 ) -> Result<T, JsValue> {
     let response = fetch_from_cache(sw, version, request).await?;
-    let json = JsFuture::from(response.json()?).await?;
-
-    JsValueSerdeExt::into_serde(&json)
-        .map_err(|e| log_and_err::<()>(&format!("Error deserializing json: {}", e)).unwrap_err())
-}
-
-async fn fetch_json_direct<T: DeserializeOwned>(
-    sw: &ServiceWorkerGlobalScope,
-    request: Request,
-) -> Result<T, JsValue> {
-    let response = fetch_direct(sw, request).await?;
     let json = JsFuture::from(response.json()?).await?;
 
     JsValueSerdeExt::into_serde(&json)
@@ -372,47 +356,18 @@ async fn push_subscription_change(
 ) -> Result<JsValue, JsValue> {
     let push_manager = sw.registration().push_manager()?;
 
-    let mut options = PushSubscriptionOptionsInit::new();
-    options.user_visible_only(true);
-
-    let subscription: PushSubscription =
-        JsFuture::from(push_manager.subscribe_with_options(&options)?)
-            .await?
-            .into();
-
-    // TODO:!
-    let key = "".to_string();
-    let auth = "".to_string();
-    let update_subscription_req = UpdateSubscriptionRequest {
-        subscription: PushNotificationSubscription {
-            endpoint: subscription.endpoint(),
-            key,
-            auth,
-        },
-    };
-
-    let body_string = serde_json::to_string(&update_subscription_req)
-        .map_err(|e| log_and_err::<()>(&format!("Error deserializing json: {}", e)).unwrap_err())?;
-
-    let headers = JsObject::new();
-    js_sys::Reflect::set(
-        &headers,
-        &JsValue::from_str("Content-Type"),
-        &JsValue::from_str("application/json"),
-    )?;
-
-    let mut r_init = RequestInit::new();
-    r_init.method("POST");
-    r_init.headers(&headers);
-    r_init.body(Some(&JsValue::from(body_string)));
-
-    let request = Request::new_with_str_and_init(Object::PushNotification.path(), &r_init)?;
-    let update_subscription_resp: UpdateSubscriptionResponse =
-        fetch_json_direct(&sw, request).await?;
-    console_log!(
-        "Got UpdateSubscriptionResponse: {:?}",
-        update_subscription_resp
-    );
+    // TODO: Should record this change in case the user is currently offline
+    //       It should also probably be user aware instead of assuming the cookies
+    //       match the subscription owner. As a minimum it should pass event.oldSub
+    //       so the server can check it's replacing the right sub
+    record_subscription(&push_manager).await.map_err(|e| {
+        log_and_err::<()>(&format!(
+            "push_subscription_change::record_subscription error: {}",
+            e
+        ))
+        .unwrap_err()
+    })?;
+    console_log!("push_subscription_change::record_subscription OK");
 
     Ok(JsValue::undefined())
 }

@@ -1,14 +1,16 @@
 use gloo_net::http::Method;
-use shared::api::{
-    self,
-    error::{FrontendError, NoValidation, ServerError},
-    response_errors::RegisterError,
+use shared::{
+    api::{
+        self,
+        error::{FrontendError, NoValidation, ServerError},
+        response_errors::RegisterError,
+    },
+    utils::fetch::json_request,
 };
 use tracing::debug;
 use web_sys::CredentialCreationOptions;
 use webauthn_rs_proto::{CreationChallengeResponse, RegisterPublicKeyCredential};
 
-use super::json_request;
 use crate::api::create_credentials;
 
 pub async fn add_key() -> Result<(), FrontendError<ServerError<RegisterError>>> {

@@ -8,7 +8,7 @@ use tracing::{debug, error};
 
 use crate::api::ping;
 
-const ONLINE_CHECK_DELAY: Duration = Duration::from_secs(10);
+const ONLINE_CHECK_DELAY: Duration = Duration::from_secs(60);
 
 #[derive(Debug, Clone, Copy)]
 pub struct Online(Resource<(), bool>);

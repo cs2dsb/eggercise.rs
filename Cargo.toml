@@ -4,7 +4,7 @@ resolver = "2"
 
 [workspace.package]
 edition = "2021"
-version = "0.0.90"
+version = "0.0.91"
 
 [profile.wasm-release]
 inherits = "release"
@@ -58,7 +58,7 @@ sha2 = "0.10.8"
 
 leptos = { version = "0.6.12", features = ["nightly", "csr"] }
 leptos_router = { version = "0.6.12", features = ["nightly", "csr"] }
-leptos_reactive = "=0.6.5"
+leptos_reactive = "0.6.12"
 
 # SQLite lib
 rusqlite = { version = "0.30.0", features = ["bundled", "serde_json", "trace"] }

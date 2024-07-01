@@ -1,5 +1,7 @@
 use gloo_net::http::Method;
-use shared::{
+use web_sys::{PushEncryptionKeyName, PushSubscription};
+
+use crate::{
     api::{
         self,
         error::{FrontendError, NoValidation, ServerError},
@@ -7,11 +9,8 @@ use shared::{
         response_errors::FetchError,
     },
     model::PushNotificationSubscription,
-    utils::get_subscription_key,
+    utils::{fetch::json_request, get_subscription_key},
 };
-use web_sys::{PushEncryptionKeyName, PushSubscription};
-
-use crate::api::json_request;
 
 pub async fn update_subscription(
     subscription: &PushSubscription,

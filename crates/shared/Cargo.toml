@@ -28,6 +28,8 @@ wasm = [
     "sea-query",
     "uuid/js",
     "base64",
+    "mime",
+    "wasm-bindgen-futures",
 
     "sea-query-enum",
 ]
@@ -55,6 +57,8 @@ http.workspace = true
 http-serde.workspace = true
 paste.workspace = true
 
+wasm-bindgen-futures = { workspace = true, optional = true }
+mime = { workspace = true, optional = true }
 anyhow = { workspace = true, optional = true }
 deadpool-sqlite = { workspace = true, optional = true }
 leptos = { workspace = true, optional = true }

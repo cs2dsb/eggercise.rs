@@ -6,15 +6,13 @@ use shared::{
         response_errors::RegisterError,
     },
     model::RegistrationUser,
+    utils::fetch::json_request,
 };
 use tracing::debug;
 use web_sys::CredentialCreationOptions;
 use webauthn_rs_proto::{CreationChallengeResponse, RegisterPublicKeyCredential};
 
-use crate::{
-    api::{create_credentials, json_request},
-    utils::JsValueIntoOk,
-};
+use crate::{api::create_credentials, utils::JsValueIntoOk};
 
 pub async fn register(
     reg_user: &RegistrationUser,

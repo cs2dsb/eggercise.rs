@@ -11,6 +11,7 @@ mod routes;
 pub use routes::*;
 use web_sys::js_sys::Function;
 
+pub mod actions;
 pub mod api;
 pub mod db;
 pub mod utils;
