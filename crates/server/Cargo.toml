@@ -13,7 +13,8 @@ sha2.workspace = true
 serde_json.workspace = true
 chrono.workspace = true
 wasm-bindgen-cli-support = "0.2.92"
-shared = { path = "../shared", features = [ "build" ] }
+# wasm feature is just to trigger build.rs when wasm related code changes so the client & worker get rebuilt
+shared = { path = "../shared", features = [ "build", "wasm" ] }
 base64.workspace = true
 wasm-opt = "0.116.1"
 glob = "0.3.1"
