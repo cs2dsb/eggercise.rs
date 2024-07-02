@@ -37,7 +37,7 @@ pub async fn add_key() -> Result<(), FrontendError<ServerError<RegisterError>>> 
 
     // Complete the registration with the server
     debug!("add_key::json_request::register_new_key_finish");
-    json_request(
+    json_request::<_, (), _>(
         Method::POST,
         api::Auth::RegisterNewKeyFinish.path(),
         Some(&NoValidation(register_public_key_credentials)),
