@@ -41,7 +41,7 @@ pub async fn register(
 
     // Complete the registration with the server
     debug!("register::json_request::register_finish");
-    json_request(
+    json_request::<_, (), _>(
         Method::POST,
         api::Auth::RegisterFinish.path(),
         Some(&NoValidation(register_public_key_credentials)),
