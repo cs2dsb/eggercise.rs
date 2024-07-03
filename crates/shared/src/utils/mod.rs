@@ -8,3 +8,6 @@ pub mod fetch;
 
 #[cfg(feature = "wasm")]
 pub mod csrf;
+
+#[cfg(feature = "wasm")]
+pub mod tracing;

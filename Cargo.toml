@@ -98,3 +98,5 @@ paste = "1.0.15"
 futures = "0.3.30"
 
 web-time = "1.1.0"
+
+time = { version = "0.3.36", features = ["wasm-bindgen"] }
