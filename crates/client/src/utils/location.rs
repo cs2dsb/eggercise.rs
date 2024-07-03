@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use leptos::leptos_dom::helpers::location as leptos_loc;
 
-use crate::api::error::{FrontendError, ResultContext};
+use shared::api::error::{FrontendError, ResultContext};
 
 /// Gets the site host with no protocol or path
 pub fn host<T: Display>() -> Result<String, FrontendError<T>> {
