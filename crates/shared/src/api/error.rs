@@ -116,7 +116,15 @@ mod frontend {
                     stack,
                 }
             } else {
-                JsError::UnknownJsValue(format!("{:?}", err))
+                let js_typeof: String =  match err.js_typeof()
+                    .try_into() 
+                    .map_err(JsError::from)
+                {
+                    Ok(v) => v,
+                    Err(e) => format!("Error from js_typeof: {e}"),
+                };
+
+                JsError::UnknownJsValue(format!("{:?}, js_typeof: {js_typeof}", err))
             }
         }
     }
