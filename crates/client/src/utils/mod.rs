@@ -5,7 +5,6 @@ use shared::api::error::FrontendError;
 use wasm_bindgen::JsValue;
 
 pub mod browser;
-pub mod tracing;
 pub mod websocket;
 
 pub trait JsValueIntoOk<R, E>: Sized

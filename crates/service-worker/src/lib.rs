@@ -7,7 +7,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use shared::{
     api::{browser::record_subscription, error::JsError, payloads::Notification, API_BASE_PATH},
     ServiceWorkerPackage, SERVICE_WORKER_PACKAGE_URL,
-    utils::tracing::configure_tracing,
+    utils::tracing::configure_tracing_once as configure_tracing,
 };
 use wasm_bindgen::{prelude::wasm_bindgen, JsCast, JsValue};
 use wasm_bindgen_futures::{future_to_promise, JsFuture};
