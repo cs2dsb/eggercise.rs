@@ -11,7 +11,7 @@ use shared::{
         payloads::Notification,
         API_BASE_PATH,
     },
-    utils::{location::root_url, tracing::configure_tracing_once as configure_tracing},
+    utils::tracing::configure_tracing_once as configure_tracing,
     ServiceWorkerPackage, SERVICE_WORKER_PACKAGE_URL,
 };
 use wasm_bindgen::{prelude::wasm_bindgen, JsCast, JsValue};
@@ -435,16 +435,12 @@ pub fn worker_push_subscription_change(
 
 async fn notification_click(sw: ServiceWorkerGlobalScope) -> Result<JsValue, JsValue> {
     log_1(&JsValue::from_str("X1"));
-    let root_url = root_url::<Nothing>()
-        .map_err(|e| log_and_err(&format!("Error getting root_url: {e}")).unwrap_err())?;
-
-    log_1(&JsValue::from_str("X2"));
-    let v = JsFuture::from(sw.clients().open_window(&root_url))
+    let v = JsFuture::from(sw.clients().open_window(&sw.origin()))
         .await
         .map_err(JsError::from)
         .map_err(|e| log_and_err(&format!("Error opening new window: {}", e)).unwrap_err())?;
 
-    log_1(&JsValue::from_str("X3"));
+    log_1(&JsValue::from_str("X2"));
     error_2(&JsValue::from_str("Got from open_window:"), &v);
 
     Ok(JsValue::undefined())

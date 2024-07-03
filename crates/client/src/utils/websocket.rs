@@ -6,11 +6,11 @@ use shared::{
         error::{FrontendError, Nothing},
         Object,
     },
-    utils::location::{host, protocol},
 };
 use tracing::debug;
 use wasm_bindgen::{prelude::Closure, JsCast};
 use web_sys::{MessageEvent, WebSocket};
+use crate::utils::location::{host, protocol};
 
 #[derive(Clone)]
 pub struct Websocket {
