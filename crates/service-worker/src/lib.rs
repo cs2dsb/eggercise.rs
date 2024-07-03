@@ -435,22 +435,25 @@ pub fn worker_push_subscription_change(
 
 async fn notification_click(sw: ServiceWorkerGlobalScope) -> Result<JsValue, JsValue> {
     let clients: Array = JsFuture::from(sw.clients().match_all()).await?.into();
-    if clients.length() > 0 {
-        let client: WindowClient = clients.get(0).into();
-        JsFuture::from(client.focus()?)
-            .await
-            .map_err(JsError::from)
-            .map_err(|e| {
-                log_and_err(&format!("Error focusing client window: {}", e)).unwrap_err()
-            })?;
+    
+    let client: WindowClient =  if clients.length() > 0 {
+        clients.get(0).into()  
     } else {
         let root_url = root_url::<Nothing>()
             .map_err(|e| log_and_err(&format!("Error getting root_url: {e}")).unwrap_err())?;
         JsFuture::from(sw.clients().open_window(&root_url))
             .await
             .map_err(JsError::from)
-            .map_err(|e| log_and_err(&format!("Error opening new window: {}", e)).unwrap_err())?;
-    }
+            .map_err(|e| log_and_err(&format!("Error opening new window: {}", e)).unwrap_err())?
+            .into()
+    };
+
+    JsFuture::from(client.focus()?)
+        .await
+        .map_err(JsError::from)
+        .map_err(|e| {
+            log_and_err(&format!("Error focusing client window: {}", e)).unwrap_err()
+        })?;
     Ok(JsValue::undefined())
 }
 
