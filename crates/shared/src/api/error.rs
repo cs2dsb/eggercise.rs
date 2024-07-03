@@ -35,14 +35,17 @@ mod frontend {
     use leptos::{view, IntoView};
     use thiserror::Error;
     use wasm_bindgen::{JsCast, JsValue};
-    use web_sys::js_sys::{
-        Error as GenericJsError,
-        RangeError as JsRangeError,
-        ReferenceError as JsReferenceError,
-        SyntaxError as JsSyntaxError,
-        // TryFromIntError as JsTryFromIntError,
-        TypeError as JsTypeError,
-        UriError as JsUriError,
+    use web_sys::{
+        js_sys::{
+            Error as GenericJsError,
+            RangeError as JsRangeError,
+            ReferenceError as JsReferenceError,
+            SyntaxError as JsSyntaxError,
+            // TryFromIntError as JsTryFromIntError,
+            TypeError as JsTypeError,
+            UriError as JsUriError,
+        },
+        Exception,
     };
 
     use super::{ErrorContext, Nothing, ValidationError, WrongContentTypeError};
@@ -63,6 +66,16 @@ mod frontend {
         JsType(JsTypeError),
         #[error("JsUri Error: {0:?}")]
         JsUri(JsUriError),
+        #[error("Exception:\n   exception: {exception:?},\n   name: {name},\n   message: {message},\n   filename: {filename},\n   line_number: {line_number},\n   column_number: {column_number},\n   stack: {stack}")]
+        Exception {
+            exception: Exception,
+            name: String,
+            message: String,
+            filename: String,
+            line_number: u32,
+            column_number: u32,
+            stack: String,
+        },
         #[error("UnknownJsValue Error: {0:?}")]
         UnknownJsValue(String),
     }
@@ -70,28 +83,41 @@ mod frontend {
     impl From<JsValue> for JsError {
         fn from(err: JsValue) -> JsError {
             if err.is_instance_of::<JsRangeError>() {
-                return JsError::JsRange(err.into());
-            }
-            if err.is_instance_of::<JsReferenceError>() {
-                return JsError::JsReference(err.into());
-            }
-            if err.is_instance_of::<JsSyntaxError>() {
-                return JsError::JsSyntax(err.into());
-            }
+                JsError::JsRange(err.into())
+            } else if err.is_instance_of::<JsReferenceError>() {
+                JsError::JsReference(err.into())
+            } else if err.is_instance_of::<JsSyntaxError>() {
+                JsError::JsSyntax(err.into())
             // Not supported by JsCast
-            // if err.is_instance_of::<JsTryFromIntError>() {
-            //     return JsError::JsTryFromInt(err.into());
-            // }
-            if err.is_instance_of::<JsTypeError>() {
-                return JsError::JsType(err.into());
+            //} else if err.is_instance_of::<JsTryFromIntError>() {
+            //     JsError::JsTryFromInt(err.into())
+            //
+            } else if err.is_instance_of::<JsTypeError>() {
+                JsError::JsType(err.into())
+            } else if err.is_instance_of::<JsUriError>() {
+                JsError::JsUri(err.into())
+            } else if err.is_instance_of::<GenericJsError>() {
+                JsError::GenericJs(err.into())
+            } else if err.is_instance_of::<Exception>() {
+                let exception: Exception = err.into();
+                let name = exception.name();
+                let message = exception.message();
+                let filename = exception.filename();
+                let line_number = exception.line_number();
+                let column_number = exception.column_number();
+                let stack = exception.stack();
+                JsError::Exception {
+                    exception,
+                    name,
+                    message,
+                    filename,
+                    line_number,
+                    column_number,
+                    stack,
+                }
+            } else {
+                JsError::UnknownJsValue(format!("{:?}", err))
             }
-            if err.is_instance_of::<JsUriError>() {
-                return JsError::JsUri(err.into());
-            }
-            if err.is_instance_of::<GenericJsError>() {
-                return JsError::GenericJs(err.into());
-            }
-            JsError::UnknownJsValue(format!("{:?}", err))
         }
     }
 
