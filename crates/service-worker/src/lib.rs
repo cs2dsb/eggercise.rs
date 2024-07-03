@@ -435,7 +435,9 @@ pub fn worker_push_subscription_change(
 
 async fn notification_click(sw: ServiceWorkerGlobalScope) -> Result<JsValue, JsValue> {
     log_1(&JsValue::from_str("X1"));
-    let v = JsFuture::from(sw.clients().open_window(&sw.origin()))
+    let origin = sw.origin();
+    error_2(&JsValue::from_str(&"Origin:"), &JsValue::from_str(&origin));
+    let v = JsFuture::from(sw.clients().open_window(&origin))
         .await
         .map_err(JsError::from)
         .map_err(|e| log_and_err(&format!("Error opening new window: {}", e)).unwrap_err())?;
