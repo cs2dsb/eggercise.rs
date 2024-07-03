@@ -34,9 +34,11 @@ mod frontend {
 
     use leptos::{view, IntoView};
     use thiserror::Error;
+    use tracing::{error, warn};
     use wasm_bindgen::{JsCast, JsValue};
     use web_sys::{
-        console::error_2, js_sys::{
+        console::error_2,
+        js_sys::{
             Error as GenericJsError,
             RangeError as JsRangeError,
             ReferenceError as JsReferenceError,
@@ -44,9 +46,9 @@ mod frontend {
             // TryFromIntError as JsTryFromIntError,
             TypeError as JsTypeError,
             UriError as JsUriError,
-        }, Exception
+        },
+        Exception,
     };
-    use tracing::{ warn, error};
 
     use super::{ErrorContext, Nothing, ValidationError, WrongContentTypeError};
 
@@ -116,10 +118,14 @@ mod frontend {
                     stack,
                 }
             } else {
-                // This was added to deal with NS_... exceptions from firefox C++. I haven't discovered a good way
-                // of converting them to a rust type that will log nicely
-                error_2(&JsValue::from_str("Failed to determine JSError type for"), &err);
-                
+                // This was added to deal with NS_... exceptions from firefox C++. I haven't
+                // discovered a good way of converting them to a rust type that
+                // will log nicely
+                error_2(
+                    &JsValue::from_str("Failed to determine JSError type for"),
+                    &err,
+                );
+
                 if "JsValue(Exception)" == format!("{:?}", err) {
                     match <JsValue as TryInto<Exception>>::try_into(err.clone()) {
                         Ok(exception) => {
@@ -139,14 +145,14 @@ mod frontend {
                                 column_number,
                                 stack,
                             };
-                        },
-                        Err(_) => error!("Infallible conversion from JsValue to Exception failed..."),
+                        }
+                        Err(_) => {
+                            error!("Infallible conversion from JsValue to Exception failed...")
+                        }
                     }
                 }
-                
-                
-                JsError::UnknownJsValue(format!("{:?}", err))
 
+                JsError::UnknownJsValue(format!("{:?}", err))
             }
         }
     }

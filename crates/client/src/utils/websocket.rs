@@ -6,7 +6,7 @@ use shared::{
         error::{FrontendError, Nothing},
         Object,
     },
-    utils::location::{protocol, host},
+    utils::location::{host, protocol},
 };
 use tracing::debug;
 use wasm_bindgen::{prelude::Closure, JsCast};
