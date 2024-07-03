@@ -1,3 +1,5 @@
+#![feature(duration_constructors)]
+
 use std::{
     fs::{read_to_string, remove_file, File},
     io::Read,
@@ -204,6 +206,7 @@ async fn main() -> Result<(), anyhow::Error> {
                         message_builder.set_payload(ContentEncoding::Aes128Gcm, &message_bytes);
                         message_builder.set_vapid_signature(sig_builder);
                         message_builder.set_urgency(Urgency::High);
+                        message_builder.set_ttl(Duration::from_hours(3).as_secs() as u32);
 
                         let message = message_builder.build()?;
 
