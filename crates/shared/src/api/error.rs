@@ -124,11 +124,12 @@ mod frontend {
                     Err(e) => format!("Error from js_typeof: {e}"),
                 };
 
-                tracing::warn!("is_instance_of: {}, has_type: {}",
+                let err_string = format!("{:?}", err);
+                tracing::warn!("is_instance_of: {}, has_type: {}, debug string: {}",
                     err.is_instance_of::<Exception>(),
                     err.has_type::<Exception>(),
+                    err_string,
                 );
-
                 if let Some(exception) = <JsValue as TryInto<Exception>>::try_into(err.clone()).ok() {
                     let name = exception.name();
                     let message = exception.message();
