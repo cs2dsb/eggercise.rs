@@ -7,6 +7,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use shared::{
     api::{browser::record_subscription, error::JsError, payloads::Notification, API_BASE_PATH},
     ServiceWorkerPackage, SERVICE_WORKER_PACKAGE_URL,
+    utils::tracing::configure_tracing_once as configure_tracing,
 };
 use wasm_bindgen::{prelude::wasm_bindgen, JsCast, JsValue};
 use wasm_bindgen_futures::{future_to_promise, JsFuture};
@@ -200,6 +201,8 @@ async fn install(sw: ServiceWorkerGlobalScope, version: String) -> Result<JsValu
 #[wasm_bindgen]
 pub fn worker_install(sw: ServiceWorkerGlobalScope, version: String) -> Result<Promise, JsValue> {
     set_panic_hook();
+    configure_tracing();
+
     console_log!("worker_install called. Version: {}", version);
 
     Ok(future_to_promise(install(sw, version)))
@@ -208,6 +211,7 @@ pub fn worker_install(sw: ServiceWorkerGlobalScope, version: String) -> Result<P
 #[wasm_bindgen]
 pub fn worker_activate(sw: ServiceWorkerGlobalScope) -> Promise {
     set_panic_hook();
+    configure_tracing();
     console_log!("worker_activate called");
 
     // Claim the clients so we can control them in response to a push notificiation
