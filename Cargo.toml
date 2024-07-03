@@ -4,7 +4,7 @@ resolver = "2"
 
 [workspace.package]
 edition = "2021"
-version = "0.0.95"
+version = "0.0.96"
 
 [profile.wasm-release]
 inherits = "release"
@@ -98,3 +98,5 @@ paste = "1.0.15"
 futures = "0.3.30"
 
 web-time = "1.1.0"
+
+time = { version = "0.3.36", features = ["wasm-bindgen"] }

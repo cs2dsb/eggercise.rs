@@ -28,6 +28,7 @@ tracing-web.workspace = true
 include_dir.workspace = true
 chrono.workspace = true
 sea-query.workspace = true
+time.workspace = true
 web-sys = { workspace = true, features = [
     "CredentialCreationOptions",
     "CredentialRequestOptions",
@@ -43,7 +44,6 @@ web-sys = { workspace = true, features = [
 ] }
 
 shared = { path = "../shared", features = [ "wasm" ] }
-time = { version = "0.3.36", features = ["wasm-bindgen"] }
 meval = "0.2.0"
 asciimath-rs = "0.6.2"
 #TODO: this rev fixes nightly compile. Swap to crates.io once it is released
