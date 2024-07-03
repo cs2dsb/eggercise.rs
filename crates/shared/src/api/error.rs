@@ -36,7 +36,7 @@ mod frontend {
     use thiserror::Error;
     use wasm_bindgen::{JsCast, JsValue};
     use web_sys::{
-        js_sys::{
+        console::error_2, js_sys::{
             Error as GenericJsError,
             RangeError as JsRangeError,
             ReferenceError as JsReferenceError,
@@ -44,9 +44,9 @@ mod frontend {
             // TryFromIntError as JsTryFromIntError,
             TypeError as JsTypeError,
             UriError as JsUriError,
-        },
-        Exception,
+        }, Exception
     };
+    use tracing::{ warn, error};
 
     use super::{ErrorContext, Nothing, ValidationError, WrongContentTypeError};
 
@@ -116,39 +116,36 @@ mod frontend {
                     stack,
                 }
             } else {
-                let js_typeof: String =  match err.js_typeof()
-                    .try_into() 
-                    .map_err(JsError::from)
-                {
-                    Ok(v) => v,
-                    Err(e) => format!("Error from js_typeof: {e}"),
-                };
-
-                let err_string = format!("{:?}", err);
-                tracing::warn!("is_instance_of: {}, has_type: {}, debug string: {}",
-                    err.is_instance_of::<Exception>(),
-                    err.has_type::<Exception>(),
-                    err_string,
-                );
-                if let Some(exception) = <JsValue as TryInto<Exception>>::try_into(err.clone()).ok() {
-                    let name = exception.name();
-                    let message = exception.message();
-                    let filename = exception.filename();
-                    let line_number = exception.line_number();
-                    let column_number = exception.column_number();
-                    let stack = exception.stack();
-                    tracing::warn!("Exception failed is_instance_of test but was really an exception anyway!");
-                    return JsError::Exception {
-                        exception,
-                        name,
-                        message,
-                        filename,
-                        line_number,
-                        column_number,
-                        stack,
-                    };
+                // This was added to deal with NS_... exceptions from firefox C++. I haven't discovered a good way
+                // of converting them to a rust type that will log nicely
+                error_2(&JsValue::from_str("Failed to determine JSError type for"), &err);
+                
+                if "JsValue(Exception)" == format!("{:?}", err) {
+                    match <JsValue as TryInto<Exception>>::try_into(err.clone()) {
+                        Ok(exception) => {
+                            let name = exception.name();
+                            let message = exception.message();
+                            let filename = exception.filename();
+                            let line_number = exception.line_number();
+                            let column_number = exception.column_number();
+                            let stack = exception.stack();
+                            warn!("Exception failed is_instance_of test but was really an exception anyway!");
+                            return JsError::Exception {
+                                exception,
+                                name,
+                                message,
+                                filename,
+                                line_number,
+                                column_number,
+                                stack,
+                            };
+                        },
+                        Err(_) => error!("Infallible conversion from JsValue to Exception failed..."),
+                    }
                 }
-                JsError::UnknownJsValue(format!("{:?}, js_typeof: {js_typeof}", err))
+                
+                
+                JsError::UnknownJsValue(format!("{:?}", err))
 
             }
         }
