@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{model::User, types::Uuid};
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Eq, Hash)]
 pub struct UserId {
     pub id: Uuid,
 }

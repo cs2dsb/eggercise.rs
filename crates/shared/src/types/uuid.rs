@@ -12,7 +12,7 @@ use {
 };
 
 /// Wrapper to implement ToSql and FromSql on
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Eq, Hash)]
 pub struct Uuid(uuid::Uuid);
 
 impl fmt::Display for Uuid {

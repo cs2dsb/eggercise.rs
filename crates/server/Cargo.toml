@@ -73,3 +73,5 @@ axum-extra = { version = "0.9.3", features = ["typed-header"] }
 tower-layer = "0.3.2"
 thiserror.workspace = true
 tower-service = "0.3.2"
+dashmap = "6.0.1"
+loole = "0.3.1"

@@ -643,7 +643,7 @@ checksum = "4b82cf0babdbd58558212896d1a4272303a57bdb245c2bf1147185fb45640e70"
 
 [[package]]
 name = "client"
-version = "0.0.94"
+version = "0.0.95"
 dependencies = [
  "asciimath-rs",
  "chrono",
@@ -1024,6 +1024,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "978747c1d849a7d2ee5e8adc0159961c48fb7e5db2f06af6723b80123bb53856"
 dependencies = [
  "cfg-if",
+ "hashbrown 0.14.5",
+ "lock_api",
+ "once_cell",
+ "parking_lot_core",
+]
+
+[[package]]
+name = "dashmap"
+version = "6.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "804c8821570c3f8b70230c2ba75ffa5c0f9a4189b9a432b6656c536712acae28"
+dependencies = [
+ "cfg-if",
+ "crossbeam-utils",
  "hashbrown 0.14.5",
  "lock_api",
  "once_cell",
@@ -2549,6 +2563,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "90ed8c1e510134f979dbc4f070f87d4313098b704861a105fe34231c70a3901c"
 
 [[package]]
+name = "loole"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ad95468e4700cb37d8d1f198050db18cebe55e4b4c8aa9180a715deedb2f8965"
+
+[[package]]
 name = "manyhow"
 version = "0.10.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3615,7 +3635,7 @@ dependencies = [
 
 [[package]]
 name = "server"
-version = "0.0.94"
+version = "0.0.95"
 dependencies = [
  "anyhow",
  "axum",
@@ -3624,11 +3644,13 @@ dependencies = [
  "chrono",
  "clap",
  "client",
+ "dashmap 6.0.1",
  "deadpool-sqlite",
  "futures",
  "glob",
  "headers",
  "include_dir",
+ "loole",
  "mime",
  "qrcodegen",
  "rand",
@@ -3664,7 +3686,7 @@ dependencies = [
  "bytes",
  "ciborium",
  "const_format",
- "dashmap",
+ "dashmap 5.5.3",
  "futures",
  "gloo-net",
  "http 1.1.0",
@@ -3710,7 +3732,7 @@ dependencies = [
 
 [[package]]
 name = "service-worker"
-version = "0.0.94"
+version = "0.0.95"
 dependencies = [
  "chrono",
  "console_error_panic_hook",
@@ -3757,7 +3779,7 @@ dependencies = [
 
 [[package]]
 name = "shared"
-version = "0.0.94"
+version = "0.0.95"
 dependencies = [
  "anyhow",
  "axum",
@@ -4913,7 +4935,7 @@ dependencies = [
 
 [[package]]
 name = "web-sys_dummy"
-version = "0.0.94"
+version = "0.0.95"
 dependencies = [
  "web-sys",
 ]
