@@ -19,3 +19,5 @@ pub mod routes;
 pub mod cli;
 
 pub mod middleware;
+
+pub mod constants;

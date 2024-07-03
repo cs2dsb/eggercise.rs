@@ -150,6 +150,7 @@ async fn main() -> Result<(), anyhow::Error> {
         args: Arc::new(args.clone()),
         vapid_pub_key,
         vapid_private_key,
+        websocket_clients: Default::default(),
     };
 
     // Map all routes the client can handle to the index.html

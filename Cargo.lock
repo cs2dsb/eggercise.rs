@@ -1031,6 +1031,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "dashmap"
+version = "6.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "804c8821570c3f8b70230c2ba75ffa5c0f9a4189b9a432b6656c536712acae28"
+dependencies = [
+ "cfg-if",
+ "crossbeam-utils",
+ "hashbrown 0.14.5",
+ "lock_api",
+ "once_cell",
+ "parking_lot_core",
+]
+
+[[package]]
 name = "data-encoding"
 version = "2.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2549,6 +2563,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "90ed8c1e510134f979dbc4f070f87d4313098b704861a105fe34231c70a3901c"
 
 [[package]]
+name = "loole"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ad95468e4700cb37d8d1f198050db18cebe55e4b4c8aa9180a715deedb2f8965"
+
+[[package]]
 name = "manyhow"
 version = "0.10.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3624,11 +3644,13 @@ dependencies = [
  "chrono",
  "clap",
  "client",
+ "dashmap 6.0.1",
  "deadpool-sqlite",
  "futures",
  "glob",
  "headers",
  "include_dir",
+ "loole",
  "mime",
  "qrcodegen",
  "rand",
@@ -3664,7 +3686,7 @@ dependencies = [
  "bytes",
  "ciborium",
  "const_format",
- "dashmap",
+ "dashmap 5.5.3",
  "futures",
  "gloo-net",
  "http 1.1.0",
