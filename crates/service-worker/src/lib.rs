@@ -5,19 +5,14 @@ use console_error_panic_hook::set_once as set_panic_hook;
 use gloo_utils::format::JsValueSerdeExt;
 use serde::{de::DeserializeOwned, Serialize};
 use shared::{
-    api::{
-        browser::record_subscription,
-        error::{JsError, Nothing},
-        payloads::Notification,
-        API_BASE_PATH,
-    },
+    api::{browser::record_subscription, error::JsError, payloads::Notification, API_BASE_PATH},
     utils::tracing::configure_tracing_once as configure_tracing,
     ServiceWorkerPackage, SERVICE_WORKER_PACKAGE_URL,
 };
 use wasm_bindgen::{prelude::wasm_bindgen, JsCast, JsValue};
 use wasm_bindgen_futures::{future_to_promise, JsFuture};
 use web_sys::{
-    console::{error_1, error_2, log_1},
+    console::{error_1, log_1},
     js_sys::{Array, Object as JsObject, Promise},
     Cache, CacheStorage, Event, FetchEvent, MessageEvent, NotificationEvent, NotificationOptions,
     PushEvent, Request, RequestInit, Response, ResponseInit, ServiceWorkerGlobalScope, Url,
@@ -433,41 +428,36 @@ pub fn worker_push_subscription_change(
     )))
 }
 
-async fn notification_click(sw: ServiceWorkerGlobalScope) -> Result<JsValue, JsValue> {
-    log_1(&JsValue::from_str("X1"));
-    let origin = sw.origin();
-    error_2(&JsValue::from_str(&"Origin:"), &JsValue::from_str(&origin));
-    let v = JsFuture::from(sw.clients().open_window(&origin))
+async fn notification_click(
+    sw: ServiceWorkerGlobalScope,
+    event: NotificationEvent,
+) -> Result<JsValue, JsValue> {
+    // Close the notification (chrome doesn't do this by itself)
+    event.notification().close();
+
+    let clients: Array = JsFuture::from(sw.clients().match_all()).await?.into();
+
+    let client: WindowClient = if clients.length() > 0 {
+        clients.get(0).into()
+    } else {
+        let origin = sw.origin();
+        console_log!("Opening {origin}");
+
+        // This is broken in firefox android and it doesn't seem to be being worked on
+        // <https://bugzilla.mozilla.org/show_bug.cgi?id=1717431>
+        JsFuture::from(sw.clients().open_window(&origin))
+            .await
+            .map_err(JsError::from)
+            .map_err(|e| log_and_err(&format!("Error opening new window: {}", e)).unwrap_err())?
+            .into()
+    };
+
+    console_log!("Focusing tab");
+    JsFuture::from(client.focus()?)
         .await
         .map_err(JsError::from)
-        .map_err(|e| log_and_err(&format!("Error opening new window: {}", e)).unwrap_err())?;
-
-    log_1(&JsValue::from_str("X2"));
-    error_2(&JsValue::from_str("Got from open_window:"), &v);
-
+        .map_err(|e| log_and_err(&format!("Error focusing client window: {}", e)).unwrap_err())?;
     Ok(JsValue::undefined())
-
-    // let clients: Array = JsFuture::from(sw.clients().match_all()).await?.into();
-
-    // let client: WindowClient =  if clients.length() > 0 {
-    //     clients.get(0).into()  
-    // } else {
-    //     let root_url = root_url::<Nothing>()
-    //         .map_err(|e| log_and_err(&format!("Error getting root_url: {e}")).unwrap_err())?;
-    //     JsFuture::from(sw.clients().open_window(&root_url))
-    //         .await
-    //         .map_err(JsError::from)
-    //         .map_err(|e| log_and_err(&format!("Error opening new window: {}", e)).unwrap_err())?
-    //         .into()
-    // };
-
-    // JsFuture::from(client.focus()?)
-    //     .await
-    //     .map_err(JsError::from)
-    //     .map_err(|e| {
-    //         log_and_err(&format!("Error focusing client window: {}", e)).unwrap_err()
-    //     })?;
-    // Ok(JsValue::undefined())
 }
 
 #[wasm_bindgen]
@@ -476,7 +466,10 @@ pub fn worker_notification_click(
     _version: String,
     event: NotificationEvent,
 ) -> Result<Promise, JsValue> {
-    console_log!("worker_notification_click: {:?}, version: {_version}", event.notification());
+    console_log!(
+        "worker_notification_click: {:?}, version: {_version}",
+        event.notification()
+    );
 
-    Ok(future_to_promise(notification_click(sw)))
+    Ok(future_to_promise(notification_click(sw, event)))
 }
