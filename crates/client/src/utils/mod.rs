@@ -6,6 +6,7 @@ use wasm_bindgen::JsValue;
 
 pub mod browser;
 pub mod websocket;
+pub mod location;
 
 pub trait JsValueIntoOk<R, E>: Sized
 where

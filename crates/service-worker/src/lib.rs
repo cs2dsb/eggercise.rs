@@ -11,13 +11,13 @@ use shared::{
         payloads::Notification,
         API_BASE_PATH,
     },
-    utils::{location::root_url, tracing::configure_tracing_once as configure_tracing},
+    utils::tracing::configure_tracing_once as configure_tracing,
     ServiceWorkerPackage, SERVICE_WORKER_PACKAGE_URL,
 };
 use wasm_bindgen::{prelude::wasm_bindgen, JsCast, JsValue};
 use wasm_bindgen_futures::{future_to_promise, JsFuture};
 use web_sys::{
-    console::{error_1, log_1},
+    console::{error_1, error_2, log_1},
     js_sys::{Array, Object as JsObject, Promise},
     Cache, CacheStorage, Event, FetchEvent, MessageEvent, NotificationEvent, NotificationOptions,
     PushEvent, Request, RequestInit, Response, ResponseInit, ServiceWorkerGlobalScope, Url,
@@ -434,24 +434,38 @@ pub fn worker_push_subscription_change(
 }
 
 async fn notification_click(sw: ServiceWorkerGlobalScope) -> Result<JsValue, JsValue> {
-    let clients: Array = JsFuture::from(sw.clients().match_all()).await?.into();
-    if clients.length() > 0 {
-        let client: WindowClient = clients.get(0).into();
-        JsFuture::from(client.focus()?)
-            .await
-            .map_err(JsError::from)
-            .map_err(|e| {
-                log_and_err(&format!("Error focusing client window: {}", e)).unwrap_err()
-            })?;
-    } else {
-        let root_url = root_url::<Nothing>()
-            .map_err(|e| log_and_err(&format!("Error getting root_url: {e}")).unwrap_err())?;
-        JsFuture::from(sw.clients().open_window(&root_url))
-            .await
-            .map_err(JsError::from)
-            .map_err(|e| log_and_err(&format!("Error opening new window: {}", e)).unwrap_err())?;
-    }
+    log_1(&JsValue::from_str("X1"));
+    let v = JsFuture::from(sw.clients().open_window(&sw.origin()))
+        .await
+        .map_err(JsError::from)
+        .map_err(|e| log_and_err(&format!("Error opening new window: {}", e)).unwrap_err())?;
+
+    log_1(&JsValue::from_str("X2"));
+    error_2(&JsValue::from_str("Got from open_window:"), &v);
+
     Ok(JsValue::undefined())
+
+    // let clients: Array = JsFuture::from(sw.clients().match_all()).await?.into();
+
+    // let client: WindowClient =  if clients.length() > 0 {
+    //     clients.get(0).into()  
+    // } else {
+    //     let root_url = root_url::<Nothing>()
+    //         .map_err(|e| log_and_err(&format!("Error getting root_url: {e}")).unwrap_err())?;
+    //     JsFuture::from(sw.clients().open_window(&root_url))
+    //         .await
+    //         .map_err(JsError::from)
+    //         .map_err(|e| log_and_err(&format!("Error opening new window: {}", e)).unwrap_err())?
+    //         .into()
+    // };
+
+    // JsFuture::from(client.focus()?)
+    //     .await
+    //     .map_err(JsError::from)
+    //     .map_err(|e| {
+    //         log_and_err(&format!("Error focusing client window: {}", e)).unwrap_err()
+    //     })?;
+    // Ok(JsValue::undefined())
 }
 
 #[wasm_bindgen]
@@ -460,7 +474,7 @@ pub fn worker_notification_click(
     _version: String,
     event: NotificationEvent,
 ) -> Result<Promise, JsValue> {
-    console_log!("worker_notification_click: {:?}", event.notification());
+    console_log!("worker_notification_click: {:?}, version: {_version}", event.notification());
 
     Ok(future_to_promise(notification_click(sw)))
 }
