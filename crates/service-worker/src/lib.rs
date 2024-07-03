@@ -434,14 +434,17 @@ pub fn worker_push_subscription_change(
 }
 
 async fn notification_click(sw: ServiceWorkerGlobalScope) -> Result<JsValue, JsValue> {
+    log_1(&JsValue::from_str("X1"));
     let root_url = root_url::<Nothing>()
         .map_err(|e| log_and_err(&format!("Error getting root_url: {e}")).unwrap_err())?;
 
+    log_1(&JsValue::from_str("X2"));
     let v = JsFuture::from(sw.clients().open_window(&root_url))
         .await
         .map_err(JsError::from)
         .map_err(|e| log_and_err(&format!("Error opening new window: {}", e)).unwrap_err())?;
 
+    log_1(&JsValue::from_str("X3"));
     error_2(&JsValue::from_str("Got from open_window:"), &v);
 
     Ok(JsValue::undefined())
