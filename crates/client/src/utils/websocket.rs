@@ -1,9 +1,12 @@
 use std::any::type_name;
 
-use leptos::{leptos_dom::helpers::location, provide_context, use_context};
-use shared::api::{
-    error::{FrontendError, Nothing, ResultContext},
-    Object,
+use leptos::{provide_context, use_context};
+use shared::{
+    api::{
+        error::{FrontendError, Nothing},
+        Object,
+    },
+    utils::location::{protocol, host},
 };
 use tracing::debug;
 use wasm_bindgen::{prelude::Closure, JsCast};
@@ -24,17 +27,8 @@ impl Websocket {
 
         let path = Object::Websocket.path();
 
-        let loc = location();
-        let host = loc
-            .host()
-            // TODO: can we get rid of this manual map by implementing ResultContext/ErrorContext
-            // for Into<FEE>
-            .map_err(FrontendError::from)
-            .context("location.host")?;
-        let proto = loc
-            .protocol()
-            .map_err(FrontendError::from)
-            .context("location.protocol")?;
+        let host = host()?;
+        let proto = protocol()?;
 
         let ws_proto = match proto.as_ref() {
             "http:" => "ws",

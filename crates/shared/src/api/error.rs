@@ -116,7 +116,40 @@ mod frontend {
                     stack,
                 }
             } else {
-                JsError::UnknownJsValue(format!("{:?}", err))
+                let js_typeof: String =  match err.js_typeof()
+                    .try_into() 
+                    .map_err(JsError::from)
+                {
+                    Ok(v) => v,
+                    Err(e) => format!("Error from js_typeof: {e}"),
+                };
+
+                let err_string = format!("{:?}", err);
+                tracing::warn!("is_instance_of: {}, has_type: {}, debug string: {}",
+                    err.is_instance_of::<Exception>(),
+                    err.has_type::<Exception>(),
+                    err_string,
+                );
+                if let Some(exception) = <JsValue as TryInto<Exception>>::try_into(err.clone()).ok() {
+                    let name = exception.name();
+                    let message = exception.message();
+                    let filename = exception.filename();
+                    let line_number = exception.line_number();
+                    let column_number = exception.column_number();
+                    let stack = exception.stack();
+                    tracing::warn!("Exception failed is_instance_of test but was really an exception anyway!");
+                    return JsError::Exception {
+                        exception,
+                        name,
+                        message,
+                        filename,
+                        line_number,
+                        column_number,
+                        stack,
+                    };
+                }
+                JsError::UnknownJsValue(format!("{:?}, js_typeof: {js_typeof}", err))
+
             }
         }
     }

@@ -1,3 +1,5 @@
+use std::sync::Once;
+
 use time::format_description::well_known::Iso8601;
 use tracing_subscriber::{
     fmt::{format::Pretty, time::UtcTime},
@@ -18,4 +20,10 @@ pub fn configure_tracing() {
         .with(fmt_layer)
         .with(perf_layer)
         .init(); // Install these as subscribers to tracing events
+}
+
+/// Configures tracing inside a Once block so multiple calls don't panic
+pub fn configure_tracing_once() {
+    static ONCE: Once = Once::new();
+    ONCE.call_once(|| configure_tracing());
 }

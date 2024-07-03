@@ -17,7 +17,8 @@ pub mod db;
 pub mod utils;
 
 use db::sqlite3::SqlitePromiser;
-use utils::{tracing::configure_tracing, websocket::Websocket};
+use utils::websocket::Websocket;
+use shared::utils::tracing::configure_tracing;
 
 #[wasm_bindgen]
 pub async fn start_client(sqlite_promiser: Function) {
