@@ -4,7 +4,7 @@ use leptos::leptos_dom::helpers::location as leptos_loc;
 
 use crate::api::error::{FrontendError, ResultContext};
 
-/// Gets the site host with no protocol or path 
+/// Gets the site host with no protocol or path
 pub fn host<T: Display>() -> Result<String, FrontendError<T>> {
     let loc = leptos_loc();
     let host = loc

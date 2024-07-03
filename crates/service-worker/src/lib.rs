@@ -5,9 +5,14 @@ use console_error_panic_hook::set_once as set_panic_hook;
 use gloo_utils::format::JsValueSerdeExt;
 use serde::{de::DeserializeOwned, Serialize};
 use shared::{
-    api::{browser::record_subscription, error::JsError, payloads::Notification, API_BASE_PATH},
+    api::{
+        browser::record_subscription,
+        error::{JsError, Nothing},
+        payloads::Notification,
+        API_BASE_PATH,
+    },
+    utils::{location::root_url, tracing::configure_tracing_once as configure_tracing},
     ServiceWorkerPackage, SERVICE_WORKER_PACKAGE_URL,
-    utils::tracing::configure_tracing_once as configure_tracing,
 };
 use wasm_bindgen::{prelude::wasm_bindgen, JsCast, JsValue};
 use wasm_bindgen_futures::{future_to_promise, JsFuture};
@@ -111,7 +116,7 @@ async fn fetch_from_cache(
     Ok(response)
 }
 
-fn log_and_err<T>(msg: &str) -> Result<T, JsValue> {
+fn log_and_err(msg: &str) -> Result<(), JsValue> {
     console_error!("{}", msg);
     Err(JsValue::from(msg))
 }
@@ -125,7 +130,7 @@ async fn fetch_json<T: DeserializeOwned>(
     let json = JsFuture::from(response.json()?).await?;
 
     JsValueSerdeExt::into_serde(&json)
-        .map_err(|e| log_and_err::<()>(&format!("Error deserializing json: {}", e)).unwrap_err())
+        .map_err(|e| log_and_err(&format!("Error deserializing json: {}", e)).unwrap_err())
 }
 
 #[derive(Serialize)]
@@ -178,7 +183,7 @@ async fn install(sw: ServiceWorkerGlobalScope, version: String) -> Result<JsValu
         let request = construct_request(&f.path, Some(&f.hash), "GET")
             .map_err(JsError::from)
             .map_err(|e| {
-                log_and_err::<()>(&format!("Error constructing request for {}: {}", f.path, e))
+                log_and_err(&format!("Error constructing request for {}: {}", f.path, e))
                     .unwrap_err()
             })?;
 
@@ -187,7 +192,7 @@ async fn install(sw: ServiceWorkerGlobalScope, version: String) -> Result<JsValu
             .await
             .map_err(JsError::from)
             .map_err(|e| {
-                log_and_err::<()>(&format!(
+                log_and_err(&format!(
                     "Error adding request to cache for {}: {}",
                     f.path, e
                 ))
@@ -335,12 +340,13 @@ async fn push(
     let mut title = "Got PushEvent with no data!".to_string();
 
     if let Some(data) = event.data() {
-        let json = data.json().map_err(JsError::from).map_err(|e| {
-            log_and_err::<()>(&format!("push::data::json error: {}", e)).unwrap_err()
-        })?;
+        let json = data
+            .json()
+            .map_err(JsError::from)
+            .map_err(|e| log_and_err(&format!("push::data::json error: {}", e)).unwrap_err())?;
 
         let notification: Notification = JsValueSerdeExt::into_serde(&json).map_err(|e| {
-            log_and_err::<()>(&format!("push::data::json deserialize error: {}", e)).unwrap_err()
+            log_and_err(&format!("push::data::json deserialize error: {}", e)).unwrap_err()
         })?;
 
         title = notification.title;
@@ -403,7 +409,7 @@ async fn push_subscription_change(
     //       match the subscription owner. As a minimum it should pass event.oldSub
     //       so the server can check it's replacing the right sub
     record_subscription(&push_manager).await.map_err(|e| {
-        log_and_err::<()>(&format!(
+        log_and_err(&format!(
             "push_subscription_change::record_subscription error: {}",
             e
         ))
@@ -435,15 +441,15 @@ async fn notification_click(sw: ServiceWorkerGlobalScope) -> Result<JsValue, JsV
             .await
             .map_err(JsError::from)
             .map_err(|e| {
-                log_and_err::<()>(&format!("Error focusing client window: {}", e)).unwrap_err()
+                log_and_err(&format!("Error focusing client window: {}", e)).unwrap_err()
             })?;
     } else {
-        JsFuture::from(sw.clients().open_window("/"))
+        let root_url = root_url::<Nothing>()
+            .map_err(|e| log_and_err(&format!("Error getting root_url: {e}")).unwrap_err())?;
+        JsFuture::from(sw.clients().open_window(&root_url))
             .await
             .map_err(JsError::from)
-            .map_err(|e| {
-                log_and_err::<()>(&format!("Error opening new window: {}", e)).unwrap_err()
-            })?;
+            .map_err(|e| log_and_err(&format!("Error opening new window: {}", e)).unwrap_err())?;
     }
     Ok(JsValue::undefined())
 }
