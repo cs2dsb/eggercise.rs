@@ -4,25 +4,37 @@ self.version = 'SERVICE_WORKER_VERSION';
 self.addEventListener('install', event => {
     event.waitUntil(self.init
         .then(_ => wasm_bindgen.worker_install(self, self.version))
-        .catch(err => console.error(`Error initializing or installing service worker wasm: ${err}`)));
+        .catch(err => {
+            console.error(`Error initializing or installing service worker wasm: ${err}`);
+            throw err;
+        }));
 });
 
 self.addEventListener('activate', event => {
     event.waitUntil(self.init
         .then(_ => wasm_bindgen.worker_activate(self, self.version))
-        .catch(err => console.error(`Error initializing or activating service worker wasm: ${err}`)));
+        .catch(err => {
+            console.error(`Error initializing or activating service worker wasm: ${err}`);
+            throw err;
+        }));
 });
 
 self.addEventListener('push', event => {
     event.waitUntil(self.init
         .then(_ => wasm_bindgen.worker_push(self, self.version, event))
-        .catch(err => console.error(`Error initializing or calling worker_push: ${err}`)));
+        .catch(err => {
+            console.error(`Error initializing or calling worker_push: ${err}`);
+            throw err;
+        }));
 });
 
 self.addEventListener('pushsubscriptionchange', event => {
     event.waitUntil(self.init
         .then(_ => wasm_bindgen.worker_push_subscription_change(self, self.version, event))
-        .catch(err => console.error(`Error initializing or calling worker_push_subscription_change: ${err}`)));
+        .catch(err => {
+            console.error(`Error initializing or calling worker_push_subscription_change: ${err}`);
+            throw err;
+        }));
 });
 
 self.addEventListener('notificationclick', event => {
@@ -32,7 +44,10 @@ self.addEventListener('notificationclick', event => {
         .then(_ => console.log(`A: ${ performance.now() - start }`))
         .then(_ => wasm_bindgen.worker_notification_click(self, self.version, event))
         .then(_ => console.log(`B: ${ performance.now() - start }`))
-        .catch(err => console.error(`Error initializing or calling worker_notification_click: ${err}`)));
+        .catch(err => {
+            console.error(`Error initializing or calling worker_notification_click: ${err}`);
+            throw err;
+        }));
 });
 
 
@@ -40,13 +55,19 @@ self.addEventListener('notificationclick', event => {
 // self.addEventListener('fetch', event => {
 //     event.waitUntil(self.init
 //         .then(_ => wasm_bindgen.worker_fetch(self, self.version, event))
-//         .catch(err => console.error(`Error initializing or calling worker_message: ${err}`)));
+//         .catch(err => {
+//             console.error(`Error initializing or calling worker_message: ${err}`);
+//             throw err;
+//         }));
 // });
 
 self.addEventListener('message', event => {
     event.waitUntil(self.init
         .then(_ => wasm_bindgen.worker_message(self, event))
-        .catch(err => console.error(`Error initializing or calling worker_message: ${err}`)));
+        .catch(err => {
+            console.error(`Error initializing or calling worker_message: ${err}`);
+            throw err;
+        }));
 });
 
 // Done like this because the JS part of the service worker is always available but the wasm part, if
