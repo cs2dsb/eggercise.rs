@@ -3,6 +3,7 @@
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
+use tracing::subscriber::SetGlobalDefaultError;
 use tracing_subscriber::fmt::format::FmtSpan;
 #[cfg(feature = "build")]
 use {
@@ -16,18 +17,18 @@ pub mod model;
 pub mod types;
 pub mod utils;
 
-pub fn configure_tracing() {
-    tracing::subscriber::set_global_default(
-        tracing_subscriber::FmtSubscriber::builder()
-            .with_max_level(tracing::Level::TRACE)
-            .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
-            // .with_line_number(true)
-            // .with_file(true)
-            //.with_span_events(FmtSpan::ENTER | FmtSpan::CLOSE)
-            .with_span_events(FmtSpan::CLOSE)
-            .finish(),
-    )
-    .expect("Failed to set default tracing subscriber");
+pub fn configure_tracing(span_events: bool) -> Result<(), SetGlobalDefaultError> {
+    let mut builder = tracing_subscriber::FmtSubscriber::builder()
+        .with_max_level(tracing::Level::TRACE)
+        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env());
+
+    if span_events {
+        builder = builder.with_span_events(FmtSpan::CLOSE)
+    }
+
+    let subscriber = builder.finish();
+
+    tracing::subscriber::set_global_default(subscriber)
 }
 
 pub fn load_dotenv() -> Result<Option<PathBuf>, dotenv::Error> {

@@ -31,6 +31,7 @@ use server::{
     middleware::{CsrfLayer, RegenerateToken},
     routes::{
         auth::*,
+        logging,
         notifications::{remove_push_subscription, update_push_subscription, vapid},
         ping::ping,
         websocket::websocket_handler,
@@ -87,9 +88,10 @@ fn build_webauthn(args: &Cli) -> Result<webauthn_rs::Webauthn, anyhow::Error> {
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
     load_dotenv()?;
-    configure_tracing();
 
     let args = Cli::parse();
+    configure_tracing(args.log_span_events)?;
+
     debug!(?args);
 
     if args.debug_delete_database {
@@ -286,6 +288,7 @@ async fn main() -> Result<(), anyhow::Error> {
     axum::serve(
         listener,
         Router::new()
+            .nest(Object::Log.path(), logging::router())
             .merge(client_routes)
             // User/auth routes
             .route(Auth::RegisterStart.path(), post(register_start))
