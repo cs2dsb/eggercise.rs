@@ -14,6 +14,7 @@ wasm-bindgen.workspace = true
 gloo-utils.workspace = true
 serde_json.workspace = true
 chrono.workspace = true
+tracing.workspace = true
 
 js-sys = "0.3.69"
 shared = { path = "../shared", features = [ "wasm" ] }

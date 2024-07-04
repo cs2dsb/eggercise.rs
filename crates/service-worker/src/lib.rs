@@ -9,6 +9,7 @@ use shared::{
     utils::tracing::configure_tracing_once as configure_tracing,
     ServiceWorkerPackage, SERVICE_WORKER_PACKAGE_URL,
 };
+use tracing::debug;
 use wasm_bindgen::{prelude::wasm_bindgen, JsCast, JsValue};
 use wasm_bindgen_futures::{future_to_promise, JsFuture};
 use web_sys::{
@@ -20,6 +21,7 @@ use web_sys::{
 };
 
 const SKIP_WAITING: &str = "SKIP_WAITING";
+const INSTALL_FETCH_RETRIES: usize = 3;
 
 macro_rules! console_log {
     ($($t:tt)*) => (log_1(&JsValue::from(format_args!($($t)*).to_string())))
@@ -173,26 +175,44 @@ async fn fetch_package(
 
 async fn install(sw: ServiceWorkerGlobalScope, version: String) -> Result<JsValue, JsValue> {
     let package = fetch_package(&sw, &version, true).await?;
+    let sw = &sw;
+    let version = &version;
 
     for f in package.files.iter() {
-        let request = construct_request(&f.path, Some(&f.hash), "GET")
-            .map_err(JsError::from)
-            .map_err(|e| {
-                log_and_err(&format!("Error constructing request for {}: {}", f.path, e))
-                    .unwrap_err()
-            })?;
+        debug!("install::fetching {}", f.path);
+        for retry in 0..=INSTALL_FETCH_RETRIES {
+            let result: Result<(), JsValue> = async move {
+                let request = construct_request(&f.path, Some(&f.hash), "GET")
+                    .map_err(JsError::from)
+                    .map_err(|e| {
+                        log_and_err(&format!("Error constructing request for {}: {}", f.path, e))
+                            .unwrap_err()
+                    })?;
 
-        // Done one at a time so the additional logging context can be added
-        add_to_cache(sw.caches()?, &version, &vec![request])
-            .await
-            .map_err(JsError::from)
-            .map_err(|e| {
-                log_and_err(&format!(
-                    "Error adding request to cache for {}: {}",
-                    f.path, e
-                ))
-                .unwrap_err()
-            })?;
+                // Done one at a time so the additional logging context can be added
+                add_to_cache(sw.caches()?, &version, &vec![request])
+                    .await
+                    .map_err(JsError::from)
+                    .map_err(|e| {
+                        log_and_err(&format!(
+                            "Error adding request to cache for {}: {}",
+                            f.path, e
+                        ))
+                        .unwrap_err()
+                    })?;
+
+                Ok(())
+            }
+            .await;
+
+            if result.is_ok() {
+                break;
+            } else if retry == INSTALL_FETCH_RETRIES {
+                return result.map(|_| JsValue::undefined());
+            }
+
+            debug!("install::retrying ({}): {}", retry + 1, f.path);
+        }
     }
 
     Ok(JsValue::undefined())

@@ -156,7 +156,7 @@ where
         }
         .await;
 
-        if r.is_ok() || retry == RETRIES - 1 {
+        if r.is_ok() || retry == RETRIES {
             return r;
         }
         debug!("json_request::retrying ({})", retry + 1);

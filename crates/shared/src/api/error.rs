@@ -37,7 +37,7 @@ mod frontend {
     use tracing::{error, warn};
     use wasm_bindgen::{JsCast, JsValue};
     use web_sys::{
-        console::error_2,
+        console::{error_2, log_2},
         js_sys::{
             Error as GenericJsError,
             RangeError as JsRangeError,
@@ -85,6 +85,9 @@ mod frontend {
 
     impl From<JsValue> for JsError {
         fn from(err: JsValue) -> JsError {
+            // Added to print the error in JS to compare to the rust output (which is
+            // currently pretty unreadable in some cases)
+            log_2(&JsValue::from_str("JsError::from<JsValue>"), &err);
             if err.is_instance_of::<JsRangeError>() {
                 JsError::JsRange(err.into())
             } else if err.is_instance_of::<JsReferenceError>() {
