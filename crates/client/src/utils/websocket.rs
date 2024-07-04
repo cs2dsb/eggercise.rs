@@ -1,15 +1,14 @@
 use std::any::type_name;
 
 use leptos::{provide_context, use_context};
-use shared::{
-    api::{
-        error::{FrontendError, Nothing},
-        Object,
-    },
+use shared::api::{
+    error::{FrontendError, Nothing},
+    Object,
 };
 use tracing::debug;
 use wasm_bindgen::{prelude::Closure, JsCast};
 use web_sys::{MessageEvent, WebSocket};
+
 use crate::utils::location::{host, protocol};
 
 #[derive(Clone)]

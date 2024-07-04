@@ -76,6 +76,7 @@ mod frontend {
             filename: String,
             line_number: u32,
             column_number: u32,
+            result: u32,
             stack: String,
         },
         #[error("UnknownJsValue Error: {0:?}")]
@@ -107,6 +108,7 @@ mod frontend {
                 let filename = exception.filename();
                 let line_number = exception.line_number();
                 let column_number = exception.column_number();
+                let result = exception.result();
                 let stack = exception.stack();
                 JsError::Exception {
                     exception,
@@ -115,6 +117,7 @@ mod frontend {
                     filename,
                     line_number,
                     column_number,
+                    result,
                     stack,
                 }
             } else {
@@ -134,6 +137,7 @@ mod frontend {
                             let filename = exception.filename();
                             let line_number = exception.line_number();
                             let column_number = exception.column_number();
+                            let result = exception.result();
                             let stack = exception.stack();
                             warn!("Exception failed is_instance_of test but was really an exception anyway!");
                             return JsError::Exception {
@@ -143,6 +147,7 @@ mod frontend {
                                 filename,
                                 line_number,
                                 column_number,
+                                result,
                                 stack,
                             };
                         }

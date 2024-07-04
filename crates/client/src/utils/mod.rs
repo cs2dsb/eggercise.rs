@@ -5,8 +5,8 @@ use shared::api::error::FrontendError;
 use wasm_bindgen::JsValue;
 
 pub mod browser;
-pub mod websocket;
 pub mod location;
+pub mod websocket;
 
 pub trait JsValueIntoOk<R, E>: Sized
 where
