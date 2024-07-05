@@ -14,6 +14,7 @@ cd "${repo_dir}"
 
 readonly release_dir="${repo_dir}/releases";
 readonly db_dir="${repo_dir}/database";
+readonly keys_dir="${repo_dir}/keys";
 
 readonly docker_image="ghcr.io/cs2dsb/eggercise.rs:latest";
 readonly app_user=web-apps;
@@ -80,9 +81,13 @@ sudo docker run -d \
 	-e ASSETS_DIR=/opt/server/assets \
 	-e SQLITE_CONNECTION_STRING=/opt/server/database/egg.sqlite \
 	-v "${db_dir}":/opt/server/database \
+	-v "${keys_dir}":/opt/server/keys \
+	-v "${repo_dir}/.env":/opt/server/.env \
 	-e WEBAUTHN_ORIGIN=https://egg.ileet.co.uk \
 	-e WEBAUTHN_ID=egg.ileet.co.uk \
 	-e CORS_ORIGIN=https://egg.ileet.co.uk \
+	-e PRIVATE_KEY_PATH=/opt/server/keys/egg_key.pem \
+	-e PUBLIC_KEY_PATH=/opt/server/keys/egg_key.pub.pem \
 	-p 9090:9090 \
 	"$docker_image"
 
