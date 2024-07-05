@@ -4,7 +4,7 @@ resolver = "2"
 
 [workspace.package]
 edition = "2021"
-version = "0.0.101"
+version = "0.0.102"
 
 [profile.wasm-release]
 inherits = "release"
