@@ -5,11 +5,16 @@ use console_error_panic_hook::set_once as set_panic_hook;
 use gloo_utils::format::JsValueSerdeExt;
 use serde::{de::DeserializeOwned, Serialize};
 use shared::{
-    api::{browser::record_subscription, error::JsError, payloads::Notification, API_BASE_PATH},
+    api::{
+        browser::record_subscription,
+        error::{FrontendError, Nothing},
+        payloads::Notification,
+        API_BASE_PATH,
+    },
+    server_debug, server_error, server_trace,
     utils::tracing::configure_tracing_once as configure_tracing,
     ServiceWorkerPackage, SERVICE_WORKER_PACKAGE_URL,
 };
-use tracing::debug;
 use wasm_bindgen::{prelude::wasm_bindgen, JsCast, JsValue};
 use wasm_bindgen_futures::{future_to_promise, JsFuture};
 use web_sys::{
@@ -24,11 +29,29 @@ const SKIP_WAITING: &str = "SKIP_WAITING";
 const INSTALL_FETCH_RETRIES: usize = 3;
 
 macro_rules! console_log {
-    ($($t:tt)*) => (log_1(&JsValue::from(format_args!($($t)*).to_string())))
+    ($($t:tt)*) => {{
+        let message = format_args!($($t)*).to_string();
+
+        // Log with the server
+        server_debug!(&message);
+
+        // Log in the browser console
+        let js_value = JsValue::from(message);
+        log_1(&js_value);
+    }};
 }
 
 macro_rules! console_error {
-    ($($t:tt)*) => (error_1(&JsValue::from(format_args!($($t)*).to_string())))
+    ($($t:tt)*) => {{
+        let message = format_args!($($t)*).to_string();
+
+        // Log with the server
+        server_error!(&message);
+
+        // Log in the browser console
+        let js_value = JsValue::from(message);
+        error_1(&js_value);
+    }};
 }
 
 async fn get_cache(caches: &CacheStorage, version: &str) -> Result<Cache, JsValue> {
@@ -65,7 +88,6 @@ async fn add_to_cache(
     )
     .await?;
 
-    console_log!("add_to_cache OK");
     Ok(JsValue::undefined())
 }
 
@@ -113,9 +135,40 @@ async fn fetch_from_cache(
     Ok(response)
 }
 
-fn log_and_err(msg: &str) -> Result<(), JsValue> {
-    console_error!("{}", msg);
-    Err(JsValue::from(msg))
+/// Matches the first argument as a result
+/// The second argument is the inner type of the FrontendError
+/// If there is an error, the remaining arguments are passed to format_args!()
+/// to be prepended to ": {e:?}"
+/// It's written like this because server_error is async and calls a macro to
+/// work out the calling function's name which won't work if we call a function
+/// to do the logging (or use map_err)
+macro_rules! log_frontend_err {
+    ($f:expr, $fee:ty, $($t:tt)*) => {
+        match $f {
+            Ok(v) => Ok(v),
+            Err(e) => {
+                let e = FrontendError::<$fee>::from(e);
+
+                let message = format!("{}: {e}", format_args!($($t)*));
+
+                // Log with the server
+                server_error!(&message);
+
+                // Log in the browser console
+                let js_value = JsValue::from(message);
+                error_1(&js_value);
+
+                // Return the error
+                Err(js_value)
+            }
+        }
+    };
+}
+
+macro_rules! log_frontend_nothing_err {
+    ($f:expr, $($t:tt)*) => {{
+        log_frontend_err!($f, Nothing, $($t)*)
+    }};
 }
 
 async fn fetch_json<T: DeserializeOwned>(
@@ -126,8 +179,10 @@ async fn fetch_json<T: DeserializeOwned>(
     let response = fetch_from_cache(sw, version, request).await?;
     let json = JsFuture::from(response.json()?).await?;
 
-    JsValueSerdeExt::into_serde(&json)
-        .map_err(|e| log_and_err(&format!("Error deserializing json: {}", e)).unwrap_err())
+    log_frontend_nothing_err!(
+        JsValueSerdeExt::into_serde(&json),
+        "Error deserializing json"
+    )
 }
 
 #[derive(Serialize)]
@@ -165,8 +220,12 @@ async fn fetch_package(
     version: &str,
     remote: bool,
 ) -> Result<ServiceWorkerPackage, JsValue> {
+    server_trace!({ "version": version });
     let request = construct_request(SERVICE_WORKER_PACKAGE_URL, None, "GET")?;
     if remote {
+        // TODO: refactor so all requests go via the same method for consistent logging
+        // and retry logic
+        console_log!("Fetching package {version} ({SERVICE_WORKER_PACKAGE_URL})");
         add_to_cache(sw.caches()?, version, &[request.clone()?]).await?;
     }
 
@@ -174,44 +233,44 @@ async fn fetch_package(
 }
 
 async fn install(sw: ServiceWorkerGlobalScope, version: String) -> Result<JsValue, JsValue> {
+    server_trace!({ "version": version });
     let package = fetch_package(&sw, &version, true).await?;
     let sw = &sw;
     let version = &version;
 
     for f in package.files.iter() {
-        debug!("install::fetching {}", f.path);
+        console_log!("fetching ({})", f.path);
         for retry in 0..=INSTALL_FETCH_RETRIES {
             let result: Result<(), JsValue> = async move {
-                let request = construct_request(&f.path, Some(&f.hash), "GET")
-                    .map_err(JsError::from)
-                    .map_err(|e| {
-                        log_and_err(&format!("Error constructing request for {}: {}", f.path, e))
-                            .unwrap_err()
-                    })?;
+                let request = log_frontend_nothing_err!(
+                    construct_request(&f.path, Some(&f.hash), "GET"),
+                    "Error constructing request for {}",
+                    f.path,
+                )?;
 
                 // Done one at a time so the additional logging context can be added
-                add_to_cache(sw.caches()?, &version, &vec![request])
-                    .await
-                    .map_err(JsError::from)
-                    .map_err(|e| {
-                        log_and_err(&format!(
-                            "Error adding request to cache for {}: {}",
-                            f.path, e
-                        ))
-                        .unwrap_err()
-                    })?;
+                log_frontend_nothing_err!(
+                    add_to_cache(sw.caches()?, &version, &vec![request]).await,
+                    "Error adding request to cache for {}",
+                    f.path
+                )?;
 
                 Ok(())
             }
             .await;
 
             if result.is_ok() {
+                console_log!("fetch OK ({})", f.path);
                 break;
             } else if retry == INSTALL_FETCH_RETRIES {
                 return result.map(|_| JsValue::undefined());
             }
 
-            debug!("install::retrying ({}): {}", retry + 1, f.path);
+            console_log!(
+                "fetch::retrying {} of {INSTALL_FETCH_RETRIES}: ({})",
+                retry + 1,
+                f.path
+            );
         }
     }
 
@@ -223,20 +282,28 @@ pub fn worker_install(sw: ServiceWorkerGlobalScope, version: String) -> Result<P
     set_panic_hook();
     configure_tracing();
 
-    console_log!("worker_install called. Version: {}", version);
-
     Ok(future_to_promise(install(sw, version)))
+}
+
+async fn activate(sw: ServiceWorkerGlobalScope) -> Result<JsValue, JsValue> {
+    server_trace!();
+
+    // Claim the clients so we can control them in response to a push notificiation
+    // click
+    log_frontend_nothing_err!(
+        JsFuture::from(sw.clients().claim()).await,
+        "sw::clients::claim",
+    )?;
+
+    Ok(JsValue::undefined())
 }
 
 #[wasm_bindgen]
 pub fn worker_activate(sw: ServiceWorkerGlobalScope) -> Promise {
     set_panic_hook();
     configure_tracing();
-    console_log!("worker_activate called");
 
-    // Claim the clients so we can control them in response to a push notificiation
-    // click
-    sw.clients().claim()
+    future_to_promise(activate(sw))
 }
 
 async fn fetch_cached(
@@ -327,8 +394,9 @@ pub fn worker_fetch(
     Ok(())
 }
 
-#[wasm_bindgen]
-pub fn worker_message(sw: ServiceWorkerGlobalScope, event: MessageEvent) -> Result<(), JsValue> {
+async fn message(sw: ServiceWorkerGlobalScope, event: MessageEvent) -> Result<JsValue, JsValue> {
+    server_trace!();
+
     if let Ok(value) = <JsValue as TryInto<String>>::try_into(event.data()) {
         if value == SKIP_WAITING {
             console_log!("worker_message got SKIP_WAITING");
@@ -336,13 +404,21 @@ pub fn worker_message(sw: ServiceWorkerGlobalScope, event: MessageEvent) -> Resu
             // MDN states the promise returned can be safely ignored
             let _ = sw.skip_waiting()?;
 
-            return Ok(());
+            return Ok(JsValue::undefined());
         }
     }
 
     console_log!("worker_message got unexpected message: {:?}", event.data());
 
-    Ok(())
+    Ok(JsValue::undefined())
+}
+
+#[wasm_bindgen]
+pub fn worker_message(
+    sw: ServiceWorkerGlobalScope,
+    event: MessageEvent,
+) -> Result<Promise, JsValue> {
+    Ok(future_to_promise(message(sw, event)))
 }
 
 async fn push(
@@ -350,19 +426,19 @@ async fn push(
     _version: String,
     event: PushEvent,
 ) -> Result<JsValue, JsValue> {
+    server_trace!();
+
     let mut options = NotificationOptions::new();
     options.icon("/favicon.ico");
     let mut title = "Got PushEvent with no data!".to_string();
 
     if let Some(data) = event.data() {
-        let json = data
-            .json()
-            .map_err(JsError::from)
-            .map_err(|e| log_and_err(&format!("push::data::json error: {}", e)).unwrap_err())?;
+        let json = log_frontend_nothing_err!(data.json(), "data::json",)?;
 
-        let notification: Notification = JsValueSerdeExt::into_serde(&json).map_err(|e| {
-            log_and_err(&format!("push::data::json deserialize error: {}", e)).unwrap_err()
-        })?;
+        let notification: Notification = log_frontend_nothing_err!(
+            JsValueSerdeExt::into_serde(&json),
+            "data::json deserialize",
+        )?;
 
         title = notification.title;
 
@@ -401,14 +477,13 @@ async fn push(
     )
     .await?)
 }
+
 #[wasm_bindgen]
 pub fn worker_push(
     sw: ServiceWorkerGlobalScope,
     version: String,
     event: PushEvent,
 ) -> Result<Promise, JsValue> {
-    console_log!("worker_push: {:?}", event.data());
-
     Ok(future_to_promise(push(sw, version, event)))
 }
 
@@ -417,19 +492,19 @@ async fn push_subscription_change(
     _version: String,
     _event: Event,
 ) -> Result<JsValue, JsValue> {
+    server_trace!();
+
     let push_manager = sw.registration().push_manager()?;
 
     // TODO: Should record this change in case the user is currently offline
     //       It should also probably be user aware instead of assuming the cookies
     //       match the subscription owner. As a minimum it should pass event.oldSub
     //       so the server can check it's replacing the right sub
-    record_subscription(&push_manager).await.map_err(|e| {
-        log_and_err(&format!(
-            "push_subscription_change::record_subscription error: {}",
-            e
-        ))
-        .unwrap_err()
-    })?;
+    log_frontend_err!(
+        record_subscription(&push_manager).await,
+        _,
+        "record_subscription error"
+    )?;
     console_log!("push_subscription_change::record_subscription OK");
 
     Ok(JsValue::undefined())
@@ -441,8 +516,6 @@ pub fn worker_push_subscription_change(
     version: String,
     event: Event,
 ) -> Result<Promise, JsValue> {
-    console_log!("worker_push_subscription_change: {:?}", event);
-
     Ok(future_to_promise(push_subscription_change(
         sw, version, event,
     )))
@@ -452,6 +525,8 @@ async fn notification_click(
     sw: ServiceWorkerGlobalScope,
     event: NotificationEvent,
 ) -> Result<JsValue, JsValue> {
+    server_trace!();
+
     // Close the notification (chrome doesn't do this by itself)
     event.notification().close();
 
@@ -465,19 +540,18 @@ async fn notification_click(
 
         // This is broken in firefox android and it doesn't seem to be being worked on
         // <https://bugzilla.mozilla.org/show_bug.cgi?id=1717431>
-        JsFuture::from(sw.clients().open_window(&origin))
-            .await
-            .map_err(JsError::from)
-            .map_err(|e| log_and_err(&format!("Error opening new window: {}", e)).unwrap_err())?
-            .into()
+        log_frontend_nothing_err!(
+            JsFuture::from(sw.clients().open_window(&origin)).await,
+            "sw::clients::open_window",
+        )?
+        .into()
     };
 
     console_log!("Focusing tab");
-    JsFuture::from(client.focus()?)
-        .await
-        .map_err(JsError::from)
-        .map_err(|e| log_and_err(&format!("Error focusing client window: {}", e)).unwrap_err())?;
-    Ok(JsValue::undefined())
+    log_frontend_nothing_err!(
+        JsFuture::from(client.focus()?).await,
+        "sw::clients[0]::focus",
+    )
 }
 
 #[wasm_bindgen]
@@ -486,10 +560,5 @@ pub fn worker_notification_click(
     _version: String,
     event: NotificationEvent,
 ) -> Result<Promise, JsValue> {
-    console_log!(
-        "worker_notification_click: {:?}, version: {_version}",
-        event.notification()
-    );
-
     Ok(future_to_promise(notification_click(sw, event)))
 }

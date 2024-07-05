@@ -52,7 +52,7 @@ self.addEventListener('notificationclick', event => {
 //     event.waitUntil(self.init
 //         .then(_ => wasm_bindgen.worker_fetch(self, self.version, event))
 //         .catch(err => {
-//             console.error(`Error initializing or calling worker_message: ${err}`);
+//             console.error(`Error initializing or calling worker_fetch: ${err}`);
 //             throw err;
 //         }));
 // });

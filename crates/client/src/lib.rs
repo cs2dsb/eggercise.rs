@@ -17,13 +17,15 @@ pub mod db;
 pub mod utils;
 
 use db::sqlite3::SqlitePromiser;
-use shared::utils::tracing::configure_tracing;
+use shared::{server_trace, utils::tracing::configure_tracing};
 use utils::websocket::Websocket;
 
 #[wasm_bindgen]
 pub async fn start_client(sqlite_promiser: Function) {
     set_panic_hook();
     configure_tracing();
+
+    server_trace!();
 
     SqlitePromiser::new(sqlite_promiser).provide_context();
 
