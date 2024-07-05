@@ -3736,6 +3736,7 @@ version = "0.0.103"
 dependencies = [
  "chrono",
  "console_error_panic_hook",
+ "gloo-net",
  "gloo-utils",
  "js-sys",
  "serde",
@@ -3793,6 +3794,7 @@ dependencies = [
  "exemplar",
  "gloo-net",
  "gloo-utils",
+ "headers",
  "http 1.1.0",
  "http-serde",
  "leptos",

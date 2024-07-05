@@ -2,17 +2,21 @@ use std::fmt::Write;
 
 use chrono::Utc;
 use console_error_panic_hook::set_once as set_panic_hook;
+use gloo_net::http::{Method, RequestBuilder};
 use gloo_utils::format::JsValueSerdeExt;
 use serde::{de::DeserializeOwned, Serialize};
 use shared::{
     api::{
         browser::record_subscription,
-        error::{FrontendError, Nothing},
+        error::{FrontendError, Nothing, ServerError},
         payloads::Notification,
         API_BASE_PATH,
     },
-    server_debug, server_error, server_trace,
-    utils::tracing::configure_tracing_once as configure_tracing,
+    server_debug, server_error, server_info, server_trace,
+    utils::{
+        fetch::{json_request, simple_request},
+        tracing::configure_tracing_once as configure_tracing,
+    },
     ServiceWorkerPackage, SERVICE_WORKER_PACKAGE_URL,
 };
 use wasm_bindgen::{prelude::wasm_bindgen, JsCast, JsValue};
@@ -26,7 +30,6 @@ use web_sys::{
 };
 
 const SKIP_WAITING: &str = "SKIP_WAITING";
-const INSTALL_FETCH_RETRIES: usize = 3;
 
 macro_rules! console_log {
     ($($t:tt)*) => {{
@@ -234,45 +237,39 @@ async fn fetch_package(
 
 async fn install(sw: ServiceWorkerGlobalScope, version: String) -> Result<JsValue, JsValue> {
     server_trace!({ "version": version });
-    let package = fetch_package(&sw, &version, true).await?;
-    let sw = &sw;
-    let version = &version;
+    let cache = get_cache(&sw.caches()?, &version).await?;
+
+    let package: ServiceWorkerPackage = log_frontend_err!(
+        json_request(Method::GET, SERVICE_WORKER_PACKAGE_URL, None::<&()>).await,
+        ServerError<Nothing>,
+        "fetch:: {}",
+        SERVICE_WORKER_PACKAGE_URL,
+    )?;
 
     for f in package.files.iter() {
-        console_log!("fetching ({})", f.path);
-        for retry in 0..=INSTALL_FETCH_RETRIES {
-            let result: Result<(), JsValue> = async move {
-                let request = log_frontend_nothing_err!(
-                    construct_request(&f.path, Some(&f.hash), "GET"),
-                    "Error constructing request for {}",
-                    f.path,
-                )?;
+        // No additional checking required on the response, it's guaranteed to be 200
+        let response = log_frontend_err!(
+            simple_request(
+                Method::GET,
+                &f.path,
+                Some(|builder: RequestBuilder| builder.integrity(&f.hash)),
+            )
+            .await,
+            ServerError<Nothing>,
+            "fetch:: {}",
+            f.path,
+        )?;
 
-                // Done one at a time so the additional logging context can be added
-                log_frontend_nothing_err!(
-                    add_to_cache(sw.caches()?, &version, &vec![request]).await,
-                    "Error adding request to cache for {}",
-                    f.path
-                )?;
-
-                Ok(())
-            }
-            .await;
-
-            if result.is_ok() {
-                console_log!("fetch OK ({})", f.path);
-                break;
-            } else if retry == INSTALL_FETCH_RETRIES {
-                return result.map(|_| JsValue::undefined());
-            }
-
-            console_log!(
-                "fetch::retrying {} of {INSTALL_FETCH_RETRIES}: ({})",
-                retry + 1,
-                f.path
-            );
-        }
+        let response: web_sys::Response = response.into();
+        log_frontend_nothing_err!(
+            JsFuture::from(cache.put_with_str(&f.path, &response)).await,
+            "cache::put:: {}",
+            f.path,
+        )?;
+        server_trace!("Cached", { "file": f.path });
     }
+
+    server_info!("Install successful", { "version": version });
 
     Ok(JsValue::undefined())
 }
