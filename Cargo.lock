@@ -643,7 +643,7 @@ checksum = "4b82cf0babdbd58558212896d1a4272303a57bdb245c2bf1147185fb45640e70"
 
 [[package]]
 name = "client"
-version = "0.0.103"
+version = "0.0.104"
 dependencies = [
  "asciimath-rs",
  "chrono",
@@ -3635,7 +3635,7 @@ dependencies = [
 
 [[package]]
 name = "server"
-version = "0.0.103"
+version = "0.0.104"
 dependencies = [
  "anyhow",
  "axum",
@@ -3732,10 +3732,11 @@ dependencies = [
 
 [[package]]
 name = "service-worker"
-version = "0.0.103"
+version = "0.0.104"
 dependencies = [
  "chrono",
  "console_error_panic_hook",
+ "gloo-net",
  "gloo-utils",
  "js-sys",
  "serde",
@@ -3780,7 +3781,7 @@ dependencies = [
 
 [[package]]
 name = "shared"
-version = "0.0.103"
+version = "0.0.104"
 dependencies = [
  "anyhow",
  "axum",
@@ -3793,6 +3794,7 @@ dependencies = [
  "exemplar",
  "gloo-net",
  "gloo-utils",
+ "headers",
  "http 1.1.0",
  "http-serde",
  "leptos",
@@ -4945,7 +4947,7 @@ dependencies = [
 
 [[package]]
 name = "web-sys_dummy"
-version = "0.0.103"
+version = "0.0.104"
 dependencies = [
  "web-sys",
 ]

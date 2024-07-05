@@ -35,10 +35,11 @@ include_dir.workspace = true
 base64.workspace = true
 rand.workspace = true
 web-push.workspace = true
+headers.workspace = true
 rusqlite = { workspace = true, features = [ "bundled" ] }
 webauthn-rs = { workspace = true, features = [ "danger-allow-state-serialisation" ] }
 
-headers = "0.4.0"
+
 
 # QR Code generation
 qrcodegen = "1.8.0"

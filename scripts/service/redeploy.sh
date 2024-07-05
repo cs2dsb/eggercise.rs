@@ -82,7 +82,7 @@ sudo docker run -d \
 	-e SQLITE_CONNECTION_STRING=/opt/server/database/egg.sqlite \
 	-v "${db_dir}":/opt/server/database \
 	-v "${keys_dir}":/opt/server/keys \
-	-v "${repo_dir}/.env":/opt/server/.env \
+	-v "${repo_dir}/.env":/server/.env \
 	-e WEBAUTHN_ORIGIN=https://egg.ileet.co.uk \
 	-e WEBAUTHN_ID=egg.ileet.co.uk \
 	-e CORS_ORIGIN=https://egg.ileet.co.uk \

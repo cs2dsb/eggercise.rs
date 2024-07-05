@@ -45,11 +45,11 @@ macro_rules! server_log {
     ($level:literal, $message:expr) => {
         $crate::server_log!($level, Some($message), {}) ;
     };
-    ($level:literal, $message:expr, ( $($args:tt)+ )) => {
+    ($level:literal, $message:literal, ( $($args:tt)+ )) => {
         let message = format_args!($message, $($args)+).to_string();
         $crate::server_log!($level, Some(message), {}) ;
     };
-    ($level:literal, $message:expr, ( $($args:tt)+ ), { $($json:tt)* }) => {
+    ($level:literal, $message:literal, ( $($args:tt)+ ), { $($json:tt)* }) => {
         let message = format_args!($message, $($args)+).to_string();
         $crate::server_log!($level, Some(message), { $($json)+ }) ;
     };
@@ -58,30 +58,35 @@ macro_rules! server_log {
 #[macro_export]
 macro_rules! server_trace {
     ({ $($tt:tt)* }) => { $crate::server_log!("trace", None::<String>, { $($tt)* }) };
+    ($msg:literal, { $($tt:tt)* }) => { $crate::server_log!("trace", Some($msg), { $($tt)* }) };
     ($($tt:tt)*) => { $crate::server_log!("trace", $($tt)*) };
 }
 
 #[macro_export]
 macro_rules! server_debug {
     ({ $($tt:tt)* }) => { $crate::server_log!("debug", None::<String>, { $($tt)* }) };
+    ($msg:literal, { $($tt:tt)* }) => { $crate::server_log!("debug", Some($msg), { $($tt)* }) };
     ($($tt:tt)*) => { $crate::server_log!("debug", $($tt)*) };
 }
 
 #[macro_export]
 macro_rules! server_info {
     ({ $($tt:tt)* }) => { $crate::server_log!("info", None::<String>, { $($tt)* }) };
+    ($msg:literal, { $($tt:tt)* }) => { $crate::server_log!("info", Some($msg), { $($tt)* }) };
     ($($tt:tt)*) => { $crate::server_log!("info", $($tt)*) };
 }
 
 #[macro_export]
 macro_rules! server_warn {
     ({ $($tt:tt)* }) => { $crate::server_log!("warn", None::<String>, { $($tt)* }) };
+    ($msg:literal, { $($tt:tt)* }) => { $crate::server_log!("warn", Some($msg), { $($tt)* }) };
     ($($tt:tt)*) => { $crate::server_log!("warn", $($tt)*) };
 }
 
 #[macro_export]
 macro_rules! server_error {
     ({ $($tt:tt)* }) => { $crate::server_log!("error", None::<String>, { $($tt)* }) };
+    ($msg:literal, { $($tt:tt)* }) => { $crate::server_log!("error", Some($msg), { $($tt)* }) };
     ($($tt:tt)*) => { $crate::server_log!("error", $($tt)*) };
 }
 
