@@ -285,6 +285,8 @@ async fn main() -> Result<(), anyhow::Error> {
     let listener = TcpListener::bind(socket).await?;
     debug!("listening on {}", listener.local_addr()?);
 
+    let log_span_events = args.log_span_events;
+
     axum::serve(
         listener,
         Router::new()
@@ -363,15 +365,27 @@ async fn main() -> Result<(), anyhow::Error> {
 
                                 span
                             })
-                            .on_response(|response: &Response, _latency: Duration, span: &Span| {
-                                span.record("status", response.status().to_string());
-                            })
+                            .on_response(
+                                move |response: &Response, _latency: Duration, span: &Span| {
+                                    span.record("status", response.status().to_string());
+                                    // If enter/exit events are off we want to make sure http_log
+                                    // generates something anyway
+                                    if !log_span_events {
+                                        info!(target: "http_log", parent: span, "");
+                                    }
+                                },
+                            )
                             .on_failure(
-                                |error: ServerErrorsFailureClass,
-                                 _latency: Duration,
-                                 span: &Span| {
+                                move |error: ServerErrorsFailureClass,
+                                      _latency: Duration,
+                                      span: &Span| {
                                     if let ServerErrorsFailureClass::StatusCode(code) = error {
                                         span.record("status", code.to_string());
+                                    }
+                                    // If enter/exit events are off we want to make sure http_log
+                                    // generates something anyway
+                                    if !log_span_events {
+                                        info!(target: "http_log", parent: span, "");
                                     }
                                 },
                             ),
