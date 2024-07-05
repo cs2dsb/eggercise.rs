@@ -65,7 +65,7 @@ tokio = { version = "1.37.0", features = [ "full" ] }
 
 # HTTP utils
 tower-http = { version = "0.5.2", features = [ 
-    "trace", "fs", "set-header", "cors",
+    "trace", "fs", "set-header", "cors", "limit", 
     "compression-br", "compression-deflate", "compression-gzip", "compression-zstd" ] }
 tower = "0.4.13"
 tokio-tungstenite = "0.23.1"

@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+
+# Exit when any command fails
+set -o errexit
+
+# Exit when an undeclared variable is used
+set -o nounset
+
+# Exit when a piped command returns a non-zero exit code
+set -o pipefail
+
+readonly log="${1:-Test log text}";
+
+# get a session cookie
+readonly cookie=`curl -s -c - http://127.0.0.1:9090/api/ping`;
+# get the csrf token 
+readonly token=`curl --cookie <(echo "$cookie") -I -s -o /dev/null -w '%header{x-csrf-token}' http://127.0.0.1:9090/api/ping`;
+
+levels=("trace" "debug" "info" "warn" "error")
+
+for level in ${levels[@]}; do  
+    printf "${level} "
+    curl \
+        -s -o /dev/null -w "%{http_code}\n" \
+        --cookie <(echo "$cookie") \
+        --header "Content-Type: application/json" \
+        --header "X-Csrf-Token: $token" \
+        --data "{ \"message\": \"${log}\", \"level\": \"${level}\" }" \
+        http://127.0.0.1:9090/api/log
+done
+
+printf "too big (should be 413 - Payload Too Large) "
+curl \
+    -s -o /dev/null -w "%{http_code}\n" \
+    --cookie <(echo "$cookie") \
+    --header "Content-Type: application/json" \
+    --header "X-Csrf-Token: $token" \
+    --header "Content-Length: 6000" \
+    --data "{ \"message\": \"${log}\", \"level\": \"${level}\" }" \
+    http://127.0.0.1:9090/api/log

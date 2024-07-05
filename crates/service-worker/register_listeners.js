@@ -38,12 +38,8 @@ self.addEventListener('pushsubscriptionchange', event => {
 });
 
 self.addEventListener('notificationclick', event => {
-    let start = performance.now();
-    console.log(`start: ${ start }`);
     event.waitUntil(self.init
-        .then(_ => console.log(`A: ${ performance.now() - start }`))
         .then(_ => wasm_bindgen.worker_notification_click(self, self.version, event))
-        .then(_ => console.log(`B: ${ performance.now() - start }`))
         .catch(err => {
             console.error(`Error initializing or calling worker_notification_click: ${err}`);
             throw err;
@@ -56,7 +52,7 @@ self.addEventListener('notificationclick', event => {
 //     event.waitUntil(self.init
 //         .then(_ => wasm_bindgen.worker_fetch(self, self.version, event))
 //         .catch(err => {
-//             console.error(`Error initializing or calling worker_message: ${err}`);
+//             console.error(`Error initializing or calling worker_fetch: ${err}`);
 //             throw err;
 //         }));
 // });

@@ -22,6 +22,7 @@ pub enum Object {
     PushNotification,
     PushSubscription,
     Vapid,
+    Log,
 }
 
 impl Object {
@@ -36,6 +37,7 @@ impl Object {
             PushNotification => concatcp!(API_BASE_PATH, "push_notification"),
             PushSubscription => concatcp!(API_BASE_PATH, "push_subscription"),
             Vapid => concatcp!(API_BASE_PATH, "vapid"),
+            Log => concatcp!(API_BASE_PATH, "log"),
         }
     }
 }

@@ -175,6 +175,8 @@ mod frontend {
         Js { inner: String },
         #[error("{inner}")]
         Validation { inner: ValidationError },
+        #[error("{message}")]
+        Json { message: String },
         #[error("{inner}")]
         WrongContentType { inner: WrongContentTypeError },
         #[error("{inner}\nContext: {context}")]
@@ -208,6 +210,14 @@ mod frontend {
     impl From<FrontendError<Nothing>> for FrontendErrorOnly {
         fn from(value: FrontendError<Nothing>) -> Self {
             Self(value)
+        }
+    }
+
+    impl<T: Display> From<serde_json::Error> for FrontendError<T> {
+        fn from(value: serde_json::Error) -> Self {
+            Self::Json {
+                message: format!("serde_json error: {value:?}"),
+            }
         }
     }
 
@@ -277,6 +287,7 @@ mod frontend {
                     let errors = inner.error_messages.join(", ");
                     view! { <li>{ format!("ValidationErrors:\n{errors}") }</li> }.into_view()
                 },
+                Json { message } => view! { <li>{ message }</li> }.into_view(),
                 WrongContentType { inner: WrongContentTypeError { expected, got, body } } => {
                     view! { <li>{ format!("WrongContentTypeError:\nExpected: {expected}\nGot:{:?}\nBody: {body}", got) }</li> }.into_view()
                 },
