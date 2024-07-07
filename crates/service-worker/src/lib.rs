@@ -282,8 +282,8 @@ pub fn worker_install(sw: ServiceWorkerGlobalScope, version: String) -> Result<P
     Ok(future_to_promise(install(sw, version)))
 }
 
-async fn activate(sw: ServiceWorkerGlobalScope) -> Result<JsValue, JsValue> {
-    server_trace!();
+async fn activate(sw: ServiceWorkerGlobalScope, version: String) -> Result<JsValue, JsValue> {
+    server_trace!({ "version": version });
 
     // Claim the clients so we can control them in response to a push notificiation
     // click
@@ -296,11 +296,11 @@ async fn activate(sw: ServiceWorkerGlobalScope) -> Result<JsValue, JsValue> {
 }
 
 #[wasm_bindgen]
-pub fn worker_activate(sw: ServiceWorkerGlobalScope) -> Promise {
+pub fn worker_activate(sw: ServiceWorkerGlobalScope, version: String) -> Promise {
     set_panic_hook();
     configure_tracing();
 
-    future_to_promise(activate(sw))
+    future_to_promise(activate(sw, version))
 }
 
 async fn fetch_cached(

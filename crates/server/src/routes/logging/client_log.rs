@@ -10,7 +10,7 @@ use tracing::{debug, error, info, span, trace, warn, Level};
 
 use crate::{db::DatabaseConnection, UserState};
 
-const LOG_MAX_BYTES: usize = 100 * 1024;
+const LOG_MAX_BYTES: usize = 512 * 1024;
 
 pub fn router<S>() -> Router<S>
 where
