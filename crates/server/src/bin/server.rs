@@ -34,6 +34,7 @@ use server::{
         logging,
         notifications::{remove_push_subscription, update_push_subscription, vapid},
         ping::ping,
+        rtc::offer_handler,
         websocket::websocket_handler,
     },
     AppError, AppState, VapidPrivateKey, VapidPubKey,
@@ -46,6 +47,10 @@ use shared::{
     },
     configure_tracing, load_dotenv,
     model::{PushNotificationSubscription, User},
+    rtc::{
+        peer_connector::Connector as _, signalling_client::Client as _, Builder as _,
+        PeerConnector, SignallingClient,
+    },
 };
 use tokio::net::TcpListener;
 use tower::ServiceBuilder;
@@ -67,18 +72,14 @@ use web_push::{
 use webauthn_rs::{prelude::Url, WebauthnBuilder};
 
 fn build_webauthn(args: &Cli) -> Result<webauthn_rs::Webauthn, anyhow::Error> {
-    let rp_name = format!("eggercise.rs on {}", &args.webauthn_origin);
-    let url = Url::parse(&args.webauthn_origin).with_context(|| {
-        format!(
-            "Parsing \"{}\" as webauthn origin URL",
-            &args.webauthn_origin
-        )
-    })?;
+    let rp_name = format!("eggercise.rs on {}", &args.origin);
+    let url = Url::parse(&args.origin)
+        .with_context(|| format!("Parsing \"{}\" as webauthn origin URL", &args.origin))?;
 
     let builder = WebauthnBuilder::new(&args.webauthn_id, &url).with_context(|| {
         format!(
             "WebauthnBuilder::new({}, {})",
-            &args.webauthn_id, &args.webauthn_origin
+            &args.webauthn_id, &args.origin
         )
     })?;
 
@@ -148,6 +149,9 @@ async fn main() -> Result<(), anyhow::Error> {
     let notifier_db_connection = pool.get().await?;
     let notifier_private_key = vapid_private_key.clone();
 
+    let rtc_connector = PeerConnector::with_base(&args.origin).build()?;
+    let rtc_signalling_client = SignallingClient::new().build()?.into();
+
     let state = AppState {
         pool,
         webauthn,
@@ -155,6 +159,9 @@ async fn main() -> Result<(), anyhow::Error> {
         vapid_pub_key,
         vapid_private_key,
         websocket_clients: Default::default(),
+        rtc_connector: rtc_connector.into(),
+        rtc_peers: Default::default(),
+        rtc_signalling_client,
     };
 
     // Map all routes the client can handle to the index.html
@@ -320,6 +327,7 @@ async fn main() -> Result<(), anyhow::Error> {
             )
             .route(Object::Ping.path(), get(ping))
             .route(Object::Websocket.path(), get(websocket_handler))
+            .route(Object::RtcOffer.path(), post(offer_handler))
             .nest_service(
                 "/wasm/service_worker.js",
                 ServiceBuilder::new()
@@ -408,7 +416,7 @@ async fn main() -> Result<(), anyhow::Error> {
                     .layer(
                         CorsLayer::new()
                             .allow_methods([Method::GET, Method::POST, Method::DELETE])
-                            .allow_origin(args.cors_origin.parse::<HeaderValue>()?),
+                            .allow_origin(args.origin.parse::<HeaderValue>()?),
                     ),
             )
             .layer(CompressionLayer::new())

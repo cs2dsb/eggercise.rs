@@ -14,6 +14,7 @@ use {
 
 pub mod api;
 pub mod model;
+pub mod rtc;
 pub mod types;
 pub mod utils;
 

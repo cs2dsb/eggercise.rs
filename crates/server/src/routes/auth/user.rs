@@ -60,7 +60,7 @@ pub async fn create_temporary_login(
             let expiry_date = Utc::now() + Duration::from_mins(args.temporary_login_expiry_minutes);
             let url = format!(
                 "{}{}",
-                args.webauthn_origin,
+                args.origin,
                 Auth::TemporaryLogin
                     .path()
                     .replace(":id", &id.hyphenated().to_string())

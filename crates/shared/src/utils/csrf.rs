@@ -1,6 +1,6 @@
 use std::{error::Error, fmt::Display};
 
-use gloo_net::http::{Request, RequestBuilder, Response};
+use gloo::net::http::{Request, RequestBuilder, Response};
 use leptos::{provide_context, use_context, Owner};
 use tracing::debug;
 

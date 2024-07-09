@@ -1,4 +1,4 @@
-use gloo_net::http::Method;
+use gloo::net::http::Method;
 use web_sys::{PushEncryptionKeyName, PushSubscription};
 
 use crate::{

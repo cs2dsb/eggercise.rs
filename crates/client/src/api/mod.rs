@@ -28,6 +28,9 @@ pub use create_temporary_login::*;
 mod ping;
 pub use ping::*;
 
+mod rtc;
+pub use rtc::*;
+
 pub async fn run_promise_with_timeout(
     promise: Promise,
     timeout: Duration,

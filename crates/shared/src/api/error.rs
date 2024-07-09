@@ -51,6 +51,7 @@ mod frontend {
     };
 
     use super::{ErrorContext, Nothing, ValidationError, WrongContentTypeError};
+    use crate::rtc::Error as RtcError;
 
     #[derive(Debug, Clone, Error)]
     pub enum JsError {
@@ -178,6 +179,10 @@ mod frontend {
         #[error("{message}")]
         Json { message: String },
         #[error("{inner}")]
+        Rtc { inner: RtcError },
+        #[error("{message}")]
+        Other { message: String },
+        #[error("{inner}")]
         WrongContentType { inner: WrongContentTypeError },
         #[error("{inner}\nContext: {context}")]
         WithContext { context: String, inner: Box<Self> },
@@ -221,16 +226,16 @@ mod frontend {
         }
     }
 
-    impl<T: Display> From<gloo_net::Error> for FrontendError<T> {
-        fn from(value: gloo_net::Error) -> Self {
+    impl<T: Display> From<gloo::net::Error> for FrontendError<T> {
+        fn from(value: gloo::net::Error) -> Self {
             Self::Client {
                 message: format!("gloo-net error: {}", value.to_string()),
             }
         }
     }
 
-    impl<T: Display> From<gloo_utils::errors::JsError> for FrontendError<T> {
-        fn from(value: gloo_utils::errors::JsError) -> Self {
+    impl<T: Display> From<gloo::utils::errors::JsError> for FrontendError<T> {
+        fn from(value: gloo::utils::errors::JsError) -> Self {
             Self::Js {
                 inner: format!("gloo-utils error: {}", value.to_string()),
             }
@@ -248,6 +253,14 @@ mod frontend {
     impl<T: Display> From<WrongContentTypeError> for FrontendError<T> {
         fn from(inner: WrongContentTypeError) -> Self {
             Self::WrongContentType {
+                inner,
+            }
+        }
+    }
+
+    impl<T: Display> From<RtcError> for FrontendError<T> {
+        fn from(inner: RtcError) -> Self {
+            Self::Rtc {
                 inner,
             }
         }
@@ -288,6 +301,8 @@ mod frontend {
                     view! { <li>{ format!("ValidationErrors:\n{errors}") }</li> }.into_view()
                 },
                 Json { message } => view! { <li>{ message }</li> }.into_view(),
+                Rtc { inner } => view! { <li>{ inner.to_string() }</li> }.into_view(),
+                Other { message } => view! { <li>{ message }</li> }.into_view(),
                 WrongContentType { inner: WrongContentTypeError { expected, got, body } } => {
                     view! { <li>{ format!("WrongContentTypeError:\nExpected: {expected}\nGot:{:?}\nBody: {body}", got) }</li> }.into_view()
                 },

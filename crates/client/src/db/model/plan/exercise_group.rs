@@ -1,4 +1,4 @@
-use gloo_utils::format::JsValueSerdeExt;
+use gloo::utils::format::JsValueSerdeExt;
 use shared::{
     model::{PlanExerciseGroup, PlanExerciseGroupIden},
     types::Uuid,

@@ -2,8 +2,10 @@ use std::fmt::Write;
 
 use chrono::Utc;
 use console_error_panic_hook::set_once as set_panic_hook;
-use gloo_net::http::{Method, RequestBuilder};
-use gloo_utils::format::JsValueSerdeExt;
+use gloo::{
+    net::http::{Method, RequestBuilder},
+    utils::format::JsValueSerdeExt,
+};
 use serde::{de::DeserializeOwned, Serialize};
 use shared::{
     api::{

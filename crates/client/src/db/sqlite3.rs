@@ -3,7 +3,7 @@
 use std::{any::type_name, collections::HashMap};
 
 use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
-use gloo_utils::{
+use gloo::utils::{
     errors::{JsError, NotJsError},
     format::JsValueSerdeExt,
 };
@@ -93,7 +93,7 @@ impl SqlitePromiserError {
     }
 
     fn from_sqlite(value: JsValue) -> Self {
-        // Copied out of gloo_utils because their version panics when the non error
+        // Copied out of gloo::utils because their version panics when the non error
         // isn't a string
         // See <https://github.com/rustwasm/gloo/issues/477>
         match value.dyn_into::<js_sys::Error>() {

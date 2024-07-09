@@ -12,14 +12,14 @@ use shared::model::UserId;
 use crate::AppState;
 
 #[derive(Debug)]
-pub enum Message {}
+pub enum ClientControlMessage {}
 
 type ClientKey = (UserId, SocketAddr);
 
 #[derive(Debug)]
 pub struct Client {
     key: ClientKey,
-    sender: Sender<Message>,
+    sender: Sender<ClientControlMessage>,
 }
 
 impl Client {
@@ -27,14 +27,21 @@ impl Client {
         &self.key
     }
 
-    pub fn new(user_id: UserId, socket_address: SocketAddr, sender: Sender<Message>) -> Self {
+    pub fn new(
+        user_id: UserId,
+        socket_address: SocketAddr,
+        sender: Sender<ClientControlMessage>,
+    ) -> Self {
         Self {
             key: (user_id, socket_address),
             sender,
         }
     }
 
-    pub async fn send(&self, msg: Message) -> Result<(), loole::SendError<Message>> {
+    pub async fn send(
+        &self,
+        msg: ClientControlMessage,
+    ) -> Result<(), loole::SendError<ClientControlMessage>> {
         self.sender.send_async(msg).await
     }
 }

@@ -6,7 +6,7 @@ use std::{
     fmt::{Debug, Display},
 };
 
-use gloo_net::http::{Method, RequestBuilder, Response};
+use gloo::net::http::{Method, RequestBuilder, Response};
 use headers::{CacheControl, Header};
 use http::header::{self, ACCEPT, CACHE_CONTROL};
 use mime::APPLICATION_JSON;

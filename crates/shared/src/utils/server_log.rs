@@ -1,4 +1,4 @@
-pub use gloo_net::http::Method;
+pub use gloo::net::http::Method;
 pub use stdext::function_name as stdext_function_name;
 
 #[macro_export]

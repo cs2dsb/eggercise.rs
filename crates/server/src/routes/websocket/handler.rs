@@ -7,8 +7,10 @@ use axum::{
 };
 use tracing::{debug, warn};
 
-use super::handle_socket;
-use crate::{constants::WEBSOCKET_CHANNEL_BOUND, Client, Clients, UserState};
+use crate::{
+    constants::WEBSOCKET_CHANNEL_BOUND, routes::websocket::handle_socket, Client, Clients,
+    PeerConnectorState, PeerMapState, SignallingClientState, UserState,
+};
 
 pub async fn websocket_handler(
     ws: WebSocketUpgrade,
@@ -20,6 +22,10 @@ pub async fn websocket_handler(
     user_state: UserState,
     // Map containing all connected clients
     clients: Clients,
+
+    peer_connector: PeerConnectorState,
+    rtc_peers: PeerMapState,
+    peer_signalling_client: SignallingClientState,
 ) -> impl IntoResponse {
     debug!("Websocket upgrade headers: {:?}", headers);
 
@@ -53,5 +59,14 @@ pub async fn websocket_handler(
     }
 
     // Complete the upgrade to a websocket
-    ws.on_upgrade(move |socket| handle_socket(socket, socket_addr, receiver))
+    ws.on_upgrade(move |socket| {
+        handle_socket(
+            socket,
+            socket_addr,
+            receiver,
+            peer_connector,
+            rtc_peers,
+            peer_signalling_client,
+        )
+    })
 }
