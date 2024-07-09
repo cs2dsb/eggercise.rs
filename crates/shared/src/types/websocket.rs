@@ -56,6 +56,7 @@ impl From<PeerId> for ServerMessage {
 #[cfg(feature = "backend")]
 impl TryFrom<ServerMessage> for axum::extract::ws::Message {
     type Error = MessageError;
+
     fn try_from(message: ServerMessage) -> Result<Self, Self::Error> {
         let payload = serde_json::to_string(&message)?;
         // TODO: binary would be preferable
@@ -80,7 +81,11 @@ impl ServerMessage {
                 obj.to_string()
             )))
         } else {
-            Err(MessageError::Other("Unexpected event.data type (not even a JS Object). Only Blob and Text are supported".to_string()))
+            Err(MessageError::Other(
+                "Unexpected event.data type (not even a JS Object). Only Blob and Text are \
+                 supported"
+                    .to_string(),
+            ))
         }
     }
 }

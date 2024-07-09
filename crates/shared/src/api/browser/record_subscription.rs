@@ -22,9 +22,7 @@ pub async fn record_subscription(
     options.application_server_key(Some(&key));
 
     let subscription: PushSubscription =
-        JsFuture::from(push_manager.subscribe_with_options(&options)?)
-            .await?
-            .into();
+        JsFuture::from(push_manager.subscribe_with_options(&options)?).await?.into();
 
     // Pass the sub to the backend
     update_subscription(&subscription).await?;

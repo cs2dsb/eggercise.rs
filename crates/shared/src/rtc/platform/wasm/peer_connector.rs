@@ -33,10 +33,12 @@ impl<R: RoomId, P: PeerId> PeerConnectorBuilder<R, P> {
         self.signalling_server = Some(signalling_server);
         self
     }
+
     pub fn set_ice_servers(mut self, ice_servers: Vec<String>) -> Self {
         self.ice_servers = ice_servers;
         self
     }
+
     pub fn add_ice_server<T: Into<String>>(mut self, ice_server: T) -> Self {
         self.ice_servers.push(ice_server.into());
         self
@@ -45,26 +47,15 @@ impl<R: RoomId, P: PeerId> PeerConnectorBuilder<R, P> {
 
 impl<R: RoomId, P: PeerId> Builder<PeerConnector<R, P>> for PeerConnectorBuilder<R, P> {
     fn build(self) -> Result<PeerConnector<R, P>, Error> {
-        let Self {
-            signalling_server,
-            ice_servers,
-            ..
-        } = self;
+        let Self { signalling_server, ice_servers, .. } = self;
 
-        let signalling_server = signalling_server.ok_or(Error::Builder {
-            message: "signalling server must be set",
-        })?;
+        let signalling_server =
+            signalling_server.ok_or(Error::Builder { message: "signalling server must be set" })?;
         if ice_servers.len() == 0 {
-            Err(Error::Builder {
-                message: "at least once ice server must be set",
-            })?;
+            Err(Error::Builder { message: "at least once ice server must be set" })?;
         }
 
-        Ok(PeerConnector {
-            signalling_server,
-            ice_servers,
-            ..Default::default()
-        })
+        Ok(PeerConnector { signalling_server, ice_servers, ..Default::default() })
     }
 }
 
@@ -106,8 +97,6 @@ impl<R: RoomId, P: PeerId> peer_connector::Connector<R, P, SignallingClient<R, P
     }
 
     fn build_signalling_client(&self) -> Result<SignallingClient<R, P>, Error> {
-        SignallingClient::new()
-            .set_url(self.signalling_server.clone())
-            .build()
+        SignallingClient::new().set_url(self.signalling_server.clone()).build()
     }
 }

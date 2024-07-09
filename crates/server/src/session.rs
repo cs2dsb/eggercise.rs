@@ -31,11 +31,7 @@ pub struct PasskeyRegistrationState {
 
 impl PasskeyRegistrationState {
     pub fn new(username: String, id: Uuid, passkey_registration: PasskeyRegistration) -> Self {
-        Self {
-            username,
-            id,
-            passkey_registration,
-        }
+        Self { username, id, passkey_registration }
     }
 }
 
@@ -47,10 +43,7 @@ pub struct PasskeyAuthenticationState {
 
 impl PasskeyAuthenticationState {
     pub fn new(user_id: Uuid, passkey_authentication: PasskeyAuthentication) -> Self {
-        Self {
-            user_id,
-            passkey_authentication,
-        }
+        Self { user_id, passkey_authentication }
     }
 }
 
@@ -61,9 +54,7 @@ pub struct UserState {
 
 impl From<&User> for UserState {
     fn from(value: &User) -> Self {
-        Self {
-            id: value.into(),
-        }
+        Self { id: value.into() }
     }
 }
 
@@ -137,12 +128,8 @@ impl SessionValue {
             .insert(Self::SESSION_DATA_KEY, data.clone())
             .await
             .map_err(|e| match e {
-                SessionError::SerdeJson(e) => ServerError::Json {
-                    message: e.to_string(),
-                },
-                SessionError::Store(e) => ServerError::Other {
-                    message: e.to_string(),
-                },
+                SessionError::SerdeJson(e) => ServerError::Json { message: e.to_string() },
+                SessionError::Store(e) => ServerError::Other { message: e.to_string() },
             })
             .context("Updating session")?;
         Ok(())
@@ -167,10 +154,7 @@ where
             .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("{:?}", e)))?
             .unwrap_or_default();
 
-        Ok(Self {
-            session,
-            data,
-        })
+        Ok(Self { session, data })
     }
 }
 
@@ -182,21 +166,13 @@ pub struct JsonOrText<T: Serialize + Display> {
 
 impl<T: Serialize + Display> JsonOrText<T> {
     pub fn new(json: bool, code: StatusCode, body: T) -> Self {
-        Self {
-            json,
-            code,
-            body,
-        }
+        Self { json, code, body }
     }
 }
 
 impl<T: Serialize + Display> IntoResponse for JsonOrText<T> {
     fn into_response(self) -> Response {
-        let Self {
-            json,
-            code,
-            body,
-        } = self;
+        let Self { json, code, body } = self;
 
         if json {
             (code, Json(body)).into_response()
@@ -215,15 +191,11 @@ where
 
     async fn from_request_parts(req: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
         let accept_json = req.headers.get(ACCEPT).map(|v| {
-            v.to_str()
-                .map(|v| v.contains(mime::APPLICATION_JSON.essence_str()))
-                .unwrap_or(false)
+            v.to_str().map(|v| v.contains(mime::APPLICATION_JSON.essence_str())).unwrap_or(false)
         });
 
         let content_type_is_json = req.headers.get(CONTENT_TYPE).map(|v| {
-            v.to_str()
-                .map(|v| v == mime::APPLICATION_JSON.essence_str())
-                .unwrap_or(false)
+            v.to_str().map(|v| v == mime::APPLICATION_JSON.essence_str()).unwrap_or(false)
         });
 
         let json_reply = match (accept_json, content_type_is_json) {

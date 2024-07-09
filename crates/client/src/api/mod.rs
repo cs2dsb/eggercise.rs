@@ -61,11 +61,9 @@ where
 {
     // Get a promise that returns the credentials
     debug!("create/get_credentials::window.credentials.create/get");
-    let create_fut = f(window().navigator().credentials())
-        .map_err(FrontendError::from)
-        .context(
-            "Creating credential create/get request (window.navigator.credentials.create/get)",
-        )?;
+    let create_fut = f(window().navigator().credentials()).map_err(FrontendError::from).context(
+        "Creating credential create/get request (window.navigator.credentials.create/get)",
+    )?;
 
     // Get the credentials
     debug!("create/get_credentials::window.credentials.create/get.await");

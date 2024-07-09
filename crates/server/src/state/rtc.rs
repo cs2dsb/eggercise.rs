@@ -23,6 +23,7 @@ impl From<PeerConnector<RoomId, PeerId>> for PeerConnectorState {
 
 impl Deref for PeerConnectorState {
     type Target = PeerConnector<RoomId, PeerId>;
+
     fn deref(&self) -> &Self::Target {
         &self.0
     }
@@ -41,6 +42,7 @@ where
     PeerConnectorState: FromRef<S>,
 {
     type Rejection = (StatusCode, String);
+
     async fn from_request_parts(_parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
         Ok(PeerConnectorState::from_ref(state).into())
     }
@@ -57,6 +59,7 @@ impl From<PeerMap> for PeerMapState {
 
 impl Deref for PeerMapState {
     type Target = PeerMap;
+
     fn deref(&self) -> &Self::Target {
         &self.0
     }
@@ -75,6 +78,7 @@ where
     PeerMapState: FromRef<S>,
 {
     type Rejection = (StatusCode, String);
+
     async fn from_request_parts(_parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
         Ok(PeerMapState::from_ref(state).into())
     }
@@ -91,6 +95,7 @@ impl From<SignallingClient<RoomId, PeerId>> for SignallingClientState {
 
 impl Deref for SignallingClientState {
     type Target = SignallingClient<RoomId, PeerId>;
+
     fn deref(&self) -> &Self::Target {
         &self.0
     }
@@ -109,6 +114,7 @@ where
     SignallingClientState: FromRef<S>,
 {
     type Rejection = (StatusCode, String);
+
     async fn from_request_parts(_parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
         Ok(SignallingClientState::from_ref(state).into())
     }

@@ -11,14 +11,8 @@ use shared::{
 pub async fn send_offer(
     sdp: String,
 ) -> Result<RtcOfferResponse, FrontendError<ServerError<RtcOfferError>>> {
-    let payload = RtcOfferRequest {
-        sdp,
-    };
+    let payload = RtcOfferRequest { sdp };
 
-    Ok(json_request(
-        Method::POST,
-        api::Object::RtcOffer.path(),
-        Some(&NoValidation(payload)),
-    )
-    .await?)
+    Ok(json_request(Method::POST, api::Object::RtcOffer.path(), Some(&NoValidation(payload)))
+        .await?)
 }

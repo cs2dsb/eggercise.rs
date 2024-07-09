@@ -68,9 +68,9 @@ impl Websocket {
         let ws_proto = match proto.as_ref() {
             "http:" => "ws",
             "https:" => "wss",
-            other => Err(FrontendError::Other {
-                message: format!("Unsupported protocol: {other}"),
-            })?,
+            other => {
+                Err(FrontendError::Other { message: format!("Unsupported protocol: {other}") })?
+            },
         };
 
         let url = format!("{ws_proto}://{host}{path}");
@@ -82,9 +82,8 @@ impl Websocket {
             Default::default();
 
         let message_listener = EventListener::new(&socket, "message", move |event| {
-            let event = event
-                .dyn_ref::<MessageEvent>()
-                .expect("on message Event should be MessageEvent");
+            let event =
+                event.dyn_ref::<MessageEvent>().expect("on message Event should be MessageEvent");
             message_signal.update(|v| *v = Some(ServerMessage::try_from(event)))
         });
 
@@ -105,12 +104,7 @@ impl Websocket {
             message_signal,
             inner: Arc::new(WebSocketInner {
                 socket,
-                _listeners: [
-                    message_listener,
-                    open_listener,
-                    close_listener,
-                    error_listener,
-                ],
+                _listeners: [message_listener, open_listener, close_listener, error_listener],
             }),
         })
     }

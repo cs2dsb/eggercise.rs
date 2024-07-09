@@ -23,10 +23,7 @@ pub struct NewUser {
 
 impl NewUser {
     pub fn new<I: Into<Uuid>, T: Into<String>>(id: I, username: T) -> Self {
-        Self {
-            id: id.into(),
-            username: username.into(),
-        }
+        Self { id: id.into(), username: username.into() }
     }
 }
 
@@ -41,19 +38,12 @@ pub struct NewUserWithPasskey {
 #[cfg(feature = "backend")]
 impl NewUserWithPasskey {
     fn split(self) -> (NewUser, Passkey) {
-        let Self {
-            id,
-            username,
-            passkey,
-        } = self;
+        let Self { id, username, passkey } = self;
         (NewUser::new(id, username), passkey)
     }
+
     pub fn new<I: Into<Uuid>, T: Into<String>>(id: I, username: T, passkey: Passkey) -> Self {
-        Self {
-            id: id.into(),
-            username: username.into(),
-            passkey,
-        }
+        Self { id: id.into(), username: username.into(), passkey }
     }
 
     pub fn create<T: Error>(
@@ -67,17 +57,13 @@ impl NewUserWithPasskey {
         let new_credential = NewCredential::new(new_user.id.clone(), passkey.into());
 
         let user = {
-            new_user
-                .insert(&tx)
-                .context("NewUserWithPasskey::insert(User)")?;
+            new_user.insert(&tx).context("NewUserWithPasskey::insert(User)")?;
 
             User::fetch_by_id(&tx, &user_id).context("NewUserWithPasskey::fetch(User)")?
         };
 
         let credential = {
-            new_credential
-                .insert(&tx)
-                .context("NewUserWithPasskey::insert(Credential)")?;
+            new_credential.insert(&tx).context("NewUserWithPasskey::insert(Credential)")?;
             Credential::fetch(&tx, &new_credential.id)
                 .context("NewUserWithPasskey::fetch(Credential)")?
         };

@@ -60,21 +60,14 @@ fn get_crate_info<P: AsRef<Path>>(crate_path: P) -> Result<CrateInfo, anyhow::Er
     let shared_dir = PathBuf::from_str(env!("CARGO_MANIFEST_DIR"))?;
     let manifest_dir = shared_dir.join(crate_path.as_ref());
     let manifest = read_manifest(manifest_dir.join("Cargo.toml"))?;
-    let package = manifest
-        .package
-        .ok_or(anyhow::anyhow!("Worker manifest missing package entry"))?;
+    let package =
+        manifest.package.ok_or(anyhow::anyhow!("Worker manifest missing package entry"))?;
     let lib_file_name = package.name.replace("-", "_");
     let version = package.version().to_string();
     let version_with_timestamp = format!("{}_{}", version, Utc::now().format("%Y%m%d%H%M%S"),);
     let package_name = package.name;
 
-    Ok(CrateInfo {
-        manifest_dir,
-        lib_file_name,
-        package_name,
-        version,
-        version_with_timestamp,
-    })
+    Ok(CrateInfo { manifest_dir, lib_file_name, package_name, version, version_with_timestamp })
 }
 
 #[cfg(feature = "build")]

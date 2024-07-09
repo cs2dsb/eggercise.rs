@@ -41,6 +41,7 @@ where
     Arc<webauthn_rs::Webauthn>: FromRef<S>,
 {
     type Rejection = (StatusCode, String);
+
     async fn from_request_parts(_parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
         let webauthn = <Arc<webauthn_rs::Webauthn>>::from_ref(state);
         Ok(webauthn.into())

@@ -37,10 +37,7 @@ pub fn Notificiations() -> impl IntoView {
 
     let is_subscribed = move || {
         subscription_trigger.track();
-        is_subscribed_resource
-            .get()
-            .map(|r| r.unwrap_or(false))
-            .unwrap_or(false)
+        is_subscribed_resource.get().map(|r| r.unwrap_or(false)).unwrap_or(false)
     };
 
     let subscribe_action = subscribe_action(subscription_trigger, set_error);

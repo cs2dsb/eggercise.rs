@@ -11,10 +11,5 @@ use shared::{
 
 pub async fn create_temporary_login(
 ) -> Result<TemporaryLogin, FrontendError<ServerError<TemporaryLoginError>>> {
-    Ok(json_request(
-        Method::POST,
-        api::Auth::CreateTemporaryLogin.path(),
-        None::<&()>,
-    )
-    .await?)
+    Ok(json_request(Method::POST, api::Auth::CreateTemporaryLogin.path(), None::<&()>).await?)
 }

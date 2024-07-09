@@ -1,8 +1,8 @@
 use leptos::{component, use_context, view, IntoView, Resource, SignalWith};
 
 // use shared::model::{
-//     Exercise, ExerciseGroup, ExerciseGroupMember, Plan, PlanExerciseGroup, PlanInstance,
-// Session,     SessionExercise, User,
+//     Exercise, ExerciseGroup, ExerciseGroupMember, Plan, PlanExerciseGroup,
+// PlanInstance, Session,     SessionExercise, User,
 // };
 use crate::{
     // components::ModelList,

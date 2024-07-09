@@ -44,20 +44,10 @@ impl<R: RoomId, P: PeerId> SignallingClientBuilder<R, P> {
 
 impl<R: RoomId, P: PeerId> Builder<SignallingClient<R, P>> for SignallingClientBuilder<R, P> {
     fn build(self) -> Result<SignallingClient<R, P>, Error> {
-        let SignallingClientBuilder {
-            url,
-            timeout,
-            ..
-        } = self;
+        let SignallingClientBuilder { url, timeout, .. } = self;
 
-        let url = url.ok_or(Error::Builder {
-            message: "url not set",
-        })?;
-        Ok(SignallingClient {
-            url,
-            timeout,
-            ..Default::default()
-        })
+        let url = url.ok_or(Error::Builder { message: "url not set" })?;
+        Ok(SignallingClient { url, timeout, ..Default::default() })
     }
 }
 
@@ -83,6 +73,7 @@ impl<R: RoomId, P: PeerId> Default for SignallingClient<R, P> {
 
 impl<R: RoomId, P: PeerId> signalling_client::Client<R, P> for SignallingClient<R, P> {
     type Builder = SignallingClientBuilder<R, P>;
+
     fn new() -> Self::Builder {
         Default::default()
     }

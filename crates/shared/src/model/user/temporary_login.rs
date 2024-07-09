@@ -21,10 +21,9 @@ feature_model_derives!(
 
 impl TemporaryLogin {
     pub fn qr_code_url(&self) -> String {
-        Object::QrCodeId.path().replace(
-            ":id",
-            &percent_encode(self.url.as_bytes(), NON_ALPHANUMERIC).to_string(),
-        )
+        Object::QrCodeId
+            .path()
+            .replace(":id", &percent_encode(self.url.as_bytes(), NON_ALPHANUMERIC).to_string())
     }
 
     pub fn expired(&self) -> bool {
@@ -56,9 +55,8 @@ impl TemporaryLogin {
             .build_rusqlite(SqliteQueryBuilder);
 
         let mut stmt = conn.prepare_cached(&sql)?;
-        let temporary_login = stmt
-            .query_row(&*values.as_params(), TemporaryLogin::from_row)
-            .optional()?;
+        let temporary_login =
+            stmt.query_row(&*values.as_params(), TemporaryLogin::from_row).optional()?;
 
         Ok(temporary_login)
     }
@@ -73,9 +71,8 @@ impl TemporaryLogin {
             .build_rusqlite(SqliteQueryBuilder);
 
         let mut stmt = conn.prepare_cached(&sql)?;
-        let temporary_login = stmt
-            .query_row(&*values.as_params(), TemporaryLogin::from_row)
-            .optional()?;
+        let temporary_login =
+            stmt.query_row(&*values.as_params(), TemporaryLogin::from_row).optional()?;
 
         Ok(temporary_login)
     }

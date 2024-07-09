@@ -32,10 +32,7 @@ impl Client {
         socket_address: SocketAddr,
         sender: Sender<ClientControlMessage>,
     ) -> Self {
-        Self {
-            key: (user_id, socket_address),
-            sender,
-        }
+        Self { key: (user_id, socket_address), sender }
     }
 
     pub async fn send(
@@ -85,6 +82,7 @@ where
     Clients: FromRef<S>,
 {
     type Rejection = (StatusCode, String);
+
     async fn from_request_parts(_parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
         Ok(Clients::from_ref(state).into())
     }

@@ -34,9 +34,7 @@ where
                 type_name::<R>()
             );
             error!("{inner}");
-            Err(FrontendError::Js {
-                inner,
-            })
+            Err(FrontendError::Js { inner })
         } else {
             Ok(self.into())
         }

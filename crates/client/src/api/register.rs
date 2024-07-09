@@ -19,12 +19,8 @@ pub async fn register(
 ) -> Result<(), FrontendError<ServerError<RegisterError>>> {
     // Ask the server to start the registration process and return a challenge
     debug!("register::json_request::register_start");
-    let creation_challenge_response: CreationChallengeResponse = json_request(
-        Method::POST,
-        api::Auth::RegisterStart.path(),
-        Some(reg_user),
-    )
-    .await?;
+    let creation_challenge_response: CreationChallengeResponse =
+        json_request(Method::POST, api::Auth::RegisterStart.path(), Some(reg_user)).await?;
 
     // Convert to the browser type
     debug!("register::CreationChallengeResponse => CredentialCreationOptions");

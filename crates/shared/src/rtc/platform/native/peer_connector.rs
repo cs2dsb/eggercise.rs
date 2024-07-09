@@ -15,11 +15,7 @@ pub struct PeerConnectorBuilder<R: RoomId, P: PeerId> {
 
 impl<R: RoomId, P: PeerId> Default for PeerConnectorBuilder<R, P> {
     fn default() -> Self {
-        Self {
-            ice_servers: Default::default(),
-            _r: PhantomData,
-            _p: PhantomData,
-        }
+        Self { ice_servers: Default::default(), _r: PhantomData, _p: PhantomData }
     }
 }
 
@@ -28,6 +24,7 @@ impl<R: RoomId, P: PeerId> PeerConnectorBuilder<R, P> {
         self.ice_servers = ice_servers;
         self
     }
+
     pub fn add_ice_server<T: Into<String>>(mut self, ice_server: T) -> Self {
         self.ice_servers.push(ice_server.into());
         self
@@ -36,13 +33,8 @@ impl<R: RoomId, P: PeerId> PeerConnectorBuilder<R, P> {
 
 impl<R: RoomId, P: PeerId> Builder<PeerConnector<R, P>> for PeerConnectorBuilder<R, P> {
     fn build(self) -> Result<PeerConnector<R, P>, Error> {
-        let Self {
-            ice_servers, ..
-        } = self;
-        Ok(PeerConnector {
-            ice_servers,
-            ..Default::default()
-        })
+        let Self { ice_servers, .. } = self;
+        Ok(PeerConnector { ice_servers, ..Default::default() })
     }
 }
 
@@ -56,11 +48,7 @@ pub struct PeerConnector<R: RoomId, P: PeerId> {
 
 impl<R: RoomId, P: PeerId> Default for PeerConnector<R, P> {
     fn default() -> Self {
-        Self {
-            ice_servers: Default::default(),
-            _r: PhantomData,
-            _p: PhantomData,
-        }
+        Self { ice_servers: Default::default(), _r: PhantomData, _p: PhantomData }
     }
 }
 

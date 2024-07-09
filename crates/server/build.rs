@@ -24,14 +24,8 @@ use shared::{
 use wasm_opt::{OptimizationOptions, Pass};
 
 const WASM_PROFILE: &str = "wasm-release";
-const PACKAGE_BLOCKLIST: &[&str] = &[
-    "**/*_input.css",
-    "**/AUTHORS",
-    "**/*.txt",
-    "**/LICENSE",
-    "**/NEWS",
-    "**/README.md",
-];
+const PACKAGE_BLOCKLIST: &[&str] =
+    &["**/*_input.css", "**/AUTHORS", "**/*.txt", "**/LICENSE", "**/NEWS", "**/README.md"];
 
 macro_rules! p {
     ($($tokens: tt)*) => {
@@ -40,8 +34,7 @@ macro_rules! p {
 }
 
 fn path_to_str<'a>(path: &'a Path) -> &'a str {
-    path.to_str()
-        .expect(&format!("Path \"{:?}\" cannot be converted to utf8", path))
+    path.to_str().expect(&format!("Path \"{:?}\" cannot be converted to utf8", path))
 }
 
 fn path_prefix_to_str<'a>(path: &'a Path) -> &'a str {
@@ -108,12 +101,7 @@ fn build_css<'a>(
     if !output.status.success() {
         let std_out = String::from_utf8_lossy(&output.stdout);
         let std_err = String::from_utf8_lossy(&output.stderr);
-        bail!(
-            "Command failed: {:?}\n{}\n{}",
-            output.status,
-            std_out,
-            std_err
-        );
+        bail!("Command failed: {:?}\n{}\n{}", output.status, std_out, std_err);
     }
 
     Ok(())
@@ -154,12 +142,7 @@ fn run_cmd_and_log_errors(mut cmd: Command) -> Result<String, anyhow::Error> {
 
     if !output.status.success() {
         let std_err = String::from_utf8_lossy(&output.stderr);
-        bail!(
-            "Command failed: {:?}\n{}\n{}",
-            output.status,
-            std_out,
-            std_err
-        );
+        bail!("Command failed: {:?}\n{}\n{}", output.status, std_out, std_err);
     }
     Ok(std_out.into())
 }
@@ -171,10 +154,7 @@ fn build_wasm(
     modified_time: DateTime<Utc>,
 ) -> Result<(), anyhow::Error> {
     let mut cmd = Command::new("cargo");
-    cmd.env(
-        "BUILD_TIME",
-        modified_time.format("%Y%m%d %H%M%S").to_string(),
-    );
+    cmd.env("BUILD_TIME", modified_time.format("%Y%m%d %H%M%S").to_string());
     cmd.args([
         "rustc",
         "--package",
@@ -194,12 +174,7 @@ fn build_wasm(
     if !output.status.success() {
         let std_out = String::from_utf8_lossy(&output.stdout);
         let std_err = String::from_utf8_lossy(&output.stderr);
-        bail!(
-            "Command failed: {:?}\n{}\n{}",
-            output.status,
-            std_out,
-            std_err
-        );
+        bail!("Command failed: {:?}\n{}\n{}", output.status, std_out, std_err);
     }
 
     Ok(())
@@ -207,10 +182,7 @@ fn build_wasm(
 
 // Works out where the wasm is output to
 fn wasm_out_path(lib_file_name: &str, wasm_dir: &Path, profile: &str) -> PathBuf {
-    wasm_dir
-        .join("wasm32-unknown-unknown")
-        .join(profile)
-        .join(format!("{lib_file_name}.wasm"))
+    wasm_dir.join("wasm32-unknown-unknown").join(profile).join(format!("{lib_file_name}.wasm"))
 }
 
 // Run bindgen on the wasm lib to create the bg version + the js
@@ -319,14 +291,8 @@ fn main() -> Result<(), anyhow::Error> {
         let assets_dir = server_dir.join("assets");
         let server_wasm_dir = assets_dir.join("wasm");
 
-        println!(
-            "cargo:rerun-if-changed={}",
-            path_to_str(&client_info.manifest_dir)
-        );
-        println!(
-            "cargo:rerun-if-changed={}",
-            path_to_str(&service_worker_info.manifest_dir)
-        );
+        println!("cargo:rerun-if-changed={}", path_to_str(&client_info.manifest_dir));
+        println!("cargo:rerun-if-changed={}", path_to_str(&service_worker_info.manifest_dir));
 
         p!("Out path: {:?}", out_dir);
         let CrateInfo {
@@ -357,26 +323,19 @@ fn main() -> Result<(), anyhow::Error> {
         // We monitor this to trigger creating the service worker package file. It's
         // unfortunate this restarts the server and does all the other build steps. It
         // could be split up down the line to reduce rework.
-        for f in glob(&format!(
-            "{}/**/*",
-            assets_dir.to_str().expect("Invalid assets_dir path")
-        ))?
-        .into_iter()
-        .collect::<Result<Vec<_>, _>>()?
-        .into_iter()
-        .filter(|f| !f.starts_with(&server_wasm_dir) && !f.starts_with(&out_css))
+        for f in glob(&format!("{}/**/*", assets_dir.to_str().expect("Invalid assets_dir path")))?
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()?
+            .into_iter()
+            .filter(|f| !f.starts_with(&server_wasm_dir) && !f.starts_with(&out_css))
         {
             // p!("{:?}", f);
             println!("cargo:rerun-if-changed={}", path_to_str(&f));
         }
 
-        time("Linking migrations", 1, || {
-            link_migrations(&workspace_root, &out_dir)
-        })?;
+        time("Linking migrations", 1, || link_migrations(&workspace_root, &out_dir))?;
 
-        time("Building css", 1, || {
-            build_css(&in_css, &out_css, &workspace_root)
-        })?;
+        time("Building css", 1, || build_css(&in_css, &out_css, &workspace_root))?;
 
         let service_worker_register_listeners_js = service_worker_dir.join("register_listeners.js");
         if !service_worker_register_listeners_js.exists() {
@@ -391,19 +350,14 @@ fn main() -> Result<(), anyhow::Error> {
         let service_worker_mod_time = time("Find latest change for service worker", 1, || {
             modificiation_date(&service_worker_dir)
         })?;
-        let client_mod_time = time("Find latest change for client", 1, || {
-            modificiation_date(&client_dir)
-        })?;
+        let client_mod_time =
+            time("Find latest change for client", 1, || modificiation_date(&client_dir))?;
 
         // worker can't use modules because browser support for modules in service
         // workers is minimal
         time("Build service worker wasm", 1, || {
-            build_wasm(
-                &service_worker_package_name,
-                wasm_dir_str,
-                service_worker_mod_time,
-            )
-            .context("build_wasm[service_worker]")
+            build_wasm(&service_worker_package_name, wasm_dir_str, service_worker_mod_time)
+                .context("build_wasm[service_worker]")
         })?;
 
         time("Build client wasm", 1, || {
@@ -427,13 +381,8 @@ fn main() -> Result<(), anyhow::Error> {
             })?;
 
         let (client_bg_file, client_js_file) = time("Generate client bindings", 1, || {
-            generate_bindings(
-                &client_lib_file_name,
-                &client_wasm_file,
-                is_release_build,
-                true,
-            )
-            .context("generate_bindings[client]")
+            generate_bindings(&client_lib_file_name, &client_wasm_file, is_release_build, true)
+                .context("generate_bindings[client]")
         })?;
 
         let (service_worker_bg_opt_file, client_bg_opt_file) = if is_release_build {
@@ -491,22 +440,18 @@ fn main() -> Result<(), anyhow::Error> {
                     Ok(Base64Display::new(&service_worker_wasm_bytes, &STANDARD).to_string())
                 })?;
 
-            let service_worker_snippet = time(
-                "Read service worker register listners and replace placeholders",
-                1,
-                || {
+            let service_worker_snippet =
+                time("Read service worker register listners and replace placeholders", 1, || {
                     Ok(read_to_string(&service_worker_register_listeners_js)?
                         .replace("SERVICE_WORKER_BASE64", &service_worker_wasm_base64)
-                        // Include the version so the worker can work out if an update is needed
+                        // Include the version so the worker can work out if an update is
+                        // needed
                         .replace("SERVICE_WORKER_VERSION", &service_worker_version))
-                },
-            )?;
+                })?;
 
             time("Write service worker registration js", 1, move || {
-                let mut service_worker_js_out = OpenOptions::new()
-                    .append(true)
-                    .create(true)
-                    .open(&service_worker_js_out)?;
+                let mut service_worker_js_out =
+                    OpenOptions::new().append(true).create(true).open(&service_worker_js_out)?;
                 service_worker_js_out.write_all(service_worker_snippet.as_bytes())?;
                 Ok(())
             })?;
@@ -541,10 +486,7 @@ fn main() -> Result<(), anyhow::Error> {
                         io::copy(&mut file, &mut hasher)?;
 
                         let hash_bytes = hasher.finalize();
-                        Ok(format!(
-                            "sha384-{}",
-                            Base64Display::new(&hash_bytes, &STANDARD)
-                        ))
+                        Ok(format!("sha384-{}", Base64Display::new(&hash_bytes, &STANDARD)))
                     })?;
 
                     let path = format!(
@@ -554,10 +496,7 @@ fn main() -> Result<(), anyhow::Error> {
                             .expect(&format!("Invalid assets path ({:?})", &f))
                     );
 
-                    files.push(HashedFile {
-                        path,
-                        hash,
-                    });
+                    files.push(HashedFile { path, hash });
                 }
 
                 let mut package_out = OpenOptions::new()
@@ -566,10 +505,7 @@ fn main() -> Result<(), anyhow::Error> {
                     .truncate(true)
                     .open(package_file_path)?;
 
-                let package = ServiceWorkerPackage {
-                    version: service_worker_version,
-                    files,
-                };
+                let package = ServiceWorkerPackage { version: service_worker_version, files };
 
                 serde_json::to_writer_pretty(&mut package_out, &package)?;
                 Ok(())

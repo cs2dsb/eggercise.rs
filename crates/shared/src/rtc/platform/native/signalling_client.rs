@@ -14,10 +14,7 @@ pub struct SignallingClientBuilder<R: RoomId, P: PeerId> {
 
 impl<R: RoomId, P: PeerId> Default for SignallingClientBuilder<R, P> {
     fn default() -> Self {
-        Self {
-            _r: PhantomData,
-            _p: PhantomData,
-        }
+        Self { _r: PhantomData, _p: PhantomData }
     }
 }
 
@@ -36,15 +33,13 @@ pub struct SignallingClient<R: RoomId, P: PeerId> {
 
 impl<R: RoomId, P: PeerId> Default for SignallingClient<R, P> {
     fn default() -> Self {
-        Self {
-            _r: PhantomData,
-            _p: PhantomData,
-        }
+        Self { _r: PhantomData, _p: PhantomData }
     }
 }
 
 impl<R: RoomId, P: PeerId> signalling_client::Client<R, P> for SignallingClient<R, P> {
     type Builder = SignallingClientBuilder<R, P>;
+
     fn new() -> Self::Builder {
         Default::default()
     }

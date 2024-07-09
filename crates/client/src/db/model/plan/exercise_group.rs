@@ -30,8 +30,7 @@ impl PromiserFetcher for PlanExerciseGroup {
                         .and_then(|s: String| Ok(Uuid::parse(&s)?))?,
                     notes: notes_e(&result, i)?,
                     config: config_e(&result, i).and_then(|s: Option<String>| {
-                        s.map(|s| Ok(JsValueSerdeExt::into_serde(&JsValue::from(s))?))
-                            .transpose()
+                        s.map(|s| Ok(JsValueSerdeExt::into_serde(&JsValue::from(s))?)).transpose()
                     })?,
                     creation_date: creation_date_e(&result, i)
                         .and_then(|s: String| Ok(parse_datetime(&s)?))?,

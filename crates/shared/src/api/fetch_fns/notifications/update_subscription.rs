@@ -19,18 +19,12 @@ pub async fn update_subscription(
     let key = get_subscription_key(&subscription, PushEncryptionKeyName::P256dh)?;
     let auth = get_subscription_key(&subscription, PushEncryptionKeyName::Auth)?;
 
-    let subscription = PushNotificationSubscription {
-        endpoint,
-        key,
-        auth,
-    };
+    let subscription = PushNotificationSubscription { endpoint, key, auth };
 
     json_request::<_, UpdateSubscriptionResponse, _>(
         Method::POST,
         api::Object::PushSubscription.path(),
-        Some(&NoValidation(UpdateSubscriptionRequest {
-            subscription,
-        })),
+        Some(&NoValidation(UpdateSubscriptionRequest { subscription })),
     )
     .await
 }

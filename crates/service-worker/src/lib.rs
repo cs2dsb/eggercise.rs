@@ -69,10 +69,7 @@ async fn clear_cache(caches: CacheStorage, version: &str) -> Result<JsValue, JsV
     let cache = get_cache(&caches, version).await?;
     let keys: Array = JsFuture::from(cache.keys()).await?.into();
 
-    for k in keys
-        .into_iter()
-        .map(|x| <JsValue as Into<Request>>::into(x))
-    {
+    for k in keys.into_iter().map(|x| <JsValue as Into<Request>>::into(x)) {
         console_log!("Clearing {}", k.url());
         JsFuture::from(cache.delete_with_request(&k)).await?;
     }
@@ -130,11 +127,7 @@ async fn fetch_from_cache(
     let mut r_init = ResponseInit::new();
     r_init.status(status_code).headers(&headers);
     let response = Response::new_with_opt_str_and_init(
-        Some(&format!(
-            "Failed to retrieve {} from cache ({})",
-            request.url(),
-            status_code
-        )),
+        Some(&format!("Failed to retrieve {} from cache ({})", request.url(), status_code)),
         &r_init,
     )?;
     Ok(response)
@@ -184,10 +177,7 @@ async fn fetch_json<T: DeserializeOwned>(
     let response = fetch_from_cache(sw, version, request).await?;
     let json = JsFuture::from(response.json()?).await?;
 
-    log_frontend_nothing_err!(
-        JsValueSerdeExt::into_serde(&json),
-        "Error deserializing json"
-    )
+    log_frontend_nothing_err!(JsValueSerdeExt::into_serde(&json), "Error deserializing json")
 }
 
 #[derive(Serialize)]
@@ -197,9 +187,7 @@ struct CacheHeader {
 
 impl CacheHeader {
     fn no_store() -> Self {
-        Self {
-            cache: "no-store".to_string(),
-        }
+        Self { cache: "no-store".to_string() }
     }
 }
 
@@ -289,10 +277,7 @@ async fn activate(sw: ServiceWorkerGlobalScope, version: String) -> Result<JsVal
 
     // Claim the clients so we can control them in response to a push notificiation
     // click
-    log_frontend_nothing_err!(
-        JsFuture::from(sw.clients().claim()).await,
-        "sw::clients::claim",
-    )?;
+    log_frontend_nothing_err!(JsFuture::from(sw.clients().claim()).await, "sw::clients::claim",)?;
 
     Ok(JsValue::undefined())
 }
@@ -337,10 +322,7 @@ async fn fetch_direct(
     if response.is_instance_of::<Response>() {
         Ok(response.into())
     } else {
-        let e = format!(
-            "Fetch returned something other than a Response: {:?}",
-            response
-        );
+        let e = format!("Fetch returned something other than a Response: {:?}", response);
         console_error!("{}", e);
 
         // We have to construct some kind of response
@@ -470,11 +452,7 @@ async fn push(
         console_error!("{}", title);
     }
 
-    Ok(JsFuture::from(
-        sw.registration()
-            .show_notification_with_options(&title, &options)?,
-    )
-    .await?)
+    Ok(JsFuture::from(sw.registration().show_notification_with_options(&title, &options)?).await?)
 }
 
 #[wasm_bindgen]
@@ -499,11 +477,7 @@ async fn push_subscription_change(
     //       It should also probably be user aware instead of assuming the cookies
     //       match the subscription owner. As a minimum it should pass event.oldSub
     //       so the server can check it's replacing the right sub
-    log_frontend_err!(
-        record_subscription(&push_manager).await,
-        _,
-        "record_subscription error"
-    )?;
+    log_frontend_err!(record_subscription(&push_manager).await, _, "record_subscription error")?;
     console_log!("push_subscription_change::record_subscription OK");
 
     Ok(JsValue::undefined())
@@ -515,9 +489,7 @@ pub fn worker_push_subscription_change(
     version: String,
     event: Event,
 ) -> Result<Promise, JsValue> {
-    Ok(future_to_promise(push_subscription_change(
-        sw, version, event,
-    )))
+    Ok(future_to_promise(push_subscription_change(sw, version, event)))
 }
 
 async fn notification_click(
@@ -547,10 +519,7 @@ async fn notification_click(
     };
 
     console_log!("Focusing tab");
-    log_frontend_nothing_err!(
-        JsFuture::from(client.focus()?).await,
-        "sw::clients[0]::focus",
-    )
+    log_frontend_nothing_err!(JsFuture::from(client.focus()?).await, "sw::clients[0]::focus",)
 }
 
 #[wasm_bindgen]

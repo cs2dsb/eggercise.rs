@@ -19,6 +19,7 @@ impl From<Sdp> for String {
 
 impl Deref for Sdp {
     type Target = String;
+
     fn deref(&self) -> &Self::Target {
         &self.0
     }

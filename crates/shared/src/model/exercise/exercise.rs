@@ -38,9 +38,8 @@ impl Exercise {
         let (sql, values) = Self::select_star().build_rusqlite(SqliteQueryBuilder);
 
         let mut stmt = conn.prepare_cached(&sql)?;
-        let res = stmt
-            .query_map(&*values.as_params(), Exercise::from_row)?
-            .collect::<Result<_, _>>()?;
+        let res =
+            stmt.query_map(&*values.as_params(), Exercise::from_row)?.collect::<Result<_, _>>()?;
         Ok(res)
     }
 }
