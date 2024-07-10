@@ -1,56 +1,37 @@
-#![allow(unused)]
-use std::{
-    any::type_name,
-    pin::Pin,
-    sync::Arc,
-    task::{Context, Poll},
-};
+use std::{any::type_name, fmt::Display};
 
-use futures::{channel::mpsc, stream::Stream};
-use gloo::events::EventListener;
-use leptos::{provide_context, use_context, ReadSignal, RwSignal, SignalUpdate};
+use futures::{
+    channel::mpsc::{self, SendError, UnboundedSender},
+    select, SinkExt as _, StreamExt,
+};
+use gloo::net::websocket::{futures::WebSocket, Message, State, WebSocketError};
+use leptos::{
+    provide_context, spawn_local, use_context, Memo, RwSignal, Signal, SignalUpdate, SignalWith,
+};
 use shared::{
     api::{
         error::{FrontendError, Nothing},
         Object,
     },
-    types::websocket::{MessageError, ServerMessage},
+    types::websocket::{ClientMessage, MessageError, ServerMessage},
 };
-use tracing::{debug, error, info};
-use wasm_bindgen::{JsCast, JsValue};
-use web_sys::{MessageEvent, WebSocket};
+use tracing::{debug, error, warn};
 
-use crate::utils::{
-    location::{host, protocol},
-    wrap_callback,
-};
+use crate::utils::location::{host, protocol};
 
-#[derive(Debug, Clone, Copy)]
-pub enum SocketStatus {
-    Connecting,
-    Open,
-    Closing,
-    Closed,
-    Error,
-}
-
-impl Default for SocketStatus {
-    fn default() -> Self {
-        SocketStatus::Connecting
+fn compare_state(a: State, b: State) -> bool {
+    use State::*;
+    match (a, b) {
+        (Connecting, Connecting) | (Open, Open) | (Closing, Closing) | (Closed, Closed) => true,
+        _ => false,
     }
 }
 
 #[derive(Clone)]
 pub struct Websocket {
-    status_signal: RwSignal<SocketStatus>,
+    status_memo: Memo<State>,
     message_signal: RwSignal<Option<Result<ServerMessage, MessageError>>>,
-    inner: Arc<WebSocketInner>,
-}
-
-struct WebSocketInner {
-    socket: WebSocket,
-    // Only retained so they get dropped correctly if this struct is dropped
-    _listeners: [EventListener; 4],
+    message_sender: UnboundedSender<ClientMessage>,
 }
 
 impl Websocket {
@@ -60,53 +41,80 @@ impl Websocket {
             "Call to Websocket::new() when there's already one in the context"
         );
 
-        let path = Object::Websocket.path();
+        let url = url()?;
+        let mut socket = WebSocket::open(&url)?;
 
-        let host = host()?;
-        let proto = protocol()?;
-
-        let ws_proto = match proto.as_ref() {
-            "http:" => "ws",
-            "https:" => "wss",
-            other => {
-                Err(FrontendError::Other { message: format!("Unsupported protocol: {other}") })?
-            },
-        };
-
-        let url = format!("{ws_proto}://{host}{path}");
-
-        let socket = WebSocket::new(&url)?;
-
-        let status_signal: RwSignal<SocketStatus> = Default::default();
         let message_signal: RwSignal<Option<Result<ServerMessage, MessageError>>> =
             Default::default();
-
-        let message_listener = EventListener::new(&socket, "message", move |event| {
-            let event =
-                event.dyn_ref::<MessageEvent>().expect("on message Event should be MessageEvent");
-            message_signal.update(|v| *v = Some(ServerMessage::try_from(event)))
+        let status_signal: RwSignal<State> = RwSignal::new(State::Connecting);
+        let status_memo: Memo<State> = Memo::new_owning(move |old| {
+            status_signal.with(move |new| match (old, new) {
+                (None, new) => (*new, true),
+                (Some(old), new) => (*new, compare_state(old, *new)),
+            })
         });
 
-        let open_listener = EventListener::new(&socket, "open", move |_| {
-            status_signal.update(|v| *v = SocketStatus::Open)
+        let (message_sender, mut message_receiver) = mpsc::unbounded();
+
+        spawn_local(async move {
+            loop {
+                let mut fused_socket = (&mut socket).fuse();
+
+                select! {
+                    m = message_receiver.next() => match m {
+                        None => {
+                            debug!("WebSocket message sender stream closed");
+                            break;
+                        },
+                        Some(m) => {
+                            debug!("Websocket sending: {m:?}");
+                            // TODO:
+                            let _ = socket.send(Message::Text("blah".to_string())).await;
+                        },
+                    },
+                    m = fused_socket.next() => match m {
+                        None => {
+                            debug!("Websocket closed");
+                            break;
+                        },
+                        Some(m) => match m {
+                            // TODO: is there anything more useful we can do with the send error?
+                            Err(WebSocketError::ConnectionClose(c)) => {
+                                if c.was_clean {
+                                    warn!("Websocket closed cleanly: {} {}", c.code, c.reason);
+                                } else {
+                                    error!("Websocket closed uncleanly: {} {}", c.code, c.reason);
+                                }
+                            },
+                            Err(e) => error!("Websocket error: {e:?}"),
+                            Ok(m) => match ServerMessage::try_from(&m) {
+                                Err(e) => {
+                                    error!("Websocket MessageError: {e:?}");
+                                    message_signal.update(|v| *v = Some(Err(e)));
+                                },
+                                Ok(m) => {
+                                    debug!("WebSocket ServerMessage: {m:?}");
+                                    message_signal.update(|v| *v = Some(Ok(m)));
+                                },
+                            },
+                        },
+                    },
+                };
+
+                let state = socket.state();
+                match state {
+                    State::Closed | State::Closing => break,
+                    _ => {},
+                }
+
+                status_signal.update(|v| *v = state);
+            }
+
+            status_signal.update(|v| *v = State::Closed);
+            warn!("Websocket closed");
         });
 
-        let close_listener = EventListener::new(&socket, "close", move |_| {
-            status_signal.update(|v| *v = SocketStatus::Closed)
-        });
-
-        let error_listener = EventListener::new(&socket, "error", move |_| {
-            status_signal.update(|v| *v = SocketStatus::Error)
-        });
-
-        Ok(Self {
-            status_signal,
-            message_signal,
-            inner: Arc::new(WebSocketInner {
-                socket,
-                _listeners: [message_listener, open_listener, close_listener, error_listener],
-            }),
-        })
+        Ok(Self { status_memo, message_signal, message_sender })
     }
 
     pub fn provide_context() -> Result<(), FrontendError<Nothing>> {
@@ -121,11 +129,30 @@ impl Websocket {
         use_context::<Self>().expect(&format!("{} missing from context", type_name::<Self>()))
     }
 
-    pub fn status_signal(&self) -> ReadSignal<SocketStatus> {
-        self.status_signal.read_only()
+    pub fn status_signal(&self) -> Signal<State> {
+        self.status_memo.into()
     }
 
-    pub fn message_signal(&self) -> ReadSignal<Option<Result<ServerMessage, MessageError>>> {
-        self.message_signal.read_only()
+    pub fn message_signal(&self) -> Signal<Option<Result<ServerMessage, MessageError>>> {
+        self.message_signal.into()
     }
+
+    pub async fn send(&mut self) -> Result<(), SendError> {
+        self.message_sender.send(ClientMessage::Keepalive).await
+    }
+}
+
+fn url<T: Display>() -> Result<String, FrontendError<T>> {
+    let path = Object::Websocket.path();
+
+    let host = host()?;
+    let proto = protocol()?;
+
+    let ws_proto = match proto.as_ref() {
+        "http:" => "ws",
+        "https:" => "wss",
+        other => Err(FrontendError::Other { message: format!("Unsupported protocol: {other}") })?,
+    };
+
+    Ok(format!("{ws_proto}://{host}{path}"))
 }
