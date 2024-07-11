@@ -1,5 +1,6 @@
 #[cfg(feature = "wasm")]
 use gloo::net::websocket::Message as WebSocketMessage;
+use gloo::net::websocket::WebSocketError;
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::JsValue;
 
@@ -30,6 +31,13 @@ impl From<JsValue> for MessageError {
     fn from(value: JsValue) -> Self {
         let js_error = JsError::from(value);
         Self::Js(js_error.to_string())
+    }
+}
+
+#[cfg(feature = "wasm")]
+impl From<WebSocketError> for MessageError {
+    fn from(value: WebSocketError) -> Self {
+        Self::Other(format!("WebSocket: {value:?}"))
     }
 }
 
@@ -68,8 +76,10 @@ impl TryFrom<ServerMessage> for axum::extract::ws::Message {
 }
 
 #[cfg(feature = "wasm")]
-impl ServerMessage {
-    pub fn try_from(message: &WebSocketMessage) -> Result<Self, MessageError> {
+impl TryFrom<&WebSocketMessage> for ServerMessage {
+    type Error = MessageError;
+
+    fn try_from(message: &WebSocketMessage) -> Result<Self, Self::Error> {
         match message {
             WebSocketMessage::Text(text) => Ok(serde_json::from_str(text)?),
             WebSocketMessage::Bytes(bytes) => Ok(serde_json::from_slice(bytes)?),
@@ -95,5 +105,15 @@ pub enum ClientRtc {
 impl From<RoomId> for ClientMessage {
     fn from(value: RoomId) -> Self {
         Self::Rtc(ClientRtc::Join(value))
+    }
+}
+
+#[cfg(feature = "wasm")]
+impl TryInto<WebSocketMessage> for ClientMessage {
+    type Error = MessageError;
+
+    fn try_into(self) -> Result<WebSocketMessage, Self::Error> {
+        let payload = serde_json::to_vec(&self)?;
+        Ok(WebSocketMessage::Bytes(payload))
     }
 }

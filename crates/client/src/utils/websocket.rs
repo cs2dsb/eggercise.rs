@@ -1,10 +1,13 @@
-use std::{any::type_name, fmt::Display};
+use std::{any::type_name, fmt::Display, time::Duration};
 
 use futures::{
     channel::mpsc::{self, SendError, UnboundedSender},
-    select, SinkExt as _, StreamExt,
+    select, FutureExt as _, SinkExt as _, StreamExt,
 };
-use gloo::net::websocket::{futures::WebSocket, Message, State, WebSocketError};
+use gloo::{
+    net::websocket::{futures::WebSocket, State, WebSocketError},
+    timers::future::TimeoutFuture,
+};
 use leptos::{
     provide_context, spawn_local, use_context, Memo, RwSignal, Signal, SignalUpdate, SignalWith,
 };
@@ -18,6 +21,8 @@ use shared::{
 use tracing::{debug, error, warn};
 
 use crate::utils::location::{host, protocol};
+
+const KEEPALIVE_INTERVAL: Duration = Duration::from_secs(30);
 
 fn compare_state(a: State, b: State) -> bool {
     use State::*;
@@ -42,7 +47,7 @@ impl Websocket {
         );
 
         let url = url()?;
-        let mut socket = WebSocket::open(&url)?;
+        let socket = WebSocket::open(&url)?;
 
         let message_signal: RwSignal<Option<Result<ServerMessage, MessageError>>> =
             Default::default();
@@ -54,54 +59,71 @@ impl Websocket {
             })
         });
 
-        let (message_sender, mut message_receiver) = mpsc::unbounded();
+        let (message_sender, mut message_receiver): (UnboundedSender<ClientMessage>, _) =
+            mpsc::unbounded();
 
+        let message_sender_ = message_sender.clone();
         spawn_local(async move {
+            let mut fused_socket = socket.fuse();
             loop {
-                let mut fused_socket = (&mut socket).fuse();
-
                 select! {
                     m = message_receiver.next() => match m {
                         None => {
-                            debug!("WebSocket message sender stream closed");
+                            debug!("message sender stream closed");
                             break;
                         },
                         Some(m) => {
-                            debug!("Websocket sending: {m:?}");
-                            // TODO:
-                            let _ = socket.send(Message::Text("blah".to_string())).await;
+                            debug!("sending: {m:?}");
+                            let payload = match m.try_into() {
+                                Err(e) => {
+                                    error!("ClientMessage to WSMessage: {e:?}");
+                                    message_signal.update(|v| *v = Some(Err(e)));
+                                    continue;
+                                },
+                                Ok(v) => v,
+                            };
+                            if let Err(e) = fused_socket.send(payload).await {
+                                error!("socket.send: {e:?}");
+                                message_signal.update(|v| *v = Some(Err(e.into())));
+                            }
                         },
                     },
                     m = fused_socket.next() => match m {
                         None => {
-                            debug!("Websocket closed");
+                            debug!("next==none, closed");
                             break;
                         },
                         Some(m) => match m {
                             // TODO: is there anything more useful we can do with the send error?
                             Err(WebSocketError::ConnectionClose(c)) => {
                                 if c.was_clean {
-                                    warn!("Websocket closed cleanly: {} {}", c.code, c.reason);
+                                    warn!("closed cleanly: {} {}", c.code, c.reason);
                                 } else {
-                                    error!("Websocket closed uncleanly: {} {}", c.code, c.reason);
+                                    error!("closed uncleanly: {} {}", c.code, c.reason);
                                 }
                             },
-                            Err(e) => error!("Websocket error: {e:?}"),
+                            Err(e) => error!("Error: {e:?}"),
                             Ok(m) => match ServerMessage::try_from(&m) {
                                 Err(e) => {
-                                    error!("Websocket MessageError: {e:?}");
+                                    error!("MessageError: {e:?}");
                                     message_signal.update(|v| *v = Some(Err(e)));
                                 },
                                 Ok(m) => {
-                                    debug!("WebSocket ServerMessage: {m:?}");
+                                    debug!("ServerMessage: {m:?}");
                                     message_signal.update(|v| *v = Some(Ok(m)));
                                 },
                             },
                         },
                     },
+                    _ = TimeoutFuture::new(KEEPALIVE_INTERVAL.as_millis() as u32).fuse() => {
+                        if let Err(e) = message_sender_.unbounded_send(ClientMessage::Keepalive) {
+                            // TODO: anything else we should do?
+                            error!("unbounded_send: {e:?}");
+                        }
+                    },
                 };
 
-                let state = socket.state();
+                let state = fused_socket.get_ref().state();
                 match state {
                     State::Closed | State::Closing => break,
                     _ => {},
@@ -111,7 +133,7 @@ impl Websocket {
             }
 
             status_signal.update(|v| *v = State::Closed);
-            warn!("Websocket closed");
+            debug!("closed");
         });
 
         Ok(Self { status_memo, message_signal, message_sender })
