@@ -3,7 +3,7 @@
 use std::{any::type_name, collections::HashMap};
 
 use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
-use gloo_utils::{
+use gloo::utils::{
     errors::{JsError, NotJsError},
     format::JsValueSerdeExt,
 };
@@ -93,7 +93,7 @@ impl SqlitePromiserError {
     }
 
     fn from_sqlite(value: JsValue) -> Self {
-        // Copied out of gloo_utils because their version panics when the non error
+        // Copied out of gloo::utils because their version panics when the non error
         // isn't a string
         // See <https://github.com/rustwasm/gloo/issues/477>
         match value.dyn_into::<js_sys::Error>() {
@@ -104,11 +104,10 @@ impl SqlitePromiserError {
                     Self::NotJs(format!(
                         "JsValue wasn't JsError, was actually a string: {js_to_string}"
                     ))
-                }
-                Err(js_value) => Self::NotJs(format!(
-                    "JsValue wasn't JsError or JsString: {:?}",
-                    js_value
-                )),
+                },
+                Err(js_value) => {
+                    Self::NotJs(format!("JsValue wasn't JsError or JsString: {:?}", js_value))
+                },
             },
         }
     }
@@ -135,11 +134,8 @@ pub fn parse_datetime(value: &str) -> Result<DateTime<Utc>, SqlitePromiserError>
     }
 
     // Couldn't parse as rfc3339 - fall back to NaiveDateTime.
-    let fmt = if value.len() >= 11 && value.as_bytes()[10] == b'T' {
-        "%FT%T%.f"
-    } else {
-        "%F %T%.f"
-    };
+    let fmt =
+        if value.len() >= 11 && value.as_bytes()[10] == b'T' { "%FT%T%.f" } else { "%F %T%.f" };
 
     Ok(NaiveDateTime::parse_from_str(value, fmt).map(|dt| Utc.from_utc_datetime(&dt))?)
 }
@@ -162,11 +158,7 @@ struct ExecArgs {
 
 impl<T: Into<String>> From<T> for ExecArgs {
     fn from(value: T) -> Self {
-        ExecArgs {
-            sql: value.into(),
-            result_rows: Vec::new(),
-            column_names: Vec::new(),
-        }
+        ExecArgs { sql: value.into(), result_rows: Vec::new(), column_names: Vec::new() }
     }
 }
 
@@ -251,10 +243,7 @@ impl ExecResult {
             let row = if r.result_rows.len() > row_index {
                 &r.result_rows[row_index]
             } else {
-                Err(SqlitePromiserError::MissingRow(
-                    row_index,
-                    r.result_rows.len(),
-                ))?
+                Err(SqlitePromiserError::MissingRow(row_index, r.result_rows.len()))?
             };
 
             let v = if row.len() > column_index {
@@ -289,7 +278,7 @@ impl ExecResult {
                     } else {
                         Err(SqlitePromiserError::Json(e))
                     }
-                }
+                },
             }
         })
     }
@@ -337,9 +326,7 @@ pub struct Version {
 
 impl SqlitePromiser {
     pub fn new(inner: Function) -> Self {
-        Self {
-            inner,
-        }
+        Self { inner }
     }
 
     pub fn provide_context(self) {
@@ -366,31 +353,20 @@ impl SqlitePromiser {
         args: Args,
     ) -> Result<CommandResult, SqlitePromiserError> {
         let this = JsValue::from(&self.inner);
-        let cmd = Command {
-            type_,
-            args,
-        };
+        let cmd = Command { type_, args };
         let cmd_value = <JsValue as JsValueSerdeExt>::from_serde(&cmd)?;
         trace!("Command: {:#?}", cmd_value);
 
-        let promise: Promise = self
-            .inner
-            .call1(&this, &cmd_value)
-            .map_err(SqlitePromiserError::from_promiser)?
-            .into();
+        let promise: Promise =
+            self.inner.call1(&this, &cmd_value).map_err(SqlitePromiserError::from_promiser)?.into();
         let result: CommandResult = JsValueSerdeExt::into_serde(
-            &JsFuture::from(promise)
-                .await
-                .map_err(SqlitePromiserError::from_sqlite)?,
+            &JsFuture::from(promise).await.map_err(SqlitePromiserError::from_sqlite)?,
         )?;
         trace!("Result: {:#?}", result);
         let ret_type = result.result.type_();
 
         if ret_type != type_ {
-            Err(SqlitePromiserError::UnexpectedResult(
-                Type::ConfigGet,
-                result.result.type_(),
-            ))
+            Err(SqlitePromiserError::UnexpectedResult(Type::ConfigGet, result.result.type_()))
         } else {
             Ok(result)
         }
@@ -409,13 +385,9 @@ impl SqlitePromiser {
     }
 
     pub async fn exec<T: Into<String>>(&self, sql: T) -> Result<ExecResult, SqlitePromiserError> {
-        let result = self
-            .send_command(Type::Exec, Args::Sql(ExecArgs::from(sql)))
-            .await?;
+        let result = self.send_command(Type::Exec, Args::Sql(ExecArgs::from(sql))).await?;
 
-        let InnerResult::Exec(result) = result.result else {
-            unreachable!()
-        };
+        let InnerResult::Exec(result) = result.result else { unreachable!() };
 
         Ok(result)
     }
@@ -437,7 +409,11 @@ impl SqlitePromiser {
                 result.result_rows.len()
             )))
         } else if result.result_rows[0].len() != 1 {
-            Err(SqlitePromiserError::ExecResult(format!("get_value expected a single row result with a single value inside but got {}. (This seems like a sqlite bug)", result.result_rows[0].len())))
+            Err(SqlitePromiserError::ExecResult(format!(
+                "get_value expected a single row result with a single value inside but got {}. \
+                 (This seems like a sqlite bug)",
+                result.result_rows[0].len()
+            )))
         } else {
             let json_value = result.result_rows.pop().unwrap().pop().unwrap();
 
@@ -449,9 +425,7 @@ impl SqlitePromiser {
     pub async fn opfs_tree(&self) -> Result<OpfsTreeResults, SqlitePromiserError> {
         let result = self.send_command(Type::OpfsTree, Args::None).await?;
 
-        let InnerResult::OpfsTree(result) = result.result else {
-            unreachable!()
-        };
+        let InnerResult::OpfsTree(result) = result.result else { unreachable!() };
 
         Ok(result)
     }

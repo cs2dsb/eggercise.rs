@@ -1,4 +1,4 @@
-use gloo_net::http::Method;
+use gloo::net::http::Method;
 use shared::{
     api::{
         self,
@@ -16,12 +16,8 @@ use crate::api::create_credentials;
 pub async fn add_key() -> Result<(), FrontendError<ServerError<RegisterError>>> {
     // Ask the server to start the registration process and return a challenge
     debug!("add_key::json_request::register_new_key_start");
-    let creation_challenge_response: CreationChallengeResponse = json_request(
-        Method::POST,
-        api::Auth::RegisterNewKeyStart.path(),
-        None::<&()>,
-    )
-    .await?;
+    let creation_challenge_response: CreationChallengeResponse =
+        json_request(Method::POST, api::Auth::RegisterNewKeyStart.path(), None::<&()>).await?;
 
     // Convert to the browser type
     debug!("add_key::CreationChallengeResponse => CredentialCreationOptions");

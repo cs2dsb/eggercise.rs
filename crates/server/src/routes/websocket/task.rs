@@ -1,30 +1,53 @@
+#![allow(unused)]
 use std::net::SocketAddr;
 
 use axum::extract::ws::{Message as WSMessage, WebSocket};
 use futures::{sink::SinkExt, stream::StreamExt};
 use loole::{Receiver, RecvError};
+use shared::types::{
+    rtc::{PeerId, RoomId},
+    websocket::ServerMessage,
+};
 use tracing::{debug, error, info, warn};
 
-use crate::Message;
+use crate::{ClientControlMessage, PeerConnectorState, PeerMapState, SignallingClientState};
 
 pub async fn handle_socket(
+    socket: WebSocket,
+    socket_addr: SocketAddr,
+    receiver: Receiver<ClientControlMessage>,
+    peer_connector: PeerConnectorState,
+    rtc_peers: PeerMapState,
+    peer_signalling_client: SignallingClientState,
+) {
+    if let Err(e) = handle_socket_inner(
+        socket,
+        socket_addr,
+        receiver,
+        peer_connector,
+        rtc_peers,
+        peer_signalling_client,
+    )
+    .await
+    {
+        error!("handle_socket error: {e:?}");
+    }
+}
+
+async fn handle_socket_inner(
     mut socket: WebSocket,
     socket_addr: SocketAddr,
-    receiver: Receiver<Message>,
-) {
-    // send a ping (unsupported by some browsers) just to kick things off and get a
-    // response
-    if socket.send(WSMessage::Ping(vec![1, 2, 3])).await.is_ok() {
-        debug!("WsClient {:?}: pinged", socket_addr);
-    } else {
-        error!("WsClient {:?}: could not send ping", socket_addr);
-        // no Error here since the only thing we can do is to close the connection.
-        // If we can not send messages, there is no way to salvage the statemachine
-        // anyway.
-        return;
-    }
-
+    receiver: Receiver<ClientControlMessage>,
+    peer_connector: PeerConnectorState,
+    rtc_peers: PeerMapState,
+    peer_signalling_client: SignallingClientState,
+) -> Result<(), anyhow::Error> {
     let (mut ws_sender, mut ws_receiver) = socket.split();
+
+    // Allocte a peer ID to this connection
+    let peer_id: ServerMessage = PeerId::new().into();
+    ws_sender.send(WSMessage::try_from(peer_id)?).await?;
+
     loop {
         tokio::select! {
             // Receive any messages from the server/db/etc
@@ -73,6 +96,8 @@ pub async fn handle_socket(
 
     // returning from the handler closes the websocket connection
     println!("Websocket context {socket_addr} destroyed");
+
+    Ok(())
 }
 
 // /// helper to print contents of messages to stdout. Has special treatment for

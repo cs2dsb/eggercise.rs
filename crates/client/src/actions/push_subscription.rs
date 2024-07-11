@@ -53,9 +53,7 @@ pub fn unsubscribe_action(
             let result = async move {
                 let push_manager = get_web_push_manger().await?;
                 let subscription: PushSubscription =
-                    JsFuture::from(push_manager.get_subscription()?)
-                        .await?
-                        .into();
+                    JsFuture::from(push_manager.get_subscription()?).await?.into();
                 JsFuture::from(subscription.unsubscribe()?).await?;
 
                 // Remove the subscription from the backend

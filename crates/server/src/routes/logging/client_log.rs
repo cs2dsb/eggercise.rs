@@ -10,16 +10,14 @@ use tracing::{debug, error, info, span, trace, warn, Level};
 
 use crate::{db::DatabaseConnection, UserState};
 
-const LOG_MAX_BYTES: usize = 100 * 1024;
+const LOG_MAX_BYTES: usize = 512 * 1024;
 
 pub fn router<S>() -> Router<S>
 where
     S: Clone + Send + Sync + 'static,
     Pool: FromRef<S>,
 {
-    Router::new()
-        .route("/", post(handler))
-        .layer(RequestBodyLimitLayer::new(LOG_MAX_BYTES))
+    Router::new().route("/", post(handler)).layer(RequestBodyLimitLayer::new(LOG_MAX_BYTES))
 }
 
 #[derive(Debug, Deserialize)]
@@ -34,10 +32,7 @@ struct Payload {
 
 impl Payload {
     fn level(&self) -> Level {
-        let level = self
-            .level
-            .as_ref()
-            .map_or(String::new(), |v| v.to_lowercase());
+        let level = self.level.as_ref().map_or(String::new(), |v| v.to_lowercase());
         match level.as_ref() {
             "debug" => Level::DEBUG,
             "info" => Level::INFO,
@@ -46,6 +41,7 @@ impl Payload {
             _ => Level::TRACE,
         }
     }
+
     fn message<'a>(&'a self) -> &'a str {
         self.message.as_ref().map_or("<No message>", |v| v.as_str())
     }
@@ -74,19 +70,19 @@ async fn handler(
     match level {
         Level::TRACE => {
             trace!(target: "log", parent: &client_log_span, session_id = session_id, user_id = user_id, fields = ?payload.other, "\"{}\"", payload.message())
-        }
+        },
         Level::DEBUG => {
             debug!(target: "log", parent: &client_log_span, session_id = session_id, user_id = user_id, fields = ?payload.other, "\"{}\"", payload.message())
-        }
+        },
         Level::INFO => {
             info!(target: "log", parent: &client_log_span, session_id = session_id, user_id = user_id, fields = ?payload.other, "\"{}\"", payload.message())
-        }
+        },
         Level::WARN => {
             warn!(target: "log", parent: &client_log_span, session_id = session_id, user_id = user_id, fields = ?payload.other, "\"{}\"", payload.message())
-        }
+        },
         Level::ERROR => {
             error!(target: "log", parent: &client_log_span, session_id = session_id, user_id = user_id, fields = ?payload.other, "\"{}\"", payload.message())
-        }
+        },
     }
 
     Ok(Json(()))

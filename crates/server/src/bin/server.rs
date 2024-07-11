@@ -34,6 +34,7 @@ use server::{
         logging,
         notifications::{remove_push_subscription, update_push_subscription, vapid},
         ping::ping,
+        rtc::offer_handler,
         websocket::websocket_handler,
     },
     AppError, AppState, VapidPrivateKey, VapidPubKey,
@@ -46,6 +47,10 @@ use shared::{
     },
     configure_tracing, load_dotenv,
     model::{PushNotificationSubscription, User},
+    rtc::{
+        peer_connector::Connector as _, signalling_client::Client as _, Builder as _,
+        PeerConnector, SignallingClient,
+    },
 };
 use tokio::net::TcpListener;
 use tower::ServiceBuilder;
@@ -67,19 +72,12 @@ use web_push::{
 use webauthn_rs::{prelude::Url, WebauthnBuilder};
 
 fn build_webauthn(args: &Cli) -> Result<webauthn_rs::Webauthn, anyhow::Error> {
-    let rp_name = format!("eggercise.rs on {}", &args.webauthn_origin);
-    let url = Url::parse(&args.webauthn_origin).with_context(|| {
-        format!(
-            "Parsing \"{}\" as webauthn origin URL",
-            &args.webauthn_origin
-        )
-    })?;
+    let rp_name = format!("eggercise.rs on {}", &args.origin);
+    let url = Url::parse(&args.origin)
+        .with_context(|| format!("Parsing \"{}\" as webauthn origin URL", &args.origin))?;
 
     let builder = WebauthnBuilder::new(&args.webauthn_id, &url).with_context(|| {
-        format!(
-            "WebauthnBuilder::new({}, {})",
-            &args.webauthn_id, &args.webauthn_origin
-        )
+        format!("WebauthnBuilder::new({}, {})", &args.webauthn_id, &args.origin)
     })?;
 
     Ok(builder.rp_name(&rp_name).build()?)
@@ -148,6 +146,9 @@ async fn main() -> Result<(), anyhow::Error> {
     let notifier_db_connection = pool.get().await?;
     let notifier_private_key = vapid_private_key.clone();
 
+    let rtc_connector = PeerConnector::with_base(&args.origin).build()?;
+    let rtc_signalling_client = SignallingClient::new().build()?.into();
+
     let state = AppState {
         pool,
         webauthn,
@@ -155,6 +156,9 @@ async fn main() -> Result<(), anyhow::Error> {
         vapid_pub_key,
         vapid_private_key,
         websocket_clients: Default::default(),
+        rtc_connector: rtc_connector.into(),
+        rtc_peers: Default::default(),
+        rtc_signalling_client,
     };
 
     // Map all routes the client can handle to the index.html
@@ -180,11 +184,8 @@ async fn main() -> Result<(), anyhow::Error> {
                 let keyref = &notifier_private_key;
                 let new_version = &new_version;
                 let results = join_all(notify_users.iter().map(|user| async move {
-                    if let Some(PushNotificationSubscription {
-                        endpoint,
-                        key: p256dh,
-                        auth,
-                    }) = user.push_notification_subscription.clone()
+                    if let Some(PushNotificationSubscription { endpoint, key: p256dh, auth }) =
+                        user.push_notification_subscription.clone()
                     {
                         debug!(
                             "Notifying {} ({}) we just started version {}",
@@ -231,7 +232,8 @@ async fn main() -> Result<(), anyhow::Error> {
                     .zip(results.into_iter())
                     .filter_map(|(user, r)| r.err().map(|e| (user, e)))
                     .partition(|(_, err)| match err {
-                        // TODO: there might be some other errors this behaviour should apply to
+                        // TODO: there might be some other errors this behaviour should apply
+                        // to
                         WebPushError::EndpointNotValid
                         | WebPushError::InvalidUri
                         | WebPushError::EndpointNotFound => false,
@@ -243,7 +245,8 @@ async fn main() -> Result<(), anyhow::Error> {
                         .interact(move |conn| {
                             // TODO: move into shared db code
                             let mut stmt = conn.prepare(
-                                "UPDATE User SET push_notification_subscription = NULL WHERE id = ?1",
+                                "UPDATE User SET push_notification_subscription = NULL WHERE id = \
+                                 ?1",
                             )?;
                             for (user, _) in user_errors_invalid_sub.iter() {
                                 stmt.execute(&[&user.id])?;
@@ -264,9 +267,7 @@ async fn main() -> Result<(), anyhow::Error> {
                         .map(|(user, err)| format!("(user_id: {}, {:?})", user.id, err))
                         .collect::<Vec<_>>()
                         .join(",");
-                    Err(ServerError::<Nothing>::Other {
-                        message,
-                    })
+                    Err(ServerError::<Nothing>::Other { message })
                 } else {
                     Ok(())
                 }
@@ -277,7 +278,7 @@ async fn main() -> Result<(), anyhow::Error> {
                     if let Err(e) = r {
                         error!("Error from notifier task: {e}");
                     }
-                }
+                },
             }
         });
     }
@@ -297,20 +298,11 @@ async fn main() -> Result<(), anyhow::Error> {
             .route(Auth::RegisterFinish.path(), post(register_finish))
             .route(Auth::LoginStart.path(), post(login_start))
             .route(Auth::LoginFinish.path(), post(login_finish))
-            .route(
-                Auth::RegisterNewKeyStart.path(),
-                post(register_new_key_start),
-            )
-            .route(
-                Auth::RegisterNewKeyFinish.path(),
-                post(register_new_key_finish),
-            )
+            .route(Auth::RegisterNewKeyStart.path(), post(register_new_key_start))
+            .route(Auth::RegisterNewKeyFinish.path(), post(register_new_key_finish))
             .route(Auth::TemporaryLogin.path(), get(temporary_login))
             .route(Object::User.path(), get(fetch_user))
-            .route(
-                Auth::CreateTemporaryLogin.path(),
-                post(create_temporary_login),
-            )
+            .route(Auth::CreateTemporaryLogin.path(), post(create_temporary_login))
             .route(Object::QrCodeId.path(), get(generate_qr_code))
             // Notification routes
             .route(Object::Vapid.path(), get(vapid))
@@ -320,6 +312,7 @@ async fn main() -> Result<(), anyhow::Error> {
             )
             .route(Object::Ping.path(), get(ping))
             .route(Object::Websocket.path(), get(websocket_handler))
+            .route(Object::RtcOffer.path(), post(offer_handler))
             .nest_service(
                 "/wasm/service_worker.js",
                 ServiceBuilder::new()
@@ -327,9 +320,7 @@ async fn main() -> Result<(), anyhow::Error> {
                         HeaderName::from_static("service-worker-allowed"),
                         HeaderValue::from_static("/"),
                     ))
-                    .service(ServeFile::new(
-                        args.assets_dir.join("wasm/service_worker.js"),
-                    )),
+                    .service(ServeFile::new(args.assets_dir.join("wasm/service_worker.js"))),
             )
             .nest_service("/", ServeDir::new(&args.assets_dir))
             .layer(middleware::map_response(fallback_layer))
@@ -368,7 +359,8 @@ async fn main() -> Result<(), anyhow::Error> {
                             .on_response(
                                 move |response: &Response, _latency: Duration, span: &Span| {
                                     span.record("status", response.status().to_string());
-                                    // If enter/exit events are off we want to make sure http_log
+                                    // If enter/exit events are off we want to make sure
+                                    // http_log
                                     // generates something anyway
                                     if !log_span_events {
                                         info!(target: "http_log", parent: span, "");
@@ -382,7 +374,8 @@ async fn main() -> Result<(), anyhow::Error> {
                                     if let ServerErrorsFailureClass::StatusCode(code) = error {
                                         span.record("status", code.to_string());
                                     }
-                                    // If enter/exit events are off we want to make sure http_log
+                                    // If enter/exit events are off we want to make sure
+                                    // http_log
                                     // generates something anyway
                                     if !log_span_events {
                                         info!(target: "http_log", parent: span, "");
@@ -408,7 +401,7 @@ async fn main() -> Result<(), anyhow::Error> {
                     .layer(
                         CorsLayer::new()
                             .allow_methods([Method::GET, Method::POST, Method::DELETE])
-                            .allow_origin(args.cors_origin.parse::<HeaderValue>()?),
+                            .allow_origin(args.origin.parse::<HeaderValue>()?),
                     ),
             )
             .layer(CompressionLayer::new())
@@ -425,10 +418,9 @@ async fn fallback_layer(uri: Uri, method: Method, response: Response) -> impl In
 
     match code {
         StatusCode::NOT_FOUND => Err(AppError::new(code, format!("Not found: {}", uri))),
-        StatusCode::METHOD_NOT_ALLOWED => Err(AppError::new(
-            code,
-            format!("Method not allowed: {}: {}", method, uri),
-        )),
+        StatusCode::METHOD_NOT_ALLOWED => {
+            Err(AppError::new(code, format!("Method not allowed: {}: {}", method, uri)))
+        },
 
         _ => Ok(response),
     }

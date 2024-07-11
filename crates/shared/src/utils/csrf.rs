@@ -1,6 +1,6 @@
 use std::{error::Error, fmt::Display};
 
-use gloo_net::http::{Request, RequestBuilder, Response};
+use gloo::net::http::{Request, RequestBuilder, Response};
 use leptos::{provide_context, use_context, Owner};
 use tracing::debug;
 
@@ -23,9 +23,7 @@ impl Csrf {
 
             let token = Self::token_from_response(&response)?;
 
-            let csrf = Csrf {
-                token,
-            };
+            let csrf = Csrf { token };
             csrf.provide_context();
             csrf
         })
@@ -50,10 +48,7 @@ impl Csrf {
     {
         let token = Self::token_from_response(response)?;
 
-        Csrf {
-            token,
-        }
-        .provide_context();
+        Csrf { token }.provide_context();
 
         Ok(())
     }
@@ -62,12 +57,9 @@ impl Csrf {
     where
         E: Error + Display,
     {
-        Ok(response
-            .headers()
-            .get(CSRF_HEADER)
-            .ok_or(FrontendError::Client {
-                message: "Csrf token header missing from response headers".to_string(),
-            })?)
+        Ok(response.headers().get(CSRF_HEADER).ok_or(FrontendError::Client {
+            message: "Csrf token header missing from response headers".to_string(),
+        })?)
     }
 
     fn provide_context(&self) {

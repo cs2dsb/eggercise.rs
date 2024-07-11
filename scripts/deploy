@@ -20,14 +20,24 @@ cd $repo_dir
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
+warn() { echo -e "${RED}$@${NC}" >&2; }
+die() { warn "$@"; exit 1; }
+
 if ! cargo test; then 
-    >&2 echo -e "${RED}Failing tests detected. Aborting${NC}";
-    exit 1;
+    die "Failing tests detected. Aborting";
 fi
 
 if ! cargo +nightly fmt -- --check >/dev/null; then
-    >&2 echo -e "${RED}Run rust fmt. Aborting${NC}";
-    exit 1;
+    die "Run rust fmt. Aborting";
+fi
+
+if grep -rn "allow(unused" --include \*.rs crates/; then 
+    warn "allow(unused..) found"
+    read -r -p "Continue? [Y/n]" response
+    response=${response,,}    # tolower
+    if ! [[ "$response" =~ ^(yes|y|)$ ]]; then
+        die "Aborting";
+    fi
 fi
 
 ./scripts/deploy_skip_tests $*

@@ -33,11 +33,7 @@ fn plan() -> Resource<
             Vec<(
                 PlanExerciseGroup,
                 ExerciseGroup,
-                Vec<(
-                    Exercise,
-                    Option<UserExercise>,
-                    Vec<(SessionExercise, Session)>,
-                )>,
+                Vec<(Exercise, Option<UserExercise>, Vec<(SessionExercise, Session)>)>,
             )>,
         )>,
         SqlitePromiserError,
@@ -63,9 +59,7 @@ fn plan() -> Resource<
             debug!("Plan instances: {:?}", plan_instances);
 
             let plans = join_all(
-                plan_instances
-                    .iter()
-                    .map(|pi| Plan::fetch_one_by(&pi.plan_id, PlanIden::Id)),
+                plan_instances.iter().map(|pi| Plan::fetch_one_by(&pi.plan_id, PlanIden::Id)),
             )
             .await
             .into_iter()
@@ -165,13 +159,7 @@ fn plan() -> Resource<
                 .zip(exercises_sessions.into_iter())
                 .map(
                     |(
-                        (
-                            (
-                                (((plan, plan_instance), plan_exercise_groups), exercise_groups),
-                                exercises,
-                            ),
-                            user_exercises,
-                        ),
+                        (((((plan, plan_instance), plan_exercise_groups), exercise_groups), exercises), user_exercises),
                         exercises_sessions,
                     )| {
                         (
@@ -185,26 +173,21 @@ fn plan() -> Resource<
                                 .zip(exercises_sessions.into_iter())
                                 .map(
                                     |(
-                                        (
-                                            ((plan_exercise_group, exercise_group), exercises),
-                                            user_exercises,
-                                        ),
+                                        (((plan_exercise_group, exercise_group), exercises), user_exercises),
                                         exercises_sessions,
                                     )| {
                                         (
-                                        plan_exercise_group,
-                                        exercise_group,
-                                        exercises
-                                            .into_iter()
-                                            .zip(user_exercises.into_iter())
-                                            .zip(exercises_sessions)
-                                            .map(|((exercise, user_exercise), exercise_sessions)| (
-                                                exercise,
-                                                user_exercise,
-                                                exercise_sessions,
-                                            ))
-                                            .collect::<Vec<_>>(),
-                                    )
+                                            plan_exercise_group,
+                                            exercise_group,
+                                            exercises
+                                                .into_iter()
+                                                .zip(user_exercises.into_iter())
+                                                .zip(exercises_sessions)
+                                                .map(|((exercise, user_exercise), exercise_sessions)| {
+                                                    (exercise, user_exercise, exercise_sessions)
+                                                })
+                                                .collect::<Vec<_>>(),
+                                        )
                                     },
                                 )
                                 .collect::<Vec<_>>(),
@@ -249,11 +232,7 @@ fn Plan<'a>(
     groups: &'a Vec<(
         PlanExerciseGroup,
         ExerciseGroup,
-        Vec<(
-            Exercise,
-            Option<UserExercise>,
-            Vec<(SessionExercise, Session)>,
-        )>,
+        Vec<(Exercise, Option<UserExercise>, Vec<(SessionExercise, Session)>)>,
     )>,
 ) -> impl IntoView {
     view! {
@@ -273,11 +252,7 @@ fn PlanGroup<'a>(
     plan_instance: &'a PlanInstance,
     plan_group: &'a PlanExerciseGroup,
     group: &'a ExerciseGroup,
-    exercises: &'a Vec<(
-        Exercise,
-        Option<UserExercise>,
-        Vec<(SessionExercise, Session)>,
-    )>,
+    exercises: &'a Vec<(Exercise, Option<UserExercise>, Vec<(SessionExercise, Session)>)>,
 ) -> impl IntoView {
     view! {
         <div>
@@ -301,12 +276,10 @@ fn Exercise<'a>(
     exercise_sessions: &'a Vec<(SessionExercise, Session)>,
 ) -> impl IntoView {
     let now = Utc::now();
-    let _most_recent_session = exercise_sessions
-        .iter()
-        .filter(|(_, session)| session.planned_date < now)
-        .max_by(|(_, session_a), (_, session_b)| {
-            session_a.planned_date.cmp(&session_b.planned_date)
-        });
+    let _most_recent_session =
+        exercise_sessions.iter().filter(|(_, session)| session.planned_date < now).max_by(
+            |(_, session_a), (_, session_b)| session_a.planned_date.cmp(&session_b.planned_date),
+        );
 
     let create_new_session_action =
         create_action(move |(exercise, plan_instance): &(Uuid, Uuid)| {

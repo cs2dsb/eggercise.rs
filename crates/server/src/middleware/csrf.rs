@@ -173,7 +173,10 @@ enum Error {
     #[error("Session error")]
     Session(#[from] tower_sessions::session::Error),
 
-    #[error("Session extension missing. Is `tower_sessions::SessionLayer` installed and layered around the `axum_csrf_sync_pattern::CsrfLayer`?")]
+    #[error(
+        "Session extension missing. Is `tower_sessions::SessionLayer` installed and layered \
+         around the `axum_csrf_sync_pattern::CsrfLayer`?"
+    )]
     SessionLayerMissing,
 
     #[error("Incoming CSRF token header was not valid ASCII")]
@@ -224,10 +227,7 @@ impl<S> CsrfMiddleware<S> {
     /// [`CsrfLayer`]. Commonly, the middleware is created by the
     /// [`tower_layer::Layer`] - and never manually.
     pub fn new(inner: S, layer: CsrfLayer) -> Self {
-        CsrfMiddleware {
-            inner,
-            layer,
-        }
+        CsrfMiddleware { inner, layer }
     }
 
     /// Create a new CSRF synchronizer token layer.
@@ -245,10 +245,10 @@ where
         + 'static,
     S::Future: Send,
 {
-    type Response = S::Response;
     type Error = Infallible;
     type Future =
         Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send + 'static>>;
+    type Response = S::Response;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.inner.poll_ready(cx)
@@ -259,10 +259,7 @@ where
         let mut inner = std::mem::replace(&mut self.inner, clone);
         let layer = self.layer;
         Box::pin(async move {
-            let session = match req
-                .extensions()
-                .get::<Session>()
-                .ok_or(Error::SessionLayerMissing)
+            let session = match req.extensions().get::<Session>().ok_or(Error::SessionLayerMissing)
             {
                 Ok(session_handle) => session_handle,
                 Err(error) => return Ok(error.into_response()),
@@ -271,18 +268,14 @@ where
             // Extract the CSRF server side token from the session; create a new one if none
             // has been set yet. If the regeneration option is set to "per
             // request", then regenerate the token even if present in the session.
-            let mut server_token = match session
-                .get::<String>(layer.session_key)
-                .await
-                .ok()
-                .flatten()
-            {
-                Some(token) => token,
-                None => match layer.regenerate_token(&session).await {
-                    Ok(token) => token,
-                    Err(error) => return Ok(error.into_response()),
-                },
-            };
+            let mut server_token =
+                match session.get::<String>(layer.session_key).await.ok().flatten() {
+                    Some(token) => token,
+                    None => match layer.regenerate_token(&session).await {
+                        Ok(token) => token,
+                        Err(error) => return Ok(error.into_response()),
+                    },
+                };
 
             if !req.method().is_safe() {
                 // Verify incoming CSRF token for unsafe request methods.
@@ -295,7 +288,7 @@ where
                                 StatusCode::FORBIDDEN.into_response(),
                                 &server_token,
                             ));
-                        }
+                        },
                     }
                 };
 
@@ -303,7 +296,7 @@ where
                     Ok(token) => token,
                     Err(error) => {
                         return Ok(layer.response_with_token(error.into_response(), &server_token))
-                    }
+                    },
                 };
                 if client_token != server_token {
                     tracing::warn!("{} header mismatch!", layer.request_header);
@@ -323,7 +316,7 @@ where
                     Ok(token) => token,
                     Err(error) => {
                         return Ok(layer.response_with_token(error.into_response(), &server_token))
-                    }
+                    },
                 };
             }
 
@@ -355,11 +348,7 @@ mod tests {
     use super::*;
 
     async fn handler() -> Result<Response, Infallible> {
-        Ok((
-            StatusCode::OK,
-            "The default test success response has a body",
-        )
-            .into_response())
+        Ok((StatusCode::OK, "The default test success response has a body").into_response())
     }
 
     fn session_layer() -> SessionManagerLayer<MemoryStore> {
@@ -375,10 +364,7 @@ mod tests {
 
     #[tokio::test]
     async fn get_without_token_succeeds() {
-        let request = Request::builder()
-            .method(Method::GET)
-            .body(Body::empty())
-            .unwrap();
+        let request = Request::builder().method(Method::GET).body(Body::empty()).unwrap();
 
         let response = app(CsrfLayer::new()).oneshot(request).await.unwrap();
 
@@ -390,10 +376,7 @@ mod tests {
 
     #[tokio::test]
     async fn post_without_token_fails() {
-        let request = Request::builder()
-            .method(Method::POST)
-            .body(Body::empty())
-            .unwrap();
+        let request = Request::builder().method(Method::POST).body(Body::empty()).unwrap();
         let response = app(CsrfLayer::new()).oneshot(request).await.unwrap();
 
         assert_eq!(response.status(), StatusCode::FORBIDDEN);
@@ -423,10 +406,7 @@ mod tests {
         let session_cookie = response.headers().get(SET_COOKIE).unwrap().clone();
 
         let initial_client_token = response.headers().get("X-CSRF-TOKEN").unwrap();
-        assert_eq!(
-            BASE64_STANDARD.decode(initial_client_token).unwrap().len(),
-            32
-        );
+        assert_eq!(BASE64_STANDARD.decode(initial_client_token).unwrap().len(), 32);
 
         // Use CSRF token for POST request
         let response = app
@@ -495,10 +475,7 @@ mod tests {
         let session_cookie = response.headers().get(SET_COOKIE).unwrap().clone();
 
         let initial_client_token = response.headers().get("X-CSRF-TOKEN").unwrap();
-        assert_eq!(
-            BASE64_STANDARD.decode(initial_client_token).unwrap().len(),
-            32
-        );
+        assert_eq!(BASE64_STANDARD.decode(initial_client_token).unwrap().len(), 32);
 
         // Use CSRF token for POST request
         let response = app
@@ -567,10 +544,7 @@ mod tests {
         let session_cookie = response.headers().get(SET_COOKIE).unwrap().clone();
 
         let initial_client_token = response.headers().get("X-CSRF-TOKEN").unwrap();
-        assert_eq!(
-            BASE64_STANDARD.decode(initial_client_token).unwrap().len(),
-            32
-        );
+        assert_eq!(BASE64_STANDARD.decode(initial_client_token).unwrap().len(), 32);
 
         // Perform another GET request
         let response = app
@@ -670,10 +644,7 @@ mod tests {
 
         assert_eq!(response.status(), StatusCode::OK);
 
-        let client_token = response
-            .headers()
-            .get("X-Custom-Token-Response-Header")
-            .unwrap();
+        let client_token = response.headers().get("X-Custom-Token-Response-Header").unwrap();
         assert_eq!(BASE64_STANDARD.decode(client_token).unwrap().len(), 32);
     }
 
@@ -685,10 +656,7 @@ mod tests {
             let session_csrf_token: String =
                 session.get("custom_session_key").await.unwrap().unwrap();
 
-            assert_eq!(
-                BASE64_STANDARD.decode(session_csrf_token).unwrap().len(),
-                32
-            );
+            assert_eq!(BASE64_STANDARD.decode(session_csrf_token).unwrap().len(), 32);
             StatusCode::OK
         }
 
@@ -697,24 +665,16 @@ mod tests {
             .layer(CsrfLayer::new().session_key("custom_session_key"))
             .layer(session_layer());
 
-        let response = app
-            .oneshot(Request::builder().body(Body::empty()).unwrap())
-            .await
-            .unwrap();
+        let response = app.oneshot(Request::builder().body(Body::empty()).unwrap()).await.unwrap();
 
         assert_eq!(response.status(), StatusCode::OK);
     }
 
     #[tokio::test]
     async fn missing_session_layer_error_response() {
-        let app = Router::new()
-            .route("/", get(handler))
-            .layer(CsrfLayer::new());
+        let app = Router::new().route("/", get(handler)).layer(CsrfLayer::new());
 
-        let response = app
-            .oneshot(Request::builder().body(Body::empty()).unwrap())
-            .await
-            .unwrap();
+        let response = app.oneshot(Request::builder().body(Body::empty()).unwrap()).await.unwrap();
 
         assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
     }
@@ -722,10 +682,7 @@ mod tests {
     #[tokio::test]
     async fn invalid_token_str_error_response() {
         let layer = CsrfLayer::new();
-        let response = Response::builder()
-            .status(StatusCode::OK)
-            .body(Body::empty())
-            .unwrap();
+        let response = Response::builder().status(StatusCode::OK).body(Body::empty()).unwrap();
         let response = layer.response_with_token(response, "\n");
 
         assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);

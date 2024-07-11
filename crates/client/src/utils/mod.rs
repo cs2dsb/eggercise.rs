@@ -6,7 +6,11 @@ use wasm_bindgen::JsValue;
 
 pub mod browser;
 pub mod location;
+pub mod rtc;
 pub mod websocket;
+
+mod wrap_callback;
+pub use wrap_callback::*;
 
 pub trait JsValueIntoOk<R, E>: Sized
 where
@@ -30,9 +34,7 @@ where
                 type_name::<R>()
             );
             error!("{inner}");
-            Err(FrontendError::Js {
-                inner,
-            })
+            Err(FrontendError::Js { inner })
         } else {
             Ok(self.into())
         }

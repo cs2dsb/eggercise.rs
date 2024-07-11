@@ -30,12 +30,12 @@ pub fn Register() -> impl IntoView {
                 Ok(res) => {
                     set_register_response.update(|v| *v = Some(res));
                     set_register_error.update(|e| *e = None);
-                }
+                },
                 Err(err) => {
                     let msg = format!("{:?}", err);
                     warn!("Error registering {reg_user:?}: {msg}");
                     set_register_error.update(|e| *e = Some(msg));
-                }
+                },
             }
 
             set_wait_for_response.update(|w| *w = false);

@@ -18,7 +18,7 @@ pub mod utils;
 
 use db::sqlite3::SqlitePromiser;
 use shared::{server_trace, utils::tracing::configure_tracing};
-use utils::websocket::Websocket;
+use utils::{rtc::Rtc, websocket::Websocket};
 
 #[wasm_bindgen]
 pub async fn start_client(sqlite_promiser: Function) {
@@ -32,6 +32,7 @@ pub async fn start_client(sqlite_promiser: Function) {
     Online::provide_context();
 
     Websocket::provide_context().unwrap();
+    Rtc::provide_context().await.unwrap();
 
     mount_to_body(move || {
         view! {

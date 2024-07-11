@@ -15,10 +15,11 @@ pub async fn register_new_key_finish(
     Json(register_public_key_credential): Json<RegisterPublicKeyCredential>,
 ) -> Result<Json<()>, ServerError<Nothing>> {
     // Get the challenge from the session
-    let PasskeyRegistrationState { passkey_registration, .. } = session
-        .take_passkey_registration_state()
-        .await?
-        .ok_or(unauthorized_error!("Current session doesn't contain a PasskeyRegistrationState. Client error or replay attack?"))?;
+    let PasskeyRegistrationState { passkey_registration, .. } =
+        session.take_passkey_registration_state().await?.ok_or(unauthorized_error!(
+            "Current session doesn't contain a PasskeyRegistrationState. Client error or replay \
+             attack?"
+        ))?;
 
     // Attempt to complete the passkey registration with the provided public key
     let passkey = webauthn
@@ -27,10 +28,7 @@ pub async fn register_new_key_finish(
     let result = {
         conn.interact(move |conn| {
             // Get the user first
-            let user = user_state
-                .id
-                .fetch_full_user(conn)
-                .map_err(|e| (true, e.into()))?;
+            let user = user_state.id.fetch_full_user(conn).map_err(|e| (true, e.into()))?;
 
             // Add the new passkey
             user.add_passkey(conn, passkey).map_err(|e| (false, e))?;

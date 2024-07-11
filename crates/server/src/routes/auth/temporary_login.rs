@@ -38,10 +38,7 @@ pub async fn temporary_login(
                     Ok(tl)
                 }
             } else {
-                Err(bad_request_error!(
-                    "Code does not exist ({})",
-                    code.as_str()
-                ))
+                Err(bad_request_error!("Code does not exist ({})", code.as_str()))
             }?;
 
             // Get the user to log in with this code

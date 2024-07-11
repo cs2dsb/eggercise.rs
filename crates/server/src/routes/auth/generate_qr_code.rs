@@ -14,8 +14,13 @@ fn to_svg_string(qr: &QrCode, border: u16) -> String {
 
     let mut result = String::new();
     result += "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
-    result += "<!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\" \"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\">\n";
-    result += &format!("<svg xmlns=\"http://www.w3.org/2000/svg\" version=\"1.1\" viewBox=\"0 0 {0} {0}\" stroke=\"none\">\n", dimension);
+    result +=
+        "<!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\" \"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\">\n";
+    result += &format!(
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" version=\"1.1\" viewBox=\"0 0 {0} {0}\" \
+         stroke=\"none\">\n",
+        dimension
+    );
     result += "\t<rect width=\"100%\" height=\"100%\" fill=\"#FFFFFF\"/>\n";
     result += "\t<path d=\"";
 
@@ -49,9 +54,7 @@ pub async fn generate_qr_code(
         None,
         true,
     )
-    .map_err(|e| ServerError::Other {
-        message: format!("QrCode error: {:?}", e),
-    })?;
+    .map_err(|e| ServerError::Other { message: format!("QrCode error: {:?}", e) })?;
 
     let image = to_svg_string(&code, 3);
 
@@ -60,9 +63,7 @@ pub async fn generate_qr_code(
         headers.insert(
             header::CONTENT_TYPE,
             HeaderValue::from_str(mime::IMAGE_SVG.essence_str()).map_err(|e| {
-                ServerError::Other {
-                    message: format!("Parsing header value failed: {:?}", e),
-                }
+                ServerError::Other { message: format!("Parsing header value failed: {:?}", e) }
             })?,
         );
         headers

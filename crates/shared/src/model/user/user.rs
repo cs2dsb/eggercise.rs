@@ -95,9 +95,7 @@ impl User {
         let new_credential = NewCredential::new(self.id.clone(), passkey.into());
 
         let credential = {
-            new_credential
-                .insert(&tx)
-                .context("User::add_passkey::insert(Credential)")?;
+            new_credential.insert(&tx).context("User::add_passkey::insert(Credential)")?;
             Credential::fetch(&tx, &new_credential.id)
                 .context("User::add_passkey::fetch(Credential)")?
         };

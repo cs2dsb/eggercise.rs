@@ -39,10 +39,7 @@ impl NewServiceVersion {
         // Just to check it's valid semver
         let _ = Version::parse(&version)?;
         let id = Uuid::new_v4();
-        Ok(Self {
-            id,
-            version,
-        })
+        Ok(Self { id, version })
     }
 }
 
@@ -67,9 +64,8 @@ impl ServiceVersion {
             .build_rusqlite(SqliteQueryBuilder);
 
         let mut stmt = conn.prepare_cached(&sql)?;
-        let value = stmt
-            .query_row(&*values.as_params(), <Self as ExemplarModel>::from_row)
-            .optional()?;
+        let value =
+            stmt.query_row(&*values.as_params(), <Self as ExemplarModel>::from_row).optional()?;
 
         Ok(value)
     }

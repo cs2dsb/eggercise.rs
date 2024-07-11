@@ -33,6 +33,7 @@ impl From<WebauthnPasskey> for Passkey {
 
 impl Deref for Passkey {
     type Target = WebauthnPasskey;
+
     fn deref(&self) -> &Self::Target {
         &self.0
     }
@@ -71,6 +72,7 @@ impl CredentialId {
 
 impl Deref for CredentialId {
     type Target = WebauthnCredentialId;
+
     fn deref(&self) -> &Self::Target {
         &self.0
     }
@@ -174,10 +176,7 @@ impl Credential {
             .values([
                 (CredentialIden::Counter, self.counter.into()),
                 (CredentialIden::LastUsedDate, self.last_used_date.into()),
-                (
-                    CredentialIden::LastUpdatedDate,
-                    self.last_updated_date.into(),
-                ),
+                (CredentialIden::LastUpdatedDate, self.last_updated_date.into()),
                 (CredentialIden::BackupState, self.backup_state.into()),
                 (CredentialIden::BackupEligible, self.backup_eligible.into()),
             ])
@@ -203,10 +202,6 @@ impl NewCredential {
     pub fn new<I: Into<Uuid>>(user_id: I, passkey: Passkey) -> Self {
         let id = passkey.cred_id().clone().into();
         let user_id = user_id.into();
-        Self {
-            id,
-            user_id,
-            passkey,
-        }
+        Self { id, user_id, passkey }
     }
 }

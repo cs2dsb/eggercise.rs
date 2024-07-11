@@ -18,6 +18,7 @@ impl fmt::Display for UserId {
 }
 impl Deref for UserId {
     type Target = Uuid;
+
     fn deref(&self) -> &Self::Target {
         &self.id
     }
@@ -25,9 +26,7 @@ impl Deref for UserId {
 
 impl From<&User> for UserId {
     fn from(value: &User) -> Self {
-        Self {
-            id: value.id.clone(),
-        }
+        Self { id: value.id.clone() }
     }
 }
 

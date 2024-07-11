@@ -32,11 +32,10 @@ pub async fn login_start(
             Ok::<_, ServerError<_>>(match user {
                 None => (None, None),
                 Some(user) => {
-                    let passkeys = Credential::fetch_passkeys(conn, &user.id)?
-                        .into_iter()
-                        .collect::<Vec<_>>();
+                    let passkeys =
+                        Credential::fetch_passkeys(conn, &user.id)?.into_iter().collect::<Vec<_>>();
                     (Some(user), Some(passkeys))
-                }
+                },
             })
         })
         .await??

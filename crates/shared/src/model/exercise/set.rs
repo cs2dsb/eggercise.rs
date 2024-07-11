@@ -35,6 +35,7 @@ impl Sets {
 
 impl Deref for Sets {
     type Target = Vec<Set>;
+
     fn deref(&self) -> &Self::Target {
         &self.0
     }

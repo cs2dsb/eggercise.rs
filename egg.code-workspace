@@ -1,7 +1,19 @@
 {
 	"folders": [
 		{
+			"name": "webrtc",
+			"path": "../webrtc"
+		},
+		{
+			"name": "just-webrtc",
+			"path": "../just-webrtc"
+		},
+		{
+			"name": "eggercise.rs",
 			"path": "."
+		},
+		{
+			"path": "../matchbox"
 		}
 	],
 	"settings": {

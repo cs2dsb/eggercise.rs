@@ -10,10 +10,7 @@ pub fn get_subscription_key<T: Display>(
     key: PushEncryptionKeyName,
 ) -> Result<String, FrontendError<T>> {
     let key = sub.get_key(key)?.ok_or(FrontendError::Js {
-        inner: format!(
-            "Browser didn't return a {:?} key for an established subscription",
-            key
-        ),
+        inner: format!("Browser didn't return a {:?} key for an established subscription", key),
     })?;
 
     let bytes: Vec<u8> = Uint8Array::new(&key).to_vec();

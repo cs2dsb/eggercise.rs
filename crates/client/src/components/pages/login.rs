@@ -30,12 +30,12 @@ pub fn Login() -> impl IntoView {
                 Ok(res) => {
                     set_login_response.update(|v| *v = Some(res));
                     set_login_error.update(|e| *e = None);
-                }
+                },
                 Err(err) => {
                     let msg = format!("{:?}", err);
                     warn!("Error logging in {login_user:?}: {msg}");
                     set_login_error.update(|e| *e = Some(msg));
-                }
+                },
             }
 
             set_wait_for_response.update(|w| *w = false);

@@ -13,9 +13,7 @@ pub struct RegistrationUser {
 impl RegistrationUser {
     pub fn new<T: Into<String>>(username: T) -> Self {
         let username = username.into();
-        Self {
-            username,
-        }
+        Self { username }
     }
 }
 

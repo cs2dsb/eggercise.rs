@@ -11,8 +11,6 @@ pub async fn vapid(
     _user_state: UserState,
     State(vapid_pub_key): State<VapidPubKey>,
 ) -> Result<Json<VapidResponse>, ServerError<Nothing>> {
-    let vapid_response = VapidResponse {
-        key: vapid_pub_key.into(),
-    };
+    let vapid_response = VapidResponse { key: vapid_pub_key.into() };
     Ok(Json(vapid_response))
 }

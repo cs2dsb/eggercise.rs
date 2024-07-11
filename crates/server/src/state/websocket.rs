@@ -12,14 +12,14 @@ use shared::model::UserId;
 use crate::AppState;
 
 #[derive(Debug)]
-pub enum Message {}
+pub enum ClientControlMessage {}
 
 type ClientKey = (UserId, SocketAddr);
 
 #[derive(Debug)]
 pub struct Client {
     key: ClientKey,
-    sender: Sender<Message>,
+    sender: Sender<ClientControlMessage>,
 }
 
 impl Client {
@@ -27,14 +27,18 @@ impl Client {
         &self.key
     }
 
-    pub fn new(user_id: UserId, socket_address: SocketAddr, sender: Sender<Message>) -> Self {
-        Self {
-            key: (user_id, socket_address),
-            sender,
-        }
+    pub fn new(
+        user_id: UserId,
+        socket_address: SocketAddr,
+        sender: Sender<ClientControlMessage>,
+    ) -> Self {
+        Self { key: (user_id, socket_address), sender }
     }
 
-    pub async fn send(&self, msg: Message) -> Result<(), loole::SendError<Message>> {
+    pub async fn send(
+        &self,
+        msg: ClientControlMessage,
+    ) -> Result<(), loole::SendError<ClientControlMessage>> {
         self.sender.send_async(msg).await
     }
 }
@@ -78,6 +82,7 @@ where
     Clients: FromRef<S>,
 {
     type Rejection = (StatusCode, String);
+
     async fn from_request_parts(_parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
         Ok(Clients::from_ref(state).into())
     }

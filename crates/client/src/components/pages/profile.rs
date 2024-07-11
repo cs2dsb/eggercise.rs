@@ -37,12 +37,12 @@ fn ProfileWithUser(
                 Ok(tl) => {
                     set_temporary_login_error.update(|e| *e = None);
                     update_action.dispatch((user.get().unwrap(), tl))
-                }
+                },
                 Err(err) => {
                     let msg = format!("{:?}", err);
                     warn!("Error creating temporary login: {msg}");
                     set_temporary_login_error.update(|e| *e = Some(msg));
-                }
+                },
             }
 
             set_wait_for_response.update(|w| *w = false);
@@ -58,13 +58,13 @@ fn ProfileWithUser(
                 Ok(_) => {
                     set_add_key_success.update(|v| *v = Some("Key added successfully".to_string()));
                     set_add_key_error.update(|e| *e = None);
-                }
+                },
                 Err(err) => {
                     let msg = format!("{:?}", err);
                     warn!("Error adding key: {msg}");
                     set_add_key_success.update(|v| *v = None);
                     set_add_key_error.update(|e| *e = Some(msg));
-                }
+                },
             }
 
             set_wait_for_response.update(|w| *w = false);

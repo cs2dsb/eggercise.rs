@@ -11,6 +11,7 @@ impl VapidPubKey {
     pub fn bytes(&self) -> &[u8] {
         &self.0
     }
+
     pub fn cursor(&self) -> Cursor<&[u8]> {
         Cursor::new(self.bytes())
     }
@@ -34,6 +35,7 @@ impl VapidPrivateKey {
     pub fn bytes(&self) -> &[u8] {
         &self.0
     }
+
     pub fn cursor(&self) -> Cursor<&[u8]> {
         Cursor::new(self.bytes())
     }

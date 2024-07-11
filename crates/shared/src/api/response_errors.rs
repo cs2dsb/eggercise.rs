@@ -1,10 +1,8 @@
 use serde::{Deserialize, Serialize};
-use thiserror::Error;
-#[cfg(feature = "backend")]
-use {crate::api::error::ServerError, http::StatusCode};
 
 use super::error::Nothing;
 
+#[macro_export]
 macro_rules! response_error {
     ($name:ident {
         $(
@@ -14,7 +12,7 @@ macro_rules! response_error {
         ,)*
     }) => {
 
-        #[derive(Debug, Clone, Serialize, Deserialize, Error)]
+        #[derive(Debug, Clone, Serialize, Deserialize, thiserror::Error)]
         pub enum $name {
             $(
                 #[error("{}::{}: {:?}", stringify!($name), stringify!($variant), self)]
@@ -25,7 +23,7 @@ macro_rules! response_error {
         }
 
         #[cfg(feature="backend")]
-        impl From<$name> for ServerError<$name> {
+        impl From<$name> for $crate::api::error::ServerError<$name> {
             fn from(inner: $name) -> Self {
                 let code = match &inner {
                     $( $name::$variant { .. } => $variant_code, )*
@@ -37,18 +35,18 @@ macro_rules! response_error {
 }
 
 response_error!(RegisterError {
-    #[code(StatusCode::UNAUTHORIZED)]
+    #[code(http::StatusCode::UNAUTHORIZED)]
     UsernameUnavailable,
-    #[code(StatusCode::BAD_REQUEST)]
+    #[code(http::StatusCode::BAD_REQUEST)]
     UsernameInvalid { message: String },
 });
 
 response_error!(LoginError {
-    #[code(StatusCode::UNAUTHORIZED)]
+    #[code(http::StatusCode::UNAUTHORIZED)]
     UsernameDoesntExist,
-    #[code(StatusCode::BAD_REQUEST)]
+    #[code(http::StatusCode::BAD_REQUEST)]
     UsernameInvalid { message: String },
-    #[code(StatusCode::INTERNAL_SERVER_ERROR)]
+    #[code(http::StatusCode::INTERNAL_SERVER_ERROR)]
     UserHasNoCredentials,
 });
 
@@ -57,6 +55,6 @@ response_error!(LoginError {
 pub type FetchError = Nothing;
 
 response_error!(TemporaryLoginError {
-    #[code(StatusCode::BAD_REQUEST)]
+    #[code(http::StatusCode::BAD_REQUEST)]
     AlreadyExists,
 });

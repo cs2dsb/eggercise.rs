@@ -30,7 +30,7 @@ pub async fn fetch_user(
                     } else {
                         Some(tl)
                     }
-                }
+                },
             };
 
             Ok::<_, ServerError<_>>((user, temporary_login))
@@ -60,21 +60,16 @@ pub async fn create_temporary_login(
             let expiry_date = Utc::now() + Duration::from_mins(args.temporary_login_expiry_minutes);
             let url = format!(
                 "{}{}",
-                args.webauthn_origin,
-                Auth::TemporaryLogin
-                    .path()
-                    .replace(":id", &id.hyphenated().to_string())
+                args.origin,
+                Auth::TemporaryLogin.path().replace(":id", &id.hyphenated().to_string())
             );
 
-            let temporary_login = TemporaryLogin::create(
-                conn,
-                TemporaryLogin {
-                    id,
-                    user_id: (*user_state.id).clone(),
-                    expiry_date,
-                    url,
-                },
-            )?;
+            let temporary_login = TemporaryLogin::create(conn, TemporaryLogin {
+                id,
+                user_id: (*user_state.id).clone(),
+                expiry_date,
+                url,
+            })?;
 
             Ok::<_, ServerError<_>>(temporary_login)
         })

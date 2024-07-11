@@ -6,7 +6,7 @@ use std::{
     fmt::{Debug, Display},
 };
 
-use gloo_net::http::{Method, RequestBuilder, Response};
+use gloo::net::http::{Method, RequestBuilder, Response};
 use headers::{CacheControl, Header};
 use http::header::{self, ACCEPT, CACHE_CONTROL};
 use mime::APPLICATION_JSON;
@@ -37,9 +37,7 @@ fn no_cache(builder: RequestBuilder) -> RequestBuilder {
     let mut headers = Vec::with_capacity(1);
     cc.encode(&mut headers);
 
-    let value = headers
-        .pop()
-        .expect("CacheControl::encode should be infallible...");
+    let value = headers.pop().expect("CacheControl::encode should be infallible...");
     let str = value.to_str().expect("CacheControl::encode valid str");
 
     builder.header(CACHE_CONTROL.as_str(), str)
@@ -66,10 +64,7 @@ where
     let method = &method;
     for retry in 0..=FETCH_RETRIES {
         // Check the body is valid
-        debug!(
-            "json_request({method}, {url}, body type: {})",
-            type_name::<B>()
-        );
+        debug!("json_request({method}, {url}, body type: {})", type_name::<B>());
 
         if let Some(body) = body {
             debug!("json_request::body::validate");
@@ -120,19 +115,15 @@ where
 
             // Check the content-type is what we're expecting
             let content_type = response.content_type();
-            let is_json = content_type
-                .as_ref()
-                .map_or(false, |v| v == mime::APPLICATION_JSON.essence_str());
+            let is_json =
+                content_type.as_ref().map_or(false, |v| v == mime::APPLICATION_JSON.essence_str());
             debug!("json_request::response::is_json: {is_json}");
 
             // Handle non-json errors (this isn't to allow the api to return other things,
             // it's only to handle errors)
             if !is_json {
-                let body = response
-                    .text()
-                    .await
-                    .map_err(FrontendError::from)
-                    .with_context(|| {
+                let body =
+                    response.text().await.map_err(FrontendError::from).with_context(|| {
                         format!("Extracting response body as text from {method} {url}")
                     })?;
 
@@ -160,22 +151,14 @@ where
                         )
                     })?;
 
-                Err(FrontendError::Inner {
-                    inner: err,
-                })?;
+                Err(FrontendError::Inner { inner: err })?;
             }
 
             // Deserialize the ok type
             debug!("json_request::deserialize");
-            let payload = response
-                .json::<R>()
-                .await
-                .map_err(FrontendError::from)
-                .with_context(|| {
-                    format!(
-                        "Deserializing OK response ({}) from {method} {url}",
-                        type_name::<E>()
-                    )
+            let payload =
+                response.json::<R>().await.map_err(FrontendError::from).with_context(|| {
+                    format!("Deserializing OK response ({}) from {method} {url}", type_name::<E>())
                 })?;
 
             debug!("json_request::return Ok::<{}>", type_name::<R>());
@@ -267,11 +250,8 @@ where
                 // Handle non-json errors (this isn't to allow the api to return other things,
                 // it's only to handle errors)
                 if !is_json {
-                    let body = response
-                        .text()
-                        .await
-                        .map_err(FrontendError::from)
-                        .with_context(|| {
+                    let body =
+                        response.text().await.map_err(FrontendError::from).with_context(|| {
                             format!("Extracting response body as text from {method} {url}")
                         })?;
 
@@ -297,9 +277,7 @@ where
                         )
                     })?;
 
-                Err(FrontendError::Inner {
-                    inner: err,
-                })?;
+                Err(FrontendError::Inner { inner: err })?;
             }
 
             debug!("simple_request::return Ok::<Response>");

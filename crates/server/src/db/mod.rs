@@ -40,11 +40,9 @@ fn sqlite_log_callback(sqlite_code: c_int, msg: &str) {
 }
 
 pub fn get_migrations() -> Result<Migrations<'static>, ServerError<Nothing>> {
-    Ok(
-        Migrations::from_directory(&MIGRATIONS_DIR).map_err(|e| ServerError::Other {
-            message: format!("Migrations::from_directory: {:?}", e),
-        })?,
-    )
+    Ok(Migrations::from_directory(&MIGRATIONS_DIR).map_err(|e| ServerError::Other {
+        message: format!("Migrations::from_directory: {:?}", e),
+    })?)
 }
 
 #[instrument(skip(conn))]
@@ -97,11 +95,15 @@ pub fn run_migrations(
     let ran = {
         let _span = span!(Level::INFO, "Running migrations").entered();
 
-        let initial_version: usize = match migrations.current_version(&conn)
-            .map_err(|e| other_error!("Migrations::current_version: {:?}", e))? 
+        let initial_version: usize = match migrations
+            .current_version(&conn)
+            .map_err(|e| other_error!("Migrations::current_version: {:?}", e))?
         {
             SchemaVersion::Inside(n) => Ok(n.into()),
-            SchemaVersion::Outside(n) => Err(other_error!("Schema version {n} is outside of known schema migrations. Manual intervention required")),
+            SchemaVersion::Outside(n) => Err(other_error!(
+                "Schema version {n} is outside of known schema migrations. Manual intervention \
+                 required"
+            )),
             SchemaVersion::NoneSet => Ok(0),
         }?;
 
@@ -109,11 +111,15 @@ pub fn run_migrations(
             .to_latest(&mut conn)
             .map_err(|e| other_error!("Migrations::to_latest: {:?}", e))?;
 
-        let final_version: usize = match migrations.current_version(&conn)
-            .map_err(|e| other_error!("Migrations::current_version: {:?}", e))? 
+        let final_version: usize = match migrations
+            .current_version(&conn)
+            .map_err(|e| other_error!("Migrations::current_version: {:?}", e))?
         {
             SchemaVersion::Inside(n) => Ok(n.into()),
-            SchemaVersion::Outside(n) => Err(other_error!("Schema version {n} is outside of known schema migrations. Manual intervention required")),
+            SchemaVersion::Outside(n) => Err(other_error!(
+                "Schema version {n} is outside of known schema migrations. Manual intervention \
+                 required"
+            )),
             SchemaVersion::NoneSet => Ok(0),
         }?;
 
@@ -129,12 +135,7 @@ pub fn run_migrations(
             // If this is the first version, it's automatically newer
             .unwrap_or(Ok(Ordering::Less))
             .map_err(|e| {
-                other_error!(
-                    "Comparing {:?} to {}: {:?}",
-                    previous_version,
-                    current_version,
-                    e
-                )
+                other_error!("Comparing {:?} to {}: {:?}", previous_version, current_version, e)
             })?;
 
     let new_version = if newer {

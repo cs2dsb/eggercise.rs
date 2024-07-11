@@ -13,14 +13,14 @@ leptos.workspace = true
 leptos_router.workspace = true
 console_error_panic_hook.workspace = true
 thiserror.workspace = true
-gloo-net.workspace = true
-gloo-utils.workspace = true
+gloo.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 wasm-bindgen-futures.workspace = true
 wasm-bindgen.workspace = true
 http.workspace = true
 mime.workspace = true
+exponential-backoff.workspace = true
 webauthn-rs-proto = { workspace = true, features = [ "wasm" ] }
 tracing.workspace = true
 tracing-subscriber = { workspace = true, features = [ "time" ] }
@@ -41,6 +41,35 @@ web-sys = { workspace = true, features = [
     "PushSubscription",
     "PushSubscriptionOptionsInit",
     "PushEncryptionKeyName",
+    "RtcPeerConnection",
+    "RtcConfiguration",
+    "RtcDataChannel",
+    "RtcDataChannelInit",
+
+    # TODO: Trim these
+    "RtcAnswerOptions", "RtcBundlePolicy", "RtcCertificate", "RtcCertificateExpiration", 
+    "RtcCodecStats", "RtcConfiguration", "RtcDataChannel", "RtcDataChannelEvent", 
+    "RtcDataChannelEventInit", "RtcDataChannelInit", "RtcDataChannelState", "RtcDataChannelType", 
+    "RtcDegradationPreference", "RtcFecParameters", "RtcIceCandidate", "RtcIceCandidateInit", 
+    "RtcIceCandidatePairStats", "RtcIceCandidateStats", "RtcIceComponentStats", 
+    "RtcIceConnectionState", "RtcIceCredentialType", "RtcIceGatheringState", "RtcIceServer", 
+    "RtcIceTransportPolicy", "RtcIdentityAssertion", "RtcIdentityAssertionResult", 
+    "RtcIdentityProvider", "RtcIdentityProviderDetails", "RtcIdentityProviderOptions", 
+    "RtcIdentityProviderRegistrar", "RtcIdentityValidationResult", "RtcInboundRtpStreamStats", 
+    "RtcMediaStreamStats", "RtcMediaStreamTrackStats", "RtcOfferAnswerOptions", "RtcOfferOptions", 
+    "RtcOutboundRtpStreamStats", "RtcPeerConnection", "RtcPeerConnectionIceErrorEvent", 
+    "RtcPeerConnectionIceEvent", "RtcPeerConnectionIceEventInit", "RtcPeerConnectionState", 
+    "RtcPriorityType", "RtcRtcpParameters", "RtcRtpCapabilities", "RtcRtpCodecCapability", 
+    "RtcRtpCodecParameters", "RtcRtpContributingSource", "RtcRtpEncodingParameters", 
+    "RtcRtpHeaderExtensionCapability", "RtcRtpHeaderExtensionParameters", "RtcRtpParameters", 
+    "RtcRtpReceiver", "RtcRtpSender", "RtcRtpSourceEntry", "RtcRtpSourceEntryType", 
+    "RtcRtpSynchronizationSource", "RtcRtpTransceiver", "RtcRtpTransceiverDirection", 
+    "RtcRtpTransceiverInit", "RtcRtxParameters", "RtcSdpType", "RtcSessionDescription", 
+    "RtcSessionDescriptionInit", "RtcSignalingState", "RtcStats", "RtcStatsIceCandidatePairState", 
+    "RtcStatsIceCandidateType", "RtcStatsReport", "RtcStatsReportInternal", "RtcStatsType", 
+    "RtcTrackEvent", "RtcTrackEventInit", "RtcTransportStats", "RtcdtmfSender", 
+    "RtcdtmfToneChangeEvent", "RtcdtmfToneChangeEventInit", "RtcrtpContributingSourceStats", 
+    "RtcrtpStreamStats",
 ] }
 
 shared = { path = "../shared", features = [ "wasm" ] }

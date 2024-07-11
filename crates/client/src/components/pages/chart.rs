@@ -38,15 +38,7 @@ pub fn EquationForm(equation: RwSignal<String>) -> impl IntoView {
 fn get_vars(expr: &meval::Expr) -> Vec<String> {
     use meval::tokenizer::Token;
 
-    expr.iter()
-        .filter_map(|t| {
-            if let Token::Var(v) = t {
-                Some(v.clone())
-            } else {
-                None
-            }
-        })
-        .collect()
+    expr.iter().filter_map(|t| if let Token::Var(v) = t { Some(v.clone()) } else { None }).collect()
 }
 // TODO: rejig so binds are in the data entry form
 #[component]
@@ -152,10 +144,7 @@ pub struct MyData {
 
 impl MyData {
     fn new(x: f64, y: Vec<f64>) -> Self {
-        Self {
-            x,
-            y,
-        }
+        Self { x, y }
     }
 }
 
@@ -190,9 +179,7 @@ pub fn Chart() -> impl IntoView {
         let mut data = Vec::new();
         for x in 0..10 {
             let x = vec![x as f64];
-            let ys = vec![bind(
-                &x.iter().cycle().take(x_count).cloned().collect::<Vec<_>>(),
-            )];
+            let ys = vec![bind(&x.iter().cycle().take(x_count).cloned().collect::<Vec<_>>())];
             data.push(MyData::new(x[0], ys));
         }
         data

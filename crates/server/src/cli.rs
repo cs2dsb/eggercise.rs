@@ -25,13 +25,9 @@ pub struct Cli {
     #[clap(long, env, default_value = "false")]
     pub secure_sessions: bool,
 
-    /// Origin url for Webauthn
+    /// Origin url
     #[arg(long, env, default_value = "http://localhost:8080")]
-    pub webauthn_origin: String,
-
-    /// Origin url for CORS
-    #[arg(long, env, default_value = "http://localhost:8080")]
-    pub cors_origin: String,
+    pub origin: String,
 
     /// Webauthn ID needs to match the domain
     #[arg(long, env, default_value = "localhost")]
