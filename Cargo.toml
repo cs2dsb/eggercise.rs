@@ -103,3 +103,5 @@ headers = "0.4.0"
 dashmap = "6.0.1"
 
 just-webrtc = "0.1.1"
+
+exponential-backoff = "1.2.0"

@@ -817,6 +817,7 @@ dependencies = [
  "asciimath-rs",
  "chrono",
  "console_error_panic_hook",
+ "exponential-backoff",
  "futures",
  "gloo",
  "http 1.1.0",
@@ -1596,6 +1597,15 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.66",
+]
+
+[[package]]
+name = "exponential-backoff"
+version = "1.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "47f78d87d930eee4b5686a2ab032de499c72bd1e954b84262bb03492a0f932cd"
+dependencies = [
+ "rand",
 ]
 
 [[package]]
