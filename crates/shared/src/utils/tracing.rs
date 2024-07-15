@@ -16,9 +16,8 @@ pub fn configure_tracing() {
         .with_writer(MakeWebConsoleWriter::new()); // write events to the console
     let perf_layer = performance_layer().with_details_from_fields(Pretty::default());
 
-    tracing_subscriber::registry().with(fmt_layer).with(perf_layer).init(); // Install these as
-                                                                            // subscribers to
-                                                                            // tracing events
+    // Install these as subscribers to tracing events
+    tracing_subscriber::registry().with(fmt_layer).with(perf_layer).init();
 }
 
 /// Configures tracing inside a Once block so multiple calls don't panic

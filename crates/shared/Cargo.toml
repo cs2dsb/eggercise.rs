@@ -33,6 +33,7 @@ wasm = [
     "tracing-subscriber/time",
     "serde_json",
     "headers",
+    "reconnecting-websocket",
 
     "sea-query-enum",
     
@@ -68,6 +69,7 @@ paste.workspace = true
 just-webrtc.workspace = true
 dashmap.workspace = true
 
+reconnecting-websocket = { workspace = true, optional = true }
 wasm-bindgen-futures = { workspace = true, optional = true }
 mime = { workspace = true, optional = true }
 anyhow = { workspace = true, optional = true }

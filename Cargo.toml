@@ -104,4 +104,4 @@ dashmap = "6.0.1"
 
 just-webrtc = "0.1.1"
 
-exponential-backoff = "1.2.0"
+reconnecting-websocket = "0.3.0"

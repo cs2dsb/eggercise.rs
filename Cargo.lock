@@ -817,7 +817,6 @@ dependencies = [
  "asciimath-rs",
  "chrono",
  "console_error_panic_hook",
- "exponential-backoff",
  "futures",
  "gloo",
  "http 1.1.0",
@@ -827,6 +826,7 @@ dependencies = [
  "leptos_router",
  "meval",
  "mime",
+ "reconnecting-websocket",
  "sea-query",
  "serde",
  "serde_json",
@@ -1927,6 +1927,7 @@ version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "97563d71863fb2824b2e974e754a81d19c4a7ec47b09ced8a0e6656b6d54bd1f"
 dependencies = [
+ "futures-channel",
  "gloo-events",
  "js-sys",
  "wasm-bindgen",
@@ -3858,6 +3859,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "reconnecting-websocket"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "11bfcff4406aef0b5ff4b3a94ba2c4abb2e9812b4c2776b9af63d0ec335e487d"
+dependencies = [
+ "cfg-if",
+ "exponential-backoff",
+ "futures",
+ "getrandom",
+ "gloo",
+ "thiserror",
+ "tracing",
+ "wasm-bindgen-futures",
+ "web-sys",
+]
+
+[[package]]
 name = "redox_syscall"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4611,6 +4629,7 @@ dependencies = [
  "mime",
  "paste",
  "percent-encoding",
+ "reconnecting-websocket",
  "rusqlite",
  "sea-query",
  "sea-query-rusqlite",
