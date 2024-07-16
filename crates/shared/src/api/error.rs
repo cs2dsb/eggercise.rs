@@ -33,6 +33,7 @@ mod frontend {
     };
 
     use leptos::{view, IntoView};
+    use reconnecting_websocket::Error as ReconnectingWebsocketError;
     use thiserror::Error;
     use tracing::{error, warn};
     use wasm_bindgen::{JsCast, JsValue};
@@ -51,7 +52,10 @@ mod frontend {
     };
 
     use super::{ErrorContext, Nothing, ValidationError, WrongContentTypeError};
-    use crate::rtc::Error as RtcError;
+    use crate::{
+        rtc::Error as RtcError,
+        types::websocket::{ClientMessage, MessageError, ServerMessage},
+    };
 
     #[derive(Debug, Clone, Error)]
     pub enum JsError {
@@ -181,6 +185,8 @@ mod frontend {
         #[error("{inner}")]
         Rtc { inner: RtcError },
         #[error("{message}")]
+        WebSocket { message: String },
+        #[error("{message}")]
         Other { message: String },
         #[error("{inner}")]
         WrongContentType { inner: WrongContentTypeError },
@@ -191,6 +197,35 @@ mod frontend {
     impl<T: Display> FrontendError<T> {
         pub fn map_display(inner: T) -> Self {
             Self::Inner { inner }
+        }
+    }
+
+    impl<T: Display> From<MessageError> for FrontendError<T> {
+        fn from(value: MessageError) -> Self {
+            use MessageError::*;
+            match value {
+                SocketClosed { clean_exit } => {
+                    Self::WebSocket { message: format!("Socket closed, clean: {clean_exit}") }
+                },
+                Json(e) => e.into(),
+                Js(inner) => Self::Js { inner },
+                Other(message) => Self::Other { message },
+            }
+        }
+    }
+
+    impl<T: Display> From<ReconnectingWebsocketError<ClientMessage, ServerMessage>>
+        for FrontendError<T>
+    {
+        fn from(value: ReconnectingWebsocketError<ClientMessage, ServerMessage>) -> Self {
+            use ReconnectingWebsocketError::*;
+            match value {
+                WebSocketError(e) => Self::WebSocket { message: e.to_string() },
+                JsError(e) => e.into(),
+                InvalidConfig(message) => Self::Other { message },
+                InputError(e) => FrontendError::from(e).context("InputError"),
+                OutputError(e) => FrontendError::from(e).context("OutputError"),
+            }
         }
     }
 
@@ -285,6 +320,7 @@ mod frontend {
                 },
                 Json { message } => view! { <li>{ message }</li> }.into_view(),
                 Rtc { inner } => view! { <li>{ inner.to_string() }</li> }.into_view(),
+                WebSocket { message } => view! { <li>{ message }</li> }.into_view(),
                 Other { message } => view! { <li>{ message }</li> }.into_view(),
                 WrongContentType { inner: WrongContentTypeError { expected, got, body } } => {
                     view! { <li>{ format!("WrongContentTypeError:\nExpected: {expected}\nGot:{:?}\nBody: {body}", got) }</li> }.into_view()

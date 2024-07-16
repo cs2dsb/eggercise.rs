@@ -47,6 +47,8 @@ async fn handle_socket_inner(
     // Allocte a peer ID to this connection
     let peer_id: ServerMessage = PeerId::new().into();
     ws_sender.send(WSMessage::try_from(peer_id)?).await?;
+    // TODO: Server send regular pings
+    ws_sender.send(WSMessage::Ping("ping".as_bytes().into())).await?;
 
     loop {
         tokio::select! {

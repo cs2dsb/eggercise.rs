@@ -76,13 +76,13 @@ impl TryFrom<ServerMessage> for axum::extract::ws::Message {
 }
 
 #[cfg(feature = "wasm")]
-impl TryFrom<&WebSocketMessage> for ServerMessage {
+impl TryFrom<WebSocketMessage> for ServerMessage {
     type Error = MessageError;
 
-    fn try_from(message: &WebSocketMessage) -> Result<Self, Self::Error> {
+    fn try_from(message: WebSocketMessage) -> Result<Self, Self::Error> {
         match message {
-            WebSocketMessage::Text(text) => Ok(serde_json::from_str(text)?),
-            WebSocketMessage::Bytes(bytes) => Ok(serde_json::from_slice(bytes)?),
+            WebSocketMessage::Text(text) => Ok(serde_json::from_str(&text)?),
+            WebSocketMessage::Bytes(bytes) => Ok(serde_json::from_slice(&bytes)?),
         }
     }
 }
@@ -109,11 +109,11 @@ impl From<RoomId> for ClientMessage {
 }
 
 #[cfg(feature = "wasm")]
-impl TryInto<WebSocketMessage> for ClientMessage {
+impl TryFrom<ClientMessage> for WebSocketMessage {
     type Error = MessageError;
 
-    fn try_into(self) -> Result<WebSocketMessage, Self::Error> {
-        let payload = serde_json::to_vec(&self)?;
+    fn try_from(message: ClientMessage) -> Result<WebSocketMessage, Self::Error> {
+        let payload = serde_json::to_vec(&message)?;
         Ok(WebSocketMessage::Bytes(payload))
     }
 }
