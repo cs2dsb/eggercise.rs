@@ -1,4 +1,4 @@
-use std::{net::SocketAddr, sync::Arc};
+use std::sync::Arc;
 
 use axum::{
     async_trait,
@@ -7,16 +7,21 @@ use axum::{
 };
 use dashmap::DashMap;
 use loole::Sender;
-use shared::model::UserId;
+use shared::types::{rtc::PeerId, websocket::Offer};
 
-use crate::AppState;
-
-#[derive(Debug)]
-pub enum ClientControlMessage {}
-
-type ClientKey = (UserId, SocketAddr);
+use crate::{AppState, PeerIdState, UserState};
 
 #[derive(Debug)]
+pub enum ClientControlMessage {
+    Login(UserState),
+    Logout,
+    RtcOffer { offer: Offer, peer: PeerId },
+    RtcAnswer { answer: Offer, peer: PeerId },
+}
+
+type ClientKey = PeerId;
+
+#[derive(Debug, Clone)]
 pub struct Client {
     key: ClientKey,
     sender: Sender<ClientControlMessage>,
@@ -27,12 +32,8 @@ impl Client {
         &self.key
     }
 
-    pub fn new(
-        user_id: UserId,
-        socket_address: SocketAddr,
-        sender: Sender<ClientControlMessage>,
-    ) -> Self {
-        Self { key: (user_id, socket_address), sender }
+    pub fn new(key: ClientKey, sender: Sender<ClientControlMessage>) -> Self {
+        Self { key, sender }
     }
 
     pub async fn send(
@@ -51,6 +52,14 @@ pub struct Clients(Arc<ClientMap>);
 impl Clients {
     pub fn add(&self, client: Client) -> Option<Client> {
         self.0.insert(client.key().clone(), client)
+    }
+
+    pub fn get(&self, key: &ClientKey) -> Option<Client> {
+        self.0.get(key).map(|v| v.value().clone())
+    }
+
+    pub fn remove(&self, key: &ClientKey) -> Option<Client> {
+        self.0.remove(key).map(|v| v.1)
     }
 
     pub fn call_with<F, E>(&self, key: &ClientKey, f: F) -> Result<(), E>
@@ -84,6 +93,29 @@ where
     type Rejection = (StatusCode, String);
 
     async fn from_request_parts(_parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
-        Ok(Clients::from_ref(state).into())
+        Ok(Clients::from_ref(state))
+    }
+}
+
+#[async_trait]
+impl<S> FromRequestParts<S> for Client
+where
+    S: Send + Sync,
+    Clients: FromRef<S>,
+{
+    type Rejection = (StatusCode, String);
+
+    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
+        let peer_id_state = PeerIdState::from_request_parts(parts, state).await?;
+        let clients = Clients::from_ref(state);
+
+        let client = clients.get(&*peer_id_state).ok_or_else(|| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to find client for peer_id: {peer_id_state:?}"),
+            )
+        })?;
+
+        Ok(client)
     }
 }

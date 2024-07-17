@@ -34,6 +34,7 @@ wasm = [
     "serde_json",
     "headers",
     "reconnecting-websocket",
+    "futures",
 
     "sea-query-enum",
     
@@ -69,6 +70,7 @@ paste.workspace = true
 just-webrtc.workspace = true
 dashmap.workspace = true
 
+futures = { workspace = true, optional = true }
 reconnecting-websocket = { workspace = true, optional = true }
 wasm-bindgen-futures = { workspace = true, optional = true }
 mime = { workspace = true, optional = true }

@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use deadpool_sqlite::Pool;
 
-use super::rtc::{PeerConnectorState, PeerMapState, SignallingClientState};
+use super::rtc::RtcRoomState;
 use crate::{
     cli::Cli,
     state::{VapidPrivateKey, VapidPubKey},
@@ -17,7 +17,5 @@ pub struct AppState {
     pub vapid_pub_key: VapidPubKey,
     pub vapid_private_key: VapidPrivateKey,
     pub websocket_clients: Clients,
-    pub rtc_connector: PeerConnectorState,
-    pub rtc_peers: PeerMapState,
-    pub rtc_signalling_client: SignallingClientState,
+    pub rtc_room_state: RtcRoomState,
 }

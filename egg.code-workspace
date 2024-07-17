@@ -5,7 +5,7 @@
 			"path": "."
 		},
 		{
-			"path": "../reconnecting-websocket"
+			"path": "../just-webrtc"
 		}
 	],
 	"settings": {

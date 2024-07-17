@@ -6,14 +6,19 @@ use shared::{
     model::{Credential, User},
     unauthorized_error,
 };
+use tracing::error;
 use webauthn_rs::prelude::PublicKeyCredential;
 
-use crate::{db::DatabaseConnection, PasskeyAuthenticationState, SessionValue, Webauthn};
+use crate::{
+    db::DatabaseConnection, Client, ClientControlMessage, PasskeyAuthenticationState, SessionValue,
+    Webauthn,
+};
 
 pub async fn login_finish(
     DatabaseConnection(conn): DatabaseConnection,
     webauthn: Webauthn,
     mut session: SessionValue,
+    client: Option<Client>,
     Json(public_key_credential): Json<PublicKeyCredential>,
 ) -> Result<Json<User>, ServerError<Nothing>> {
     // Get the challenge from the session
@@ -90,9 +95,15 @@ pub async fn login_finish(
         })
         .await??;
 
-    // Update the user state in the session so the user is logged in on furture
+    // Update the user state in the session so the user is logged in on future
     // requests
     session.set_user_state(&user).await?;
+
+    if let Some(client) = client {
+        if let Err(e) = client.send(ClientControlMessage::Login((&user).into())).await {
+            error!("Error sending ClientControlMessage for user {user:?}: {e:?}");
+        }
+    }
 
     Ok(Json(user))
 }

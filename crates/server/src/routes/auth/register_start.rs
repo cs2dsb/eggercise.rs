@@ -13,9 +13,11 @@ pub async fn register_start(
     mut session: SessionValue,
     Json(reg_user): Json<RegistrationUser>,
 ) -> Result<Json<CreationChallengeResponse>, ServerError<RegisterError>> {
-    // Remove the existing challenge
-    // session.take_passkey_registration_state().await?;
+    // Remove the existing challenge``
     session.take_passkey_registration_state().await?;
+
+    // Remove the existing user
+    session.take_user_state().await?;
 
     if reg_user.username.len() < 4 {
         Err(RegisterError::UsernameInvalid {

@@ -47,10 +47,6 @@ use shared::{
     },
     configure_tracing, load_dotenv,
     model::{PushNotificationSubscription, User},
-    rtc::{
-        peer_connector::Connector as _, signalling_client::Client as _, Builder as _,
-        PeerConnector, SignallingClient,
-    },
 };
 use tokio::net::TcpListener;
 use tower::ServiceBuilder;
@@ -146,9 +142,6 @@ async fn main() -> Result<(), anyhow::Error> {
     let notifier_db_connection = pool.get().await?;
     let notifier_private_key = vapid_private_key.clone();
 
-    let rtc_connector = PeerConnector::with_base(&args.origin).build()?;
-    let rtc_signalling_client = SignallingClient::new().build()?.into();
-
     let state = AppState {
         pool,
         webauthn,
@@ -156,9 +149,7 @@ async fn main() -> Result<(), anyhow::Error> {
         vapid_pub_key,
         vapid_private_key,
         websocket_clients: Default::default(),
-        rtc_connector: rtc_connector.into(),
-        rtc_peers: Default::default(),
-        rtc_signalling_client,
+        rtc_room_state: Default::default(),
     };
 
     // Map all routes the client can handle to the index.html

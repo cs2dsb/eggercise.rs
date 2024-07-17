@@ -1,4 +1,4 @@
-use leptos::{component, use_context, view, IntoView, Resource, SignalWith};
+use leptos::{component, use_context, view, For, IntoView, Resource, SignalWith};
 
 // use shared::model::{
 //     Exercise, ExerciseGroup, ExerciseGroupMember, Plan, PlanExerciseGroup,
@@ -7,7 +7,7 @@ use leptos::{component, use_context, view, IntoView, Resource, SignalWith};
 use crate::{
     // components::ModelList,
     db::migrations::{DatabaseVersion, MigrationError},
-    utils::websocket::Websocket,
+    utils::{rtc::Rtc, websocket::Websocket},
 };
 
 #[component]
@@ -19,13 +19,28 @@ pub fn Debug() -> impl IntoView {
     let status = ws.status_signal();
     let message = ws.message_signal();
 
+    let rtc_peer_signal = Rtc::peers_signal();
+
     view! {
         <h1>"Debug"</h1>
         <p>"Database Version: " { move || db_version
             .and_then(|v| v.into_view())
         }</p>
-        <p>"Websocket status: " { move ||  format!("{:?}", status()) }</p>
-        <p>"Websocket message: " { move ||  message.with(|v| format!("{:?}", v)) }</p>
+        <p>"Websocket status: " { move ||  status.with(|v| view! { {format!("{v:?}")} }) }</p>
+        <p>"Rtc peers: " { move || view! {
+            <For
+                each=move || rtc_peer_signal.with(|v| v.iter().enumerate().map(|(i, v)| (i, format!("{:?}", v))).collect::<Vec<_>>())
+                key=|v| v.0
+                children=move |v| view! { <p> { v.1 } </p> }
+            />
+        }}</p>
+        <p>"Websocket messages: " { move ||  view! {
+            <For
+                each=move || message.with(|v| v.iter().enumerate().map(|(i, v)| (i, format!("{:?}", v))).collect::<Vec<_>>())
+                key=|v| v.0
+                children=move |v| view! { <p> { v.1 } </p> }
+            />
+        }}</p>
     }
     // <ModelList<User> />
     // <ModelList<Exercise> />

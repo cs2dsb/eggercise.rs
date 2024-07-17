@@ -1,4 +1,4 @@
-use std::{error::Error, fmt::Display};
+use std::{error::Error, fmt::Display, ops::Deref};
 
 use axum::{
     async_trait,
@@ -13,12 +13,16 @@ use axum::{
 };
 use futures::TryFutureExt;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use shared::{
     api::error::{Nothing, ResultContext, ServerError},
     model::{User, UserId},
-    types::Uuid,
+    types::{rtc::PeerId, Uuid},
 };
-use tower_sessions::{session::Error as SessionError, Session};
+use tower_sessions::{
+    session::{Error as SessionError, Id},
+    Session,
+};
 use tracing::error;
 use webauthn_rs::prelude::{PasskeyAuthentication, PasskeyRegistration};
 
@@ -58,11 +62,34 @@ impl From<&User> for UserState {
     }
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, Hash)]
+pub struct SessionId {
+    pub id: Id,
+}
+
+impl From<Id> for SessionId {
+    fn from(id: Id) -> Self {
+        Self { id }
+    }
+}
+
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct PeerIdState(PeerId);
+
+impl Deref for PeerIdState {
+    type Target = PeerId;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 struct SessionData {
     passkey_registration_state: Option<PasskeyRegistrationState>,
     passkey_authentication_state: Option<PasskeyAuthenticationState>,
     user_state: Option<UserState>,
+    peer_id: PeerIdState,
 }
 
 #[derive(Debug, Clone)]
@@ -120,6 +147,10 @@ impl SessionValue {
         Ok(())
     }
 
+    pub fn session_id(self) -> Option<Id> {
+        self.session.id()
+    }
+
     async fn update_session<T: Error>(
         session: &Session,
         data: &SessionData,
@@ -148,11 +179,61 @@ where
             .await
             .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("{:?}", e)))?;
 
-        let data: SessionData = session
+        let value: Option<serde_json::Value> = session
             .get(Self::SESSION_DATA_KEY)
             .await
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("{:?}", e)))?
+            .map_err(|e| {
+                (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to get SessionValue: {e:?}"))
+            })
             .unwrap_or_default();
+
+        // The purpose of this is to upgrade sessions when new fields are added. It's a bit jankey
+        // but it does work
+        let (data, save) = value
+            .clone()
+            .map(|v| match serde_json::from_value(v) {
+                Ok(v) => (v, false),
+                Err(_) => {
+                    let mut default = SessionData::default();
+
+                    // Safe because we can only get inside map if Some
+                    if let Value::Object(mut v) = value.unwrap() {
+                        if let Some(passkey_registration_state) = v
+                            .remove("passkey_registration_state")
+                            .map(|v| serde_json::from_value(v).ok())
+                            .flatten()
+                        {
+                            default.passkey_registration_state = passkey_registration_state;
+                        }
+                        if let Some(passkey_authentication_state) = v
+                            .remove("passkey_authentication_state")
+                            .map(|v| serde_json::from_value(v).ok())
+                            .flatten()
+                        {
+                            default.passkey_authentication_state = passkey_authentication_state;
+                        }
+                        if let Some(user_state) =
+                            v.remove("user_state").map(|v| serde_json::from_value(v).ok()).flatten()
+                        {
+                            default.user_state = user_state;
+                        }
+                        if let Some(peer_id) =
+                            v.remove("peer_id").map(|v| serde_json::from_value(v).ok()).flatten()
+                        {
+                            default.peer_id = peer_id;
+                        }
+                    }
+
+                    (default, true)
+                },
+            })
+            .unwrap_or_default();
+
+        if save {
+            SessionValue::update_session::<Nothing>(&session, &data).await.map_err(|e| {
+                (StatusCode::INTERNAL_SERVER_ERROR, format!("Failed to update session: {e:?}"))
+            })?;
+        }
 
         Ok(Self { session, data })
     }
@@ -231,5 +312,47 @@ where
         } else {
             Err(not_logged_in!())
         }
+    }
+}
+
+#[async_trait]
+impl<S> FromRequestParts<S> for SessionId
+where
+    S: Send + Sync,
+{
+    type Rejection = (StatusCode, String);
+
+    async fn from_request_parts(req: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
+        let session = Session::from_request_parts(req, state).await.map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to construct Session from_request_parts: {:?}", e),
+            )
+        })?;
+
+        let id = session
+            .id()
+            .ok_or_else(|| (StatusCode::INTERNAL_SERVER_ERROR, format!("Session had None id")))?;
+
+        Ok(id.into())
+    }
+}
+
+#[async_trait]
+impl<S> FromRequestParts<S> for PeerIdState
+where
+    S: Send + Sync,
+{
+    type Rejection = (StatusCode, String);
+
+    async fn from_request_parts(req: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
+        let sv = SessionValue::from_request_parts(req, state).await.map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to construct SessionValue from_request_parts: {:?}", e),
+            )
+        })?;
+
+        Ok(sv.data.peer_id)
     }
 }

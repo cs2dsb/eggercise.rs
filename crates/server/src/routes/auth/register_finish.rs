@@ -4,14 +4,19 @@ use shared::{
     model::NewUserWithPasskey,
     unauthorized_error,
 };
+use tracing::error;
 use webauthn_rs::prelude::RegisterPublicKeyCredential;
 
-use crate::{db::DatabaseConnection, PasskeyRegistrationState, SessionValue, Webauthn};
+use crate::{
+    db::DatabaseConnection, Client, ClientControlMessage, PasskeyRegistrationState, SessionValue,
+    Webauthn,
+};
 
 pub async fn register_finish(
     DatabaseConnection(conn): DatabaseConnection,
     webauthn: Webauthn,
     mut session: SessionValue,
+    client: Option<Client>,
     Json(register_public_key_credential): Json<RegisterPublicKeyCredential>,
 ) -> Result<Json<()>, ServerError<Nothing>> {
     // Get the challenge from the session
@@ -27,7 +32,14 @@ pub async fn register_finish(
 
     // Create the new user with their passkey
     let new_user = NewUserWithPasskey::new(id, username, passkey);
-    conn.interact(move |conn| Ok::<_, ServerError<_>>(new_user.create(conn)?)).await??;
+    let (user, _) =
+        conn.interact(move |conn| Ok::<_, ServerError<_>>(new_user.create(conn)?)).await??;
+
+    if let Some(client) = client {
+        if let Err(e) = client.send(ClientControlMessage::Login((&user).into())).await {
+            error!("Error sending ClientControlMessage for user {user:?}: {e:?}");
+        }
+    }
 
     Ok(Json(()))
 }
