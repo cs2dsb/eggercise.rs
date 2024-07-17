@@ -5,11 +5,11 @@ use axum::{
     http::HeaderMap,
     response::IntoResponse,
 };
-use tracing::{debug, warn};
+use tracing::debug;
 
 use crate::{
     constants::WEBSOCKET_CHANNEL_BOUND, routes::websocket::handle_socket, Client, Clients,
-    PeerConnectorState, PeerMapState, SignallingClientState, UserState,
+    PeerIdState, RtcRoomState, UserState,
 };
 
 pub async fn websocket_handler(
@@ -18,14 +18,13 @@ pub async fn websocket_handler(
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     // If X-Forwarded-* is set use it to override the addr
     headers: HeaderMap,
-    // User has to be logged in and we need their ID
-    user_state: UserState,
+    // Optional user
+    user_state: Option<UserState>,
+    // Peer id allocated as part of session state
+    peer_id: PeerIdState,
     // Map containing all connected clients
     clients: Clients,
-
-    peer_connector: PeerConnectorState,
-    rtc_peers: PeerMapState,
-    peer_signalling_client: SignallingClientState,
+    rtc_room_state: RtcRoomState,
 ) -> impl IntoResponse {
     debug!("Websocket upgrade headers: {:?}", headers);
 
@@ -49,24 +48,14 @@ pub async fn websocket_handler(
 
     let (sender, receiver) = loole::bounded(WEBSOCKET_CHANNEL_BOUND);
 
-    let client = Client::new(user_state.id, socket_addr.clone(), sender);
+    let client = Client::new((*peer_id).clone(), sender);
 
     if let Some(old_client) = clients.add(client) {
-        warn!(
-            "A client with the same user_id & socket address evicted a previous client: {:?}",
-            old_client
-        );
+        debug!("A client with the same key evicted a previous client: {:?}", old_client);
     }
 
     // Complete the upgrade to a websocket
     ws.on_upgrade(move |socket| {
-        handle_socket(
-            socket,
-            socket_addr,
-            receiver,
-            peer_connector,
-            rtc_peers,
-            peer_signalling_client,
-        )
+        handle_socket(socket, socket_addr, user_state, peer_id, receiver, rtc_room_state, clients)
     })
 }

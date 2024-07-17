@@ -294,6 +294,12 @@ mod frontend {
         }
     }
 
+    impl<T: Display> From<futures::channel::mpsc::SendError> for FrontendError<T> {
+        fn from(value: futures::channel::mpsc::SendError) -> Self {
+            Self::Other { message: format!("mpsc::SendError: {value:?}") }
+        }
+    }
+
     impl<T: Display, E: Into<FrontendError<T>>> ErrorContext<FrontendError<T>> for E {
         fn with_context<S: Into<String>, F: FnOnce() -> S>(self, context: F) -> FrontendError<T> {
             self.context(context())

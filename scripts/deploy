@@ -33,8 +33,15 @@ fi
 
 if grep -rn "allow(unused" --include \*.rs crates/; then 
     warn "allow(unused..) found"
-    read -r -p "Continue? [Y/n]" response
+
+    if [ "${1:-}" == "-y" ]; then 
+        response="y"
+    else 
+        read -r -p "Continue? [Y/n]" response
+    fi
+    
     response=${response,,}    # tolower
+    
     if ! [[ "$response" =~ ^(yes|y|)$ ]]; then
         die "Aborting";
     fi

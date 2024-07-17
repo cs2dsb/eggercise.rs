@@ -32,7 +32,10 @@ pub async fn start_client(sqlite_promiser: Function) {
     Online::provide_context();
 
     Websocket::provide_context().unwrap();
-    Rtc::provide_context().await.unwrap();
+    let source = Websocket::take_rtc_source().expect("RtcSource missing");
+    let sender = Websocket::get_sender();
+
+    Rtc::provide_context(source, sender).await.unwrap();
 
     mount_to_body(move || {
         view! {

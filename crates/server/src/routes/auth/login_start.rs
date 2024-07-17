@@ -16,6 +16,9 @@ pub async fn login_start(
     // Remove the existing challenge
     session.take_passkey_authentication_state().await?;
 
+    // Remove the existing user
+    session.take_user_state().await?;
+
     if login_user.username.len() < 4 {
         Err(LoginError::UsernameInvalid {
             message: "Username needs to be at least 4 characters".to_string(),
