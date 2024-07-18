@@ -3,7 +3,10 @@ use gloo::net::websocket::Message as WebSocketMessage;
 use serde::{Deserialize, Serialize};
 
 use super::ClientMessage;
-use crate::types::{rtc::PeerId, websocket::Offer};
+use crate::types::{
+    rtc::PeerId,
+    websocket::{IceCandidate, Offer},
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ClientRtc {
@@ -11,6 +14,8 @@ pub enum ClientRtc {
     Offer { offer: Offer, peer: PeerId },
     /// Answer to an offer
     Answer { answer: Offer, peer: PeerId },
+    /// An ice candidate
+    IceCandidate { candidate: IceCandidate, peer: PeerId },
 }
 
 impl From<ClientRtc> for ClientMessage {

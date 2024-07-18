@@ -106,6 +106,10 @@ async fn handle_socket_inner(
                             let message: ServerMessage = ServerRtc::PeerAnswer { answer, peer }.into();
                             ws_sender.send(message.try_into()?).await?;
                         },
+                        ClientControlMessage::RtcIceCandidate { candidate, peer } => {
+                            let message: ServerMessage = ServerRtc::IceCandidate { candidate, peer }.into();
+                            ws_sender.send(message.try_into()?).await?;
+                        }
                     }
                 },
                 Err(RecvError::Disconnected) => break,
@@ -207,6 +211,20 @@ async fn handle_client_message(
                     .await?;
             } else {
                 error!("Failed to find client matching answer peer_id {peer}");
+                // TODO: send error back to client
+            }
+        },
+        ClientMessage::Rtc(ClientRtc::IceCandidate { candidate, peer }) => {
+            if let Some(peer_client) = clients.get(&peer) {
+                debug!("Forwarding ice candidate from {peer_id} to {peer}");
+                peer_client
+                    .send(ClientControlMessage::RtcIceCandidate {
+                        candidate,
+                        peer: peer_id.clone(),
+                    })
+                    .await?;
+            } else {
+                error!("Failed to find client matching ice candidate peer_id {peer}");
                 // TODO: send error back to client
             }
         },

@@ -44,13 +44,14 @@ const registerServiceWorker = async () => {
 
         let refreshing = false;
         // Once the worker updates, refresh the page
-        navigator.serviceWorker.addEventListener('controllerchange', () => {
-            if (!refreshing) {
-                console.log('Service worker changed, refreshing')
-                refreshing = true
-                window.location.reload()
-            }
-        })
+        // TODO: disabled while debugging
+        // navigator.serviceWorker.addEventListener('controllerchange', () => {
+        //     if (!refreshing) {
+        //         console.log('Service worker changed, refreshing')
+        //         refreshing = true
+        //         window.location.reload()
+        //     }
+        // })
     }
 };
 registerServiceWorker();

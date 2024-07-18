@@ -43,6 +43,8 @@ wasm = [
     "web-sys/PushManager",
     "web-sys/PushSubscriptionOptionsInit",
     "web-sys/Exception",
+    "web-sys/RtcIceCandidate",
+    "web-sys/RtcIceCandidateInit",
 ]
 build = [ "anyhow" ]
 

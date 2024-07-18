@@ -7,16 +7,16 @@ use std::{
     task::{Context, Poll, Waker},
 };
 
-use dashmap::DashMap;
+use dashmap::{mapref::one::RefMut, DashMap};
 use futures::{channel::mpsc::UnboundedReceiver, SinkExt, StreamExt};
-use gloo::{net::websocket, utils::errors::JsError};
+use gloo::{net::websocket, timers::future::IntervalStream, utils::errors::JsError};
 #[cfg(feature = "debug-signals")]
 use leptos::{create_rw_signal, RwSignal, Signal};
 use leptos::{provide_context, spawn_local, store_value, use_context, SignalUpdate, StoredValue};
 use reconnecting_websocket::SocketSink;
 use shared::{
     api::{
-        error::{FrontendError, Nothing},
+        error::{FrontendError, Nothing, ResultContext},
         Object,
     },
     rtc::{
@@ -26,15 +26,16 @@ use shared::{
     },
     types::{
         rtc::{PeerId, RoomId},
-        websocket::{ClientMessage, ClientRtc, Offer, ServerRtc},
+        websocket::{ClientMessage, ClientRtc, IceCandidate, Offer, ServerRtc},
     },
 };
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, warn};
 use wasm_bindgen::{convert::FromWasmAbi, prelude::Closure, JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
-    js_sys::Function, ErrorEvent, Event, MessageEvent, RtcAnswerOptions, RtcConfiguration,
-    RtcDataChannel, RtcDataChannelEvent, RtcDataChannelInit, RtcDataChannelType,
+    js_sys::{Function, Reflect},
+    ErrorEvent, Event, MessageEvent, RtcAnswerOptions, RtcConfiguration, RtcDataChannel,
+    RtcDataChannelEvent, RtcDataChannelInit, RtcDataChannelType, RtcIceCandidate,
     RtcIceCandidateInit, RtcOfferOptions, RtcPeerConnection, RtcPeerConnectionIceEvent, RtcSdpType,
     RtcSessionDescription, RtcSessionDescriptionInit,
 };
@@ -47,98 +48,96 @@ use crate::{
     },
 };
 
+/// The role this peer is taking
+/// See <https://developer.mozilla.org/en-US/docs/Web/API/WebRTC_API/Perfect_negotiation>
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PerfectRole {
+    Polite,
+    Impolite,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum OfferState {
+    None,
+    Offered,
+    Answered,
+    Accepted,
+}
+
 struct Peer {
     waker: Rc<RefCell<Option<Waker>>>,
-    channel: RtcDataChannel,
+    signalling_sender: SocketSink<ClientMessage>,
+    channel: Option<RtcDataChannel>,
     peer: RtcPeerConnection,
+    our_peer_id: PeerId,
     their_peer_id: PeerId,
+    role: PerfectRole,
+    offer_state: OfferState,
 
     // Hang on to them for de-registering
     closures: (
-        Closure<dyn FnMut(ErrorEvent)>,
-        Closure<dyn FnMut(MessageEvent)>,
-        Closure<dyn FnMut(RtcDataChannelEvent)>,
+        Option<Closure<dyn FnMut(ErrorEvent)>>,
+        Option<Closure<dyn FnMut(MessageEvent)>>,
+        Option<Closure<dyn FnMut(RtcDataChannelEvent)>>,
+        Option<Closure<dyn FnMut(Event)>>,
         Closure<dyn FnMut(RtcPeerConnectionIceEvent)>,
         Closure<dyn FnMut(Event)>,
         Closure<dyn FnMut(Event)>,
         Closure<dyn FnMut(Event)>,
+        Closure<dyn FnMut(RtcDataChannelEvent)>,
     ),
 }
 
 impl Peer {
-    async fn new(
+    fn new(
         waker: Rc<RefCell<Option<Waker>>>,
+        signalling_sender: SocketSink<ClientMessage>,
         our_peer_id: PeerId,
         their_peer_id: PeerId,
-        sender: &mut SocketSink<ClientMessage>,
-        offer: Option<Offer>,
     ) -> Result<Self, FrontendError<Nothing>> {
+        // Since both parties know the peer IDs this will result in them picking the correct roles
+        let role =
+            if our_peer_id > their_peer_id { PerfectRole::Polite } else { PerfectRole::Impolite };
+
+        let offer_state = OfferState::None;
+
         let peer = {
             let mut config = RtcConfiguration::new();
-            config.peer_identity(Some(&our_peer_id.to_string()));
+
+            // TODO: peer identity is actually for the remote peer and requires validation
+            // config.peer_identity(Some(&our_peer_id.to_string()));
 
             RtcPeerConnection::new_with_configuration(&config)?
         };
 
-        let channel = {
-            let mut config = RtcDataChannelInit::new();
-            config.ordered(true);
-
-            let mut channel =
-                peer.create_data_channel_with_data_channel_dict("client data", &config);
-
-            channel.set_binary_type(RtcDataChannelType::Arraybuffer);
-
-            channel
-        };
-
-        let channel_error_callback: Closure<dyn FnMut(_)> = {
-            let waker = Rc::clone(&waker);
-            // TODO: Not sure this is the right event type
-            Closure::wrap(Box::new(move |event: ErrorEvent| {
-                debug!("channel_error callback: {event:?}");
-                if let Some(waker) = waker.borrow_mut().take() {
-                    waker.wake();
-                }
-            }) as Box<dyn FnMut(_)>)
-        };
-        channel.add_event_listener_with_callback(
-            "error",
-            channel_error_callback.as_ref().unchecked_ref(),
-        )?;
-
-        let channel_message_callback: Closure<dyn FnMut(_)> = {
-            let waker = Rc::clone(&waker);
-            Closure::wrap(Box::new(move |event: MessageEvent| {
-                debug!("channel_message callback: {event:?}");
-                if let Some(waker) = waker.borrow_mut().take() {
-                    waker.wake();
-                }
-            }) as Box<dyn FnMut(_)>)
-        };
-        channel.add_event_listener_with_callback(
-            "message",
-            channel_message_callback.as_ref().unchecked_ref(),
-        )?;
-
-        let channel_open_callback: Closure<dyn FnMut(_)> = {
-            let waker = Rc::clone(&waker);
-            Closure::wrap(Box::new(move |event: RtcDataChannelEvent| {
-                debug!("channel_open callback: {event:?}");
-                if let Some(waker) = waker.borrow_mut().take() {
-                    waker.wake();
-                }
-            }) as Box<dyn FnMut(_)>)
-        };
-        channel.add_event_listener_with_callback(
-            "open",
-            channel_open_callback.as_ref().unchecked_ref(),
-        )?;
-
+        let signalling_sender_ = signalling_sender.clone();
+        let their_peer_id_ = their_peer_id.clone();
         let peer_icecandidate_callback: Closure<dyn FnMut(_)> = {
             let waker = Rc::clone(&waker);
             Closure::wrap(Box::new(move |event: RtcPeerConnectionIceEvent| {
-                debug!("peer_icecandidate callback: {event:?}");
+                if let Some(candidate) = event.candidate() {
+                    debug!("peer_icecandidate callback: {}", candidate.candidate());
+                    let mut signalling_sender_ = signalling_sender_.clone();
+                    let their_peer_id_ = their_peer_id_.clone();
+                    // TODO: might be preferable to have a channel with a sync send to send this
+                    // back to the main loop?
+                    spawn_local(async move {
+                        if let Err(e) = signalling_sender_
+                            .send(
+                                ClientRtc::IceCandidate {
+                                    candidate: candidate.into(),
+                                    peer: their_peer_id_.clone(),
+                                }
+                                .into(),
+                            )
+                            .await
+                        {
+                            error!("Error sending ice candidate to signalling server: {e:?}");
+                        }
+                    });
+                } else {
+                    debug!("peer_icecandidate callback: Null candidiate");
+                }
                 if let Some(waker) = waker.borrow_mut().take() {
                     waker.wake();
                 }
@@ -179,8 +178,12 @@ impl Peer {
 
         let peer_icegatheringstatechange_callback: Closure<dyn FnMut(_)> = {
             let waker = Rc::clone(&waker);
+            let target_key = JsValue::from_str("target");
             Closure::wrap(Box::new(move |event: Event| {
-                debug!("peer_icegatheringstatechange callback: {event:?}");
+                let peer: RtcPeerConnection =
+                    Reflect::get(&event, &target_key).expect("event.connection").into();
+
+                debug!("peer_icegatheringstatechange callback: {:?}", peer.ice_gathering_state());
                 if let Some(waker) = waker.borrow_mut().take() {
                     waker.wake();
                 }
@@ -191,99 +194,347 @@ impl Peer {
             peer_icegatheringstatechange_callback.as_ref().unchecked_ref(),
         )?;
 
-        if let Some(offer) = offer {
-            let mut offer_desc = RtcSessionDescriptionInit::new(offer.type_.into());
-            offer_desc.sdp(&offer.sdp);
+        let peer_datachannel_callback: Closure<dyn FnMut(_)> = {
+            let waker = Rc::clone(&waker);
+            let channel_key = JsValue::from_str("channel");
+            Closure::wrap(Box::new(move |event: RtcDataChannelEvent| {
+                let channel = event.channel();
 
-            JsFuture::from(peer.set_remote_description(&offer_desc)).await?;
+                debug!("peer_datachannel callback: {:?}", channel);
 
-            let answer_init: RtcSessionDescriptionInit =
-                JsFuture::from(peer.create_answer()).await?.into();
+                spawn_local(async move {
+                    let mut stream = IntervalStream::new(500).fuse();
+                    let mut i = 0_usize;
+                    loop {
+                        let _ = stream.next().await;
 
-            JsFuture::from(peer.set_local_description(&answer_init)).await?;
+                        channel.send_with_str(&format!("Hello {i}")).unwrap();
+                        i += 1;
+                    }
+                });
+                if let Some(waker) = waker.borrow_mut().take() {
+                    waker.wake();
+                }
+            }) as Box<dyn FnMut(_)>)
+        };
+        peer.add_event_listener_with_callback(
+            "datachannel",
+            peer_datachannel_callback.as_ref().unchecked_ref(),
+        )?;
 
-            let answer_desc = peer.local_description().ok_or(FrontendError::Client {
-                message: "Local description missing after it was set".to_string(),
-            })?;
-
-            let type_ = answer_desc.type_();
-            let sdp = answer_desc.sdp();
-
-            let answer = Offer { type_: type_.into(), sdp };
-
-            sender.send(ClientRtc::Answer { answer, peer: their_peer_id.clone() }.into()).await?;
-        } else {
-            let offer_init: RtcSessionDescriptionInit =
-                JsFuture::from(peer.create_offer()).await?.into();
-
-            JsFuture::from(peer.set_local_description(&offer_init)).await?;
-
-            let offer_desc = peer.local_description().ok_or(FrontendError::Client {
-                message: "Local description missing after it was set".to_string(),
-            })?;
-
-            let type_ = offer_desc.type_();
-            let sdp = offer_desc.sdp();
-
-            let offer = Offer { type_: type_.into(), sdp };
-
-            sender.send(ClientRtc::Offer { offer, peer: their_peer_id.clone() }.into()).await?;
-        }
-
-        // let response = send_offer(sdp).await.map_err(|e| FrontendError::Client {
-        //     message: format!("RTC offer response error: {e:?}"),
-        // })?;
-
-        // info!("Got rtc offer response: {:?}", response);
-        // let answer = {
-        //     let mut answer = RtcSessionDescriptionInit::new(response.type_.into());
-        //     answer.sdp(&response.sdp);
-        //     answer
-        // };
-        // JsFuture::from(peer.set_remote_description(&answer)).await?;
-        // info!("Remote description set successfully");
-
-        // let candidate: RtcIceCandidateInit = { todo!() };
-        // JsFuture::from(peer.add_ice_candidate_with_opt_rtc_ice_candidate_init(Some(&candidate)))
-        //     .await?;
-        // info!("Ice candidate added successfully");
+        let channel = None;
 
         let closures = (
-            channel_error_callback,
-            channel_message_callback,
-            channel_open_callback,
+            None,
+            None,
+            None,
+            None,
             peer_icecandidate_callback,
             peer_iceconnectionstatechange_callback,
             peer_connectionstatechange_callback,
             peer_icegatheringstatechange_callback,
+            peer_datachannel_callback,
         );
 
-        Ok(Self { waker, closures, peer, channel, their_peer_id })
+        Ok(Self {
+            waker,
+            closures,
+            peer,
+            channel,
+            their_peer_id,
+            our_peer_id,
+            role,
+            offer_state,
+            signalling_sender,
+        })
     }
 
-    async fn answer(
+    async fn create_channel(&mut self) -> Result<(), FrontendError<Nothing>> {
+        self.remove_channel_event_listners();
+        if let Some(channel) = self.channel.take() {
+            // TODO:
+            channel.close();
+        }
+
+        let channel = {
+            let mut config = RtcDataChannelInit::new();
+            config.ordered(true);
+
+            debug!("creating channel");
+            let mut channel =
+                self.peer.create_data_channel_with_data_channel_dict("client data", &config);
+            channel.set_binary_type(RtcDataChannelType::Arraybuffer);
+
+            channel
+        };
+
+        let waker = &self.waker;
+
+        let channel_error_callback: Closure<dyn FnMut(_)> = {
+            let waker = Rc::clone(&waker);
+            // TODO: Not sure this is the right event type
+            Closure::wrap(Box::new(move |event: ErrorEvent| {
+                debug!("channel_error callback: {event:?}");
+                if let Some(waker) = waker.borrow_mut().take() {
+                    waker.wake();
+                }
+            }) as Box<dyn FnMut(_)>)
+        };
+        channel.add_event_listener_with_callback(
+            "error",
+            channel_error_callback.as_ref().unchecked_ref(),
+        )?;
+
+        let channel_message_callback: Closure<dyn FnMut(_)> = {
+            let waker = Rc::clone(&waker);
+            Closure::wrap(Box::new(move |event: MessageEvent| {
+                let message: Option<String> = event.data().as_string();
+                debug!("channel_message callback: {message:?}");
+                if let Some(waker) = waker.borrow_mut().take() {
+                    waker.wake();
+                }
+            }) as Box<dyn FnMut(_)>)
+        };
+        channel.add_event_listener_with_callback(
+            "message",
+            channel_message_callback.as_ref().unchecked_ref(),
+        )?;
+
+        let channel_open_callback: Closure<dyn FnMut(_)> = {
+            let waker = Rc::clone(&waker);
+            Closure::wrap(Box::new(move |event: RtcDataChannelEvent| {
+                debug!("channel_open callback: {event:?}");
+                if let Some(waker) = waker.borrow_mut().take() {
+                    waker.wake();
+                }
+            }) as Box<dyn FnMut(_)>)
+        };
+        channel.add_event_listener_with_callback(
+            "open",
+            channel_open_callback.as_ref().unchecked_ref(),
+        )?;
+
+        let channel_close_callback: Closure<dyn FnMut(_)> = {
+            let waker = Rc::clone(&waker);
+            Closure::wrap(Box::new(move |event: Event| {
+                debug!("channel_close callback: {event:?}");
+                if let Some(waker) = waker.borrow_mut().take() {
+                    waker.wake();
+                }
+            }) as Box<dyn FnMut(_)>)
+        };
+        channel.add_event_listener_with_callback(
+            "close",
+            channel_close_callback.as_ref().unchecked_ref(),
+        )?;
+
+        self.channel = Some(channel);
+        self.closures.0 = Some(channel_error_callback);
+        self.closures.1 = Some(channel_message_callback);
+        self.closures.2 = Some(channel_open_callback);
+        self.closures.3 = Some(channel_close_callback);
+
+        Ok(())
+    }
+
+    async fn send_offer_or_answer(
+        &mut self,
+        sender: &mut SocketSink<ClientMessage>,
+    ) -> Result<(), FrontendError<Nothing>> {
+        let (local_init, offer_state): (RtcSessionDescriptionInit, _) =
+            if let Some(remote_description) = self.peer.remote_description() {
+                debug!("sending answer to {}", self.their_peer_id);
+                // If we have a remote description, we have already received an offer and should
+                // answer it instead of sending our own offer
+                (
+                    JsFuture::from(self.peer.create_answer())
+                        .await
+                        .map_err(FrontendError::from)
+                        .with_context(|| {
+                            format!(
+                                "create_answer. our_peer_id: {}, their_peer_id: {}",
+                                self.our_peer_id, self.their_peer_id
+                            )
+                        })?
+                        .into(),
+                    OfferState::Answered,
+                )
+            } else {
+                // Since we are offering, create the channel
+                self.create_channel().await?;
+
+                debug!("sending offer to {}", self.their_peer_id);
+                (
+                    JsFuture::from(self.peer.create_offer())
+                        .await
+                        .map_err(FrontendError::from)
+                        .with_context(|| {
+                            format!(
+                                "create_offer. our_peer_id: {}, their_peer_id: {}",
+                                self.our_peer_id, self.their_peer_id
+                            )
+                        })?
+                        .into(),
+                    OfferState::Offered,
+                )
+            };
+
+        // Update our local description with the offer/answer
+        JsFuture::from(self.peer.set_local_description(&local_init))
+            .await
+            .map_err(FrontendError::from)
+            .with_context(|| {
+                format!(
+                    "set_local_description. our_peer_id: {}, their_peer_id: {}",
+                    self.our_peer_id, self.their_peer_id
+                )
+            })?;
+
+        let local_desc = self.peer.local_description().ok_or(FrontendError::Client {
+            message: "Local description missing after it was set".to_string(),
+        })?;
+
+        let type_ = local_desc.type_();
+        let sdp = local_desc.sdp();
+        let offer_or_answer = Offer { type_: type_.into(), sdp };
+
+        let peer = self.their_peer_id.clone();
+        let message = match offer_state {
+            OfferState::Offered => ClientRtc::Offer { offer: offer_or_answer, peer },
+            _ => ClientRtc::Answer { answer: offer_or_answer, peer },
+        };
+
+        sender.send(message.into()).await?;
+        self.offer_state = offer_state;
+
+        Ok(())
+    }
+
+    async fn handle_answer(
         &mut self,
         sender: &mut SocketSink<ClientMessage>,
         answer: Offer,
     ) -> Result<(), FrontendError<Nothing>> {
+        if self.peer.remote_description().is_none() {
+            debug!("handling answer from: {}", self.their_peer_id);
+            let remote_desc = {
+                let mut desc = RtcSessionDescriptionInit::new(answer.type_.into());
+                desc.sdp(&answer.sdp);
+                desc
+            };
+
+            JsFuture::from(self.peer.set_remote_description(&remote_desc))
+                .await
+                .map_err(FrontendError::from)
+                .with_context(|| {
+                    format!(
+                        "set_remote_description. our_peer_id: {}, their_peer_id: {}, sdp: {:?}",
+                        self.our_peer_id, self.their_peer_id, answer.sdp
+                    )
+                })?;
+        } else {
+            warn!("handle_answer when remote_description.is_some");
+        }
+
         Ok(())
     }
 
-    fn close(self) {
-        for (event, closure) in [
-            ("error", self.closures.0.as_ref()),
-            ("message", self.closures.1.as_ref()),
-            ("open", self.closures.2.as_ref()),
-            ("icecandidate", self.closures.3.as_ref()),
-        ] {
-            let _ =
-                self.channel.remove_event_listener_with_callback(&event, closure.unchecked_ref());
+    async fn handle_offer(
+        &mut self,
+        sender: &mut SocketSink<ClientMessage>,
+        offer: Offer,
+    ) -> Result<(), FrontendError<Nothing>> {
+        let accept_offer = match (self.peer.remote_description(), self.role) {
+            (None, _) => {
+                debug!("accepting offer from: {}", self.their_peer_id);
+                true
+            },
+            (Some(_), PerfectRole::Impolite) => {
+                warn!("Impolite peer dropping offer from: {}", self.their_peer_id);
+                false
+            },
+            (Some(_), PerfectRole::Polite) => {
+                warn!(
+                    "Polite peer discarding our offer in favour of offer from: {}",
+                    self.their_peer_id
+                );
+                true
+            },
+        };
+
+        if accept_offer {
+            let remote_desc = {
+                let mut desc = RtcSessionDescriptionInit::new(offer.type_.into());
+                desc.sdp(&offer.sdp);
+                desc
+            };
+
+            JsFuture::from(self.peer.set_remote_description(&remote_desc))
+                .await
+                .map_err(FrontendError::from)
+                .with_context(|| {
+                    format!(
+                        "set_remote_description. our_peer_id: {}, their_peer_id: {}, sdp: {:?}",
+                        self.our_peer_id, self.their_peer_id, offer.sdp
+                    )
+                })?;
+
+            // Send the answer
+            self.send_offer_or_answer(sender).await?;
         }
 
+        Ok(())
+    }
+
+    async fn handle_signalling(
+        &mut self,
+        sender: &mut SocketSink<ClientMessage>,
+    ) -> Result<(), FrontendError<Nothing>> {
+        self.send_offer_or_answer(sender).await?;
+        Ok(())
+    }
+
+    async fn handle_ice_candidate(
+        &mut self,
+        sender: &mut SocketSink<ClientMessage>,
+        candidate: IceCandidate,
+    ) -> Result<(), FrontendError<Nothing>> {
+        JsFuture::from(
+            self.peer
+                .add_ice_candidate_with_opt_rtc_ice_candidate_init(Some(candidate.into()).as_ref()),
+        )
+        .await?;
+        Ok(())
+    }
+
+    fn remove_channel_event_listners(&mut self) {
+        if let Some(channel) = self.channel.as_ref() {
+            for (event, closure) in [
+                ("error", self.closures.0.as_ref().unwrap().as_ref()),
+                ("message", self.closures.1.as_ref().unwrap().as_ref()),
+                ("open", self.closures.2.as_ref().unwrap().as_ref()),
+                ("open", self.closures.3.as_ref().unwrap().as_ref()),
+            ] {
+                let _ =
+                    channel.remove_event_listener_with_callback(&event, closure.unchecked_ref());
+            }
+
+            self.closures.0 = None;
+            self.closures.1 = None;
+            self.closures.2 = None;
+            self.closures.3 = None;
+        }
+    }
+
+    fn close(mut self) {
+        self.remove_channel_event_listners();
+
         for (event, closure) in [
-            ("iceconnectionstatechange", self.closures.4.as_ref()),
-            ("connectionstatechange", self.closures.5.as_ref()),
-            ("icegatheringstatechange", self.closures.6.as_ref()),
+            ("icecandidate", self.closures.4.as_ref()),
+            ("iceconnectionstatechange", self.closures.5.as_ref()),
+            ("connectionstatechange", self.closures.6.as_ref()),
+            ("icegatheringstatechange", self.closures.7.as_ref()),
+            ("datachannel", self.closures.4.as_ref()),
         ] {
             let _ = self.peer.remove_event_listener_with_callback(&event, closure.unchecked_ref());
         }
@@ -303,9 +554,6 @@ impl From<UnboundedReceiver<ServerRtc>> for RtcSource {
 struct RtcInner {
     waker: Rc<RefCell<Option<Waker>>>,
     peers: Arc<DashMap<PeerId, Peer>>,
-
-    #[cfg(feature = "debug-signals")]
-    peers_signal: RwSignal<Vec<String>>,
 }
 
 impl RtcInner {
@@ -313,86 +561,106 @@ impl RtcInner {
         mut source: RtcSource,
         mut sender: SocketSink<ClientMessage>,
         waker: Rc<RefCell<Option<Waker>>>,
-
-        #[cfg(feature = "debug-signals")] peers_signal: RwSignal<Vec<String>>,
     ) -> Self {
         let peers: Arc<DashMap<PeerId, Peer>> = Default::default();
-
         let waker_ = Rc::clone(&waker);
         let peers_ = peers.clone();
-        let peers_signal_ = peers_signal.clone();
+
+        fn ensure_peer<'a>(
+            waker: &Rc<RefCell<Option<Waker>>>,
+            sender: &SocketSink<ClientMessage>,
+            our_peer_id: &Option<PeerId>,
+            their_peer_id: &PeerId,
+            peers: &'a Arc<DashMap<PeerId, Peer>>,
+        ) -> Result<(RefMut<'a, PeerId, Peer>, bool), FrontendError<Nothing>> {
+            use dashmap::Entry::*;
+
+            let our_peer_id = our_peer_id.as_ref().ok_or(FrontendError::Other {
+                message: format!("Got peer signalling messages before our_peer_id was set"),
+            })?;
+
+            let peer_ref = match peers.entry(their_peer_id.clone()) {
+                Occupied(v) => (v.into_ref(), false),
+                Vacant(v) => {
+                    let waker = Rc::clone(&waker);
+                    let peer = Peer::new(
+                        waker,
+                        sender.clone(),
+                        our_peer_id.clone(),
+                        their_peer_id.clone(),
+                    )?;
+                    (v.insert(peer), true)
+                },
+            };
+
+            Ok(peer_ref)
+        }
+
         spawn_local(async move {
             let r = async move {
-                let mut peer_id = None;
+                let mut our_peer_id = None;
 
                 loop {
-                    peers_signal
-                        .update(|v| v.push(format!("Peer count: {}", peers_.iter().count())));
+                    let count = peers_.iter().count();
+                    debug!(count, "peers");
 
                     if let Some(m) = source.receiver.next().await {
                         match m {
                             ServerRtc::PeerId(p) => {
-                                info!("got peer id: {p:?}");
-                                peer_id = Some(p);
+                                debug!("got our_peer_id: {p:?}");
+                                our_peer_id = Some(p);
                             },
+
                             ServerRtc::RoomPeers(peers) => {
-                                info!("got peers: {peers:?}");
-                                let peer_id = peer_id.as_ref().ok_or(FrontendError::Other {
-                                    message: format!("Got room peers before peer id was set"),
-                                })?;
+                                debug!("RoomPeers: {peers:?}");
 
                                 for their_peer_id in peers {
-                                    if peers_.contains_key(&their_peer_id) {
-                                        continue;
-                                    }
-
-                                    peers_signal.update(|v| {
-                                        v.push(format!("RoomPeers offering: {}", their_peer_id))
-                                    });
-                                    let peer = Peer::new(
-                                        Rc::clone(&waker_),
-                                        peer_id.clone(),
-                                        their_peer_id.clone(),
-                                        &mut sender,
-                                        None,
-                                    )
-                                    .await?;
-
-                                    peers_.insert(their_peer_id, peer);
+                                    let (mut peer, new) = ensure_peer(
+                                        &waker_,
+                                        &sender,
+                                        &our_peer_id,
+                                        &their_peer_id,
+                                        &peers_,
+                                    )?;
+                                    debug!(new, "RoomPeers got peer: {their_peer_id}");
+                                    peer.handle_signalling(&mut sender).await?;
                                 }
                             },
 
-                            ServerRtc::PeerOffer { offer, peer } => {
-                                info!("got peer offer: {peer:?}, {offer:?}");
-                                let peer_id = peer_id.as_ref().ok_or(FrontendError::Other {
-                                    message: format!("Got room peers before peer id was set"),
-                                })?;
-
-                                let their_peer_id = peer;
-
-                                peers_signal.update(|v| {
-                                    v.push(format!("PeerOffer answering: {}", their_peer_id))
-                                });
-                                let peer = Peer::new(
-                                    Rc::clone(&waker_),
-                                    peer_id.clone(),
-                                    their_peer_id.clone(),
-                                    &mut sender,
-                                    Some(offer),
-                                )
-                                .await?;
-
-                                peers_.insert(their_peer_id, peer);
+                            ServerRtc::PeerOffer { offer, peer: their_peer_id } => {
+                                let (mut peer, new) = ensure_peer(
+                                    &waker_,
+                                    &sender,
+                                    &our_peer_id,
+                                    &their_peer_id,
+                                    &peers_,
+                                )?;
+                                debug!(new, "PeerOffer from: {their_peer_id}");
+                                peer.handle_offer(&mut sender, offer).await?;
                             },
 
-                            ServerRtc::PeerAnswer { answer, peer } => {
-                                info!("got peer answer: {peer:?}, {answer:?}");
-                                if let Some(mut peer) = peers_.get_mut(&peer) {
-                                    peers_signal.update(|v| {
-                                        v.push(format!("PeerAnswer updating: {}", peer.key()))
-                                    });
-                                    peer.value_mut().answer(&mut sender, answer).await?;
-                                }
+                            ServerRtc::PeerAnswer { answer, peer: their_peer_id } => {
+                                let (mut peer, new) = ensure_peer(
+                                    &waker_,
+                                    &sender,
+                                    &our_peer_id,
+                                    &their_peer_id,
+                                    &peers_,
+                                )?;
+                                debug!(new, "PeerAnswer from: {their_peer_id}");
+                                peer.handle_answer(&mut sender, answer).await?;
+                            },
+
+                            ServerRtc::IceCandidate { candidate, peer: their_peer_id } => {
+                                let (mut peer, new) = ensure_peer(
+                                    &waker_,
+                                    &sender,
+                                    &our_peer_id,
+                                    &their_peer_id,
+                                    &peers_,
+                                )?;
+                                debug!(new, "IceCandidate from: {their_peer_id}");
+                                peer.handle_ice_candidate(&mut sender, candidate).await?;
                             },
                         }
                     } else {
@@ -409,12 +677,7 @@ impl RtcInner {
             }
         });
 
-        Self {
-            waker,
-            peers,
-            #[cfg(feature = "debug-signals")]
-            peers_signal,
-        }
+        Self { waker, peers }
     }
 
     fn close(self) {
@@ -430,9 +693,6 @@ impl RtcInner {
 #[derive(Clone)]
 pub struct Rtc {
     inner: StoredValue<RtcInner>,
-
-    #[cfg(feature = "debug-signals")]
-    peers_signal: RwSignal<Vec<String>>,
 }
 
 impl Rtc {
@@ -447,24 +707,11 @@ impl Rtc {
 
         let waker: Rc<RefCell<Option<Waker>>> = Default::default();
 
-        #[cfg(feature = "debug-signals")]
-        let peers_signal = create_rw_signal(Vec::new());
-
-        let inner = RtcInner::new(
-            source,
-            sender,
-            waker,
-            #[cfg(feature = "debug-signals")]
-            peers_signal,
-        );
+        let inner = RtcInner::new(source, sender, waker);
 
         let inner = store_value(inner);
 
-        Ok(Self {
-            inner,
-            #[cfg(feature = "debug-signals")]
-            peers_signal,
-        })
+        Ok(Self { inner })
     }
 
     pub async fn provide_context(
@@ -480,10 +727,5 @@ impl Rtc {
 
     pub fn use_rtc() -> Self {
         use_context::<Self>().expect(&format!("{} missing from context", type_name::<Self>()))
-    }
-
-    #[cfg(feature = "debug-signals")]
-    pub fn peers_signal() -> Signal<Vec<String>> {
-        Self::use_rtc().peers_signal.into()
     }
 }

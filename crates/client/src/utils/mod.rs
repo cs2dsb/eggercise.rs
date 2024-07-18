@@ -9,9 +9,6 @@ pub mod location;
 pub mod rtc;
 pub mod websocket;
 
-mod wrap_callback;
-pub use wrap_callback::*;
-
 pub trait JsValueIntoOk<R, E>: Sized
 where
     Self: Into<R>,

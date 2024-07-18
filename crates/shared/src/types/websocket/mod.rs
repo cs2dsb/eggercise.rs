@@ -12,3 +12,6 @@ pub use sdp_type::*;
 
 mod offer;
 pub use offer::*;
+
+mod ice_candidate;
+pub use ice_candidate::*;
