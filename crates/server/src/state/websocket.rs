@@ -7,7 +7,10 @@ use axum::{
 };
 use dashmap::DashMap;
 use loole::Sender;
-use shared::types::{rtc::PeerId, websocket::Offer};
+use shared::types::{
+    rtc::PeerId,
+    websocket::{IceCandidate, Offer},
+};
 
 use crate::{AppState, PeerIdState, UserState};
 
@@ -17,6 +20,7 @@ pub enum ClientControlMessage {
     Logout,
     RtcOffer { offer: Offer, peer: PeerId },
     RtcAnswer { answer: Offer, peer: PeerId },
+    RtcIceCandidate { candidate: IceCandidate, peer: PeerId },
 }
 
 type ClientKey = PeerId;

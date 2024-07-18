@@ -22,7 +22,7 @@ impl RoomId {
 
 impl rtc::RoomId for RoomId {}
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Hash, Eq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Hash, Eq, PartialOrd, Ord)]
 pub struct PeerId(Uuid);
 
 impl Default for PeerId {

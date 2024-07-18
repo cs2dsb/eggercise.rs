@@ -1,7 +1,10 @@
 use serde::{Deserialize, Serialize};
 
 use super::ServerMessage;
-use crate::types::{rtc::PeerId, websocket::Offer};
+use crate::types::{
+    rtc::PeerId,
+    websocket::{IceCandidate, Offer},
+};
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ServerRtc {
     /// Server allocated user id
@@ -12,6 +15,8 @@ pub enum ServerRtc {
     PeerOffer { offer: Offer, peer: PeerId },
     /// An answer relayed from a peer
     PeerAnswer { answer: Offer, peer: PeerId },
+    /// An ice candidate
+    IceCandidate { candidate: IceCandidate, peer: PeerId },
 }
 
 impl From<ServerRtc> for ServerMessage {
