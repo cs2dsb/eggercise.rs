@@ -7,6 +7,8 @@ use crate::types::{
 };
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ServerRtc {
+    /// Assign the peer an easy to read name mainly for making debug logs easier to read
+    Petname(String),
     /// Room peers
     RoomPeers(Vec<PeerId>),
     /// An offer or answer relayed from a peer

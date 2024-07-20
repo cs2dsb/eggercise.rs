@@ -40,13 +40,9 @@ dashmap.workspace = true
 
 rusqlite = { workspace = true, features = [ "bundled" ] }
 webauthn-rs = { workspace = true, features = [ "danger-allow-state-serialisation" ] }
-# web-sys = { workspace = true, features = [
-#     "RtcSessionDescriptionInit",
-#     "RtcSdpType",
-    
-# ]}
 
-
+# Random name generation
+petname = "2.0.2"
 
 # QR Code generation
 qrcodegen = "1.8.0"
