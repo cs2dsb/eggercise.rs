@@ -9,7 +9,7 @@ use tracing::debug;
 
 use crate::{
     constants::WEBSOCKET_CHANNEL_BOUND, routes::websocket::handle_socket, Client, Clients,
-    PeerIdState, RtcRoomState, UserState,
+    ClientsBySessionId, RtcRoomState, SessionId, UserState,
 };
 
 pub async fn websocket_handler(
@@ -20,11 +20,12 @@ pub async fn websocket_handler(
     headers: HeaderMap,
     // Optional user
     user_state: Option<UserState>,
-    // Peer id allocated as part of session state
-    peer_id: PeerIdState,
-    // Map containing all connected clients
+    // Map containing all connected clients by socket
     clients: Clients,
+    // Map containing all connected clients by session id
+    clients_by_session_id: ClientsBySessionId,
     rtc_room_state: RtcRoomState,
+    session_id: SessionId,
 ) -> impl IntoResponse {
     debug!("Websocket upgrade headers: {:?}", headers);
 
@@ -48,14 +49,22 @@ pub async fn websocket_handler(
 
     let (sender, receiver) = loole::bounded(WEBSOCKET_CHANNEL_BOUND);
 
-    let client = Client::new((*peer_id).clone(), sender);
+    let client = Client::new(socket_addr.clone(), sender);
 
-    if let Some(old_client) = clients.add(client) {
-        debug!("A client with the same key evicted a previous client: {:?}", old_client);
-    }
+    clients_by_session_id.add(session_id.clone(), client.clone());
 
     // Complete the upgrade to a websocket
     ws.on_upgrade(move |socket| {
-        handle_socket(socket, socket_addr, user_state, peer_id, receiver, rtc_room_state, clients)
+        handle_socket(
+            socket,
+            socket_addr,
+            user_state,
+            receiver,
+            rtc_room_state,
+            clients,
+            session_id,
+            clients_by_session_id,
+            client,
+        )
     })
 }

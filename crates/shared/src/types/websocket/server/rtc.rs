@@ -7,8 +7,6 @@ use crate::types::{
 };
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ServerRtc {
-    /// Server allocated user id
-    PeerId(PeerId),
     /// Room peers
     RoomPeers(Vec<PeerId>),
     /// An offer or answer relayed from a peer
@@ -20,11 +18,5 @@ pub enum ServerRtc {
 impl From<ServerRtc> for ServerMessage {
     fn from(value: ServerRtc) -> Self {
         Self::Rtc(value)
-    }
-}
-
-impl From<PeerId> for ServerMessage {
-    fn from(value: PeerId) -> Self {
-        Self::Rtc(ServerRtc::PeerId(value))
     }
 }

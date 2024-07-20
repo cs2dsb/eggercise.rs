@@ -8,15 +8,15 @@ use tracing::error;
 use webauthn_rs::prelude::RegisterPublicKeyCredential;
 
 use crate::{
-    db::DatabaseConnection, Client, ClientControlMessage, PasskeyRegistrationState, SessionValue,
-    Webauthn,
+    db::DatabaseConnection, ClientControlMessage, PasskeyRegistrationState, SessionClients,
+    SessionValue, Webauthn,
 };
 
 pub async fn register_finish(
     DatabaseConnection(conn): DatabaseConnection,
     webauthn: Webauthn,
     mut session: SessionValue,
-    client: Option<Client>,
+    clients: Option<SessionClients>,
     Json(register_public_key_credential): Json<RegisterPublicKeyCredential>,
 ) -> Result<Json<()>, ServerError<Nothing>> {
     // Get the challenge from the session
@@ -35,9 +35,11 @@ pub async fn register_finish(
     let (user, _) =
         conn.interact(move |conn| Ok::<_, ServerError<_>>(new_user.create(conn)?)).await??;
 
-    if let Some(client) = client {
-        if let Err(e) = client.send(ClientControlMessage::Login((&user).into())).await {
-            error!("Error sending ClientControlMessage for user {user:?}: {e:?}");
+    if let Some(clients) = clients {
+        for client in clients.clients {
+            if let Err(e) = client.send(ClientControlMessage::Login((&user).into())).await {
+                error!("Error sending ClientControlMessage for user {user:?}: {e:?}");
+            }
         }
     }
 

@@ -792,7 +792,7 @@ struct RtcInner {
 impl RtcInner {
     fn new(
         mut source: RtcSource,
-        mut sender: SocketSink<ClientMessage>,
+        mut signaling_sender: SocketSink<ClientMessage>,
         waker: Rc<RefCell<Option<Waker>>>,
     ) -> Self {
         let waker_ = Rc::clone(&waker);
@@ -800,15 +800,11 @@ impl RtcInner {
         fn ensure_peer<'a>(
             waker: &Rc<RefCell<Option<Waker>>>,
             sender: &SocketSink<ClientMessage>,
-            our_peer_id: &Option<PeerId>,
+            our_peer_id: &PeerId,
             their_peer_id: &PeerId,
             peers: &'a mut HashMap<PeerId, Peer>,
             peer_sender: &UnboundedSender<(PeerId, PeerUpdate)>,
         ) -> Result<(&'a mut Peer, bool), FrontendError<Nothing>> {
-            let our_peer_id = our_peer_id.as_ref().ok_or(FrontendError::Other {
-                message: format!("Got peer signaling messages before our_peer_id was set"),
-            })?;
-
             let new = if !peers.contains_key(their_peer_id) {
                 let waker = Rc::clone(&waker);
                 let peer = Peer::new(
@@ -832,7 +828,11 @@ impl RtcInner {
             let (channel_sender, channel_receiver) = mpsc::unbounded();
 
             let r = async move {
-                let mut our_peer_id = None;
+                let our_peer_id = PeerId::new();
+
+                // Announce our peer id to the server, this also kicks off joining our user room
+                signaling_sender.send(ClientRtc::Announce { peer_id: our_peer_id.clone() }.into()).await?;
+
                 let mut channel_receiver = channel_receiver.fuse();
                 let mut keepalive_interval = IntervalStream::new(5000).fuse();
 
@@ -866,7 +866,7 @@ impl RtcInner {
                             Some((their_peer_id, update)) => {
                                 let (peer, new) = ensure_peer(
                                     &waker_,
-                                    &sender,
+                                    &signaling_sender,
                                     &our_peer_id,
                                     &their_peer_id,
                                     &mut peers,
@@ -895,52 +895,47 @@ impl RtcInner {
                         r = source.receiver.next() => match r {
                             Some(m) => {
                                 match m {
-                                    ServerRtc::PeerId(p) => {
-                                        debug!("got our_peer_id: {p:?}");
-                                        our_peer_id = Some(p);
-                                    },
-
                                     ServerRtc::RoomPeers(room_peers) => {
                                         debug!("RoomPeers: {room_peers:?}");
 
                                         for their_peer_id in room_peers {
                                             let (peer, new) = ensure_peer(
                                                 &waker_,
-                                                &sender,
+                                                &signaling_sender,
                                                 &our_peer_id,
                                                 &their_peer_id,
                                                 &mut peers,
                                                 &channel_sender,
                                             )?;
                                             debug!(new, "RoomPeers got peer: {their_peer_id}");
-                                            peer.perform_signaling(&mut sender, None).await?;
+                                            peer.perform_signaling(&mut signaling_sender, None).await?;
                                         }
                                     },
 
                                     ServerRtc::PeerSdp { sdp, peer: their_peer_id } => {
                                         let (peer, new) = ensure_peer(
                                             &waker_,
-                                            &sender,
+                                            &signaling_sender,
                                             &our_peer_id,
                                             &their_peer_id,
                                             &mut peers,
                                             &channel_sender,
                                         )?;
                                         debug!(new, "PeerSdp (type: {:?}) from: {their_peer_id}", sdp.type_);
-                                        peer.perform_signaling(&mut sender, Some(sdp)).await?;
+                                        peer.perform_signaling(&mut signaling_sender, Some(sdp)).await?;
                                     },
 
                                     ServerRtc::IceCandidate { candidate, peer: their_peer_id } => {
                                         let (peer, new) = ensure_peer(
                                             &waker_,
-                                            &sender,
+                                            &signaling_sender,
                                             &our_peer_id,
                                             &their_peer_id,
                                             &mut peers,
                                             &channel_sender,
                                         )?;
                                         debug!(new, "IceCandidate from: {their_peer_id}");
-                                        peer.handle_ice_candidate(&mut sender, candidate).await?;
+                                        peer.handle_ice_candidate(&mut signaling_sender, candidate).await?;
                                     },
                                 }
                             },

@@ -10,6 +10,8 @@ use crate::types::{
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ClientRtc {
+    /// Peer informing server of it's id
+    Announce { peer_id: PeerId },
     /// Offer or answer to connect to a peer
     Sdp { sdp: Sdp, peer: PeerId },
     /// An ice candidate

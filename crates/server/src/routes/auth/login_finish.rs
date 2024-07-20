@@ -10,15 +10,15 @@ use tracing::error;
 use webauthn_rs::prelude::PublicKeyCredential;
 
 use crate::{
-    db::DatabaseConnection, Client, ClientControlMessage, PasskeyAuthenticationState, SessionValue,
-    Webauthn,
+    db::DatabaseConnection, ClientControlMessage, PasskeyAuthenticationState, SessionClients,
+    SessionValue, Webauthn,
 };
 
 pub async fn login_finish(
     DatabaseConnection(conn): DatabaseConnection,
     webauthn: Webauthn,
     mut session: SessionValue,
-    client: Option<Client>,
+    clients: Option<SessionClients>,
     Json(public_key_credential): Json<PublicKeyCredential>,
 ) -> Result<Json<User>, ServerError<Nothing>> {
     // Get the challenge from the session
@@ -99,9 +99,11 @@ pub async fn login_finish(
     // requests
     session.set_user_state(&user).await?;
 
-    if let Some(client) = client {
-        if let Err(e) = client.send(ClientControlMessage::Login((&user).into())).await {
-            error!("Error sending ClientControlMessage for user {user:?}: {e:?}");
+    if let Some(clients) = clients {
+        for client in clients.clients {
+            if let Err(e) = client.send(ClientControlMessage::Login((&user).into())).await {
+                error!("Error sending ClientControlMessage for user {user:?}: {e:?}");
+            }
         }
     }
 

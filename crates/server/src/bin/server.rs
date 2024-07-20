@@ -149,6 +149,7 @@ async fn main() -> Result<(), anyhow::Error> {
         vapid_pub_key,
         vapid_private_key,
         websocket_clients: Default::default(),
+        websocket_clients_by_user_id: Default::default(),
         rtc_room_state: Default::default(),
     };
 

@@ -13,27 +13,33 @@ use shared::types::{
 };
 use tokio::time;
 use tokio_tungstenite::tungstenite::Message;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info, trace, warn};
 
-use crate::{ClientControlMessage, Clients, PeerIdState, RtcRoomState, UserState};
+use crate::{
+    Client, ClientControlMessage, Clients, ClientsBySessionId, RtcRoomState, SessionId, UserState,
+};
 
 pub async fn handle_socket(
     socket: WebSocket,
     socket_addr: SocketAddr,
     user_state: Option<UserState>,
-    peer_id: PeerIdState,
     receiver: Receiver<ClientControlMessage>,
     rtc_room_state: RtcRoomState,
     clients: Clients,
+    session_id: SessionId,
+    clients_by_session_id: ClientsBySessionId,
+    client: Client,
 ) {
     if let Err(e) = handle_socket_inner(
         socket,
         socket_addr,
         user_state,
-        peer_id,
         receiver,
         rtc_room_state,
         clients,
+        session_id,
+        clients_by_session_id,
+        client,
     )
     .await
     {
@@ -45,26 +51,20 @@ async fn handle_socket_inner(
     mut socket: WebSocket,
     socket_addr: SocketAddr,
     mut user_state: Option<UserState>,
-    peer_id: PeerIdState,
     receiver: Receiver<ClientControlMessage>,
     rtc_room_state: RtcRoomState,
     clients: Clients,
+    session_id: SessionId,
+    clients_by_session_id: ClientsBySessionId,
+    client: Client,
 ) -> Result<(), anyhow::Error> {
     let (mut ws_sender, mut ws_receiver) = socket.split();
-
-    let peer_id: PeerId = (*peer_id).clone();
-    let peer_id_msg: ServerMessage = peer_id.clone().into();
 
     let login_state = if user_state.is_some() { ServerUser::Login } else { ServerUser::Logout };
     // Send out the login state
     ws_sender.send(login_state.try_into()?).await?;
-    // Send out the session specific peer id
-    ws_sender.send(peer_id_msg.try_into()?).await?;
 
-    // Join the user room if logged in
-    if let Some(user) = user_state.as_ref() {
-        user_join_room(&mut ws_sender, &rtc_room_state, &peer_id, user).await?;
-    }
+    let mut peer_id = None::<PeerId>;
 
     let mut interval = time::interval(Duration::from_secs(30));
 
@@ -83,8 +83,11 @@ async fn handle_socket_inner(
                             // Update the user that they are now logged in
                             ws_sender.send(ServerUser::Login.try_into()?).await;
 
-                            // Join the user to the room
-                            user_join_room(&mut ws_sender, &rtc_room_state, &peer_id, user_state.as_ref().unwrap()).await?;
+                            // If they've given us their peer id
+                            if let Some(peer_id) = peer_id.as_ref() {
+                                // Join the user to the room
+                                user_join_room(&mut ws_sender, &rtc_room_state, peer_id, user_state.as_ref().unwrap()).await?;
+                            }
                         },
                         ClientControlMessage::Logout => {
                             let prev_user = user_state.take();
@@ -93,9 +96,10 @@ async fn handle_socket_inner(
                             // Update the user that they are now logged out
                             ws_sender.send(ServerUser::Logout.try_into()?).await;
 
-                            if let Some(user) = prev_user {
+                            // If they were logged in and have shared a peer id with us
+                            if let (Some(user), Some(peer_id)) = (prev_user, peer_id.as_ref()) {
                                 // Remove the user from the room
-                                user_exit_room(&mut ws_sender, &rtc_room_state, &peer_id, &user).await?;
+                                user_exit_room(&mut ws_sender, &rtc_room_state, peer_id, &user).await?;
                             }
                         },
                         ClientControlMessage::RtcStp { sdp, peer } => {
@@ -128,7 +132,28 @@ async fn handle_socket_inner(
                         text_or_binary => {
                             let message = ClientMessage::try_from(text_or_binary)?;
                             debug!("WsClient {socket_addr:?}: got client message: {message:?}");
-                            handle_client_message(&mut ws_sender, &peer_id, message, &clients).await?;
+                            match message {
+                                ClientMessage::Rtc(ClientRtc::Announce { peer_id: peer_id_ }) => {
+                                    debug!("Got peer id from client: {peer_id_:?}");
+                                    peer_id = Some(peer_id_.clone());
+
+                                    // Add the client to the client map now we have it's peer Id
+                                    clients.add(peer_id_.clone(), client.clone());
+
+                                    // Join the user room if logged in
+                                    if let Some(user) = user_state.as_ref() {
+                                        user_join_room(&mut ws_sender, &rtc_room_state, &peer_id_, user).await?;
+                                    }
+                                },
+                                other => {
+                                    // If they've given us their peer id
+                                    if let Some(peer_id) = peer_id.as_ref() {
+                                        handle_client_message(&mut ws_sender, peer_id, other, &clients, &socket_addr).await?;
+                                    } else {
+                                        error!("Got client message: {other:?} but peer id wasn't set");
+                                    }
+                                },
+                            }
                         },
                     }
                 },
@@ -144,15 +169,21 @@ async fn handle_socket_inner(
         }
     }
 
-    if let Some(user) = user_state.as_ref() {
+    if let (Some(user), Some(peer_id)) = (user_state.as_ref(), peer_id.as_ref()) {
         // Remove the user from the room
-        user_exit_room(&mut ws_sender, &rtc_room_state, &peer_id, user).await?;
+        user_exit_room(&mut ws_sender, &rtc_room_state, peer_id, user).await?;
     }
 
-    clients.remove(&peer_id);
+    if let Some(peer_id) = peer_id.as_ref() {
+        clients.remove(peer_id);
+    }
+
+    clients_by_session_id.remove(&session_id, &socket_addr);
 
     // returning from the handler closes the websocket connection
     debug!("context destroyed ({socket_addr})");
+    trace!("Clients: {clients:?}");
+    trace!("Rooms: {rtc_room_state:?}");
 
     Ok(())
 }
@@ -191,22 +222,23 @@ async fn handle_client_message(
     peer_id: &PeerId,
     message: ClientMessage,
     clients: &Clients,
+    socket_addr: &SocketAddr,
 ) -> Result<(), anyhow::Error> {
     match message {
-        ClientMessage::Rtc(ClientRtc::Sdp { sdp, peer }) => {
-            if let Some(peer_client) = clients.get(&peer) {
-                debug!("Forwarding sdp (type: {:?}) from {peer_id} to {peer}", sdp.type_);
+        ClientMessage::Rtc(ClientRtc::Sdp { sdp, peer: target_peer_id }) => {
+            if let Some(peer_client) = clients.get(&target_peer_id) {
+                debug!("Forwarding sdp (type: {:?}) from {peer_id} to {target_peer_id}", sdp.type_);
                 peer_client
                     .send(ClientControlMessage::RtcStp { sdp, peer: peer_id.clone() })
                     .await?;
             } else {
-                error!("Failed to find client matching offer peer_id {peer}");
+                error!("Failed to find client matching offer peer_id {target_peer_id}");
                 // TODO: send error back to client
             }
         },
-        ClientMessage::Rtc(ClientRtc::IceCandidate { candidate, peer }) => {
-            if let Some(peer_client) = clients.get(&peer) {
-                debug!("Forwarding ice candidate from {peer_id} to {peer}");
+        ClientMessage::Rtc(ClientRtc::IceCandidate { candidate, peer: target_peer_id }) => {
+            if let Some(peer_client) = clients.get(&target_peer_id) {
+                debug!("Forwarding ice candidate from {peer_id} to {target_peer_id}");
                 peer_client
                     .send(ClientControlMessage::RtcIceCandidate {
                         candidate,
@@ -214,10 +246,13 @@ async fn handle_client_message(
                     })
                     .await?;
             } else {
-                error!("Failed to find client matching ice candidate peer_id {peer}");
+                error!("Failed to find client matching ice candidate peer_id {target_peer_id}");
                 // TODO: send error back to client
             }
         },
+
+        // Handled by outer loop
+        ClientMessage::Rtc(ClientRtc::Announce { .. }) => unreachable!(),
     }
 
     Ok(())

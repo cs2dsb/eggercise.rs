@@ -1,4 +1,7 @@
-use std::{error::Error, fmt::Display, ops::Deref};
+use std::{
+    error::Error,
+    fmt::{self, Display},
+};
 
 use axum::{
     async_trait,
@@ -17,7 +20,7 @@ use serde_json::Value;
 use shared::{
     api::error::{Nothing, ResultContext, ServerError},
     model::{User, UserId},
-    types::{rtc::PeerId, Uuid},
+    types::Uuid,
 };
 use tower_sessions::{
     session::{Error as SessionError, Id},
@@ -74,22 +77,10 @@ impl From<Id> for SessionId {
 }
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
-pub struct PeerIdState(PeerId);
-
-impl Deref for PeerIdState {
-    type Target = PeerId;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 struct SessionData {
     passkey_registration_state: Option<PasskeyRegistrationState>,
     passkey_authentication_state: Option<PasskeyAuthenticationState>,
     user_state: Option<UserState>,
-    peer_id: PeerIdState,
 }
 
 #[derive(Debug, Clone)]
@@ -217,11 +208,6 @@ where
                         {
                             default.user_state = user_state;
                         }
-                        if let Some(peer_id) =
-                            v.remove("peer_id").map(|v| serde_json::from_value(v).ok()).flatten()
-                        {
-                            default.peer_id = peer_id;
-                        }
                     }
 
                     (default, true)
@@ -243,6 +229,12 @@ pub struct JsonOrText<T: Serialize + Display> {
     json: bool,
     code: StatusCode,
     body: T,
+}
+
+impl<T: Serialize + Display> fmt::Debug for JsonOrText<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        Display::fmt(&self.body, f)
+    }
 }
 
 impl<T: Serialize + Display> JsonOrText<T> {
@@ -335,24 +327,5 @@ where
             .ok_or_else(|| (StatusCode::INTERNAL_SERVER_ERROR, format!("Session had None id")))?;
 
         Ok(id.into())
-    }
-}
-
-#[async_trait]
-impl<S> FromRequestParts<S> for PeerIdState
-where
-    S: Send + Sync,
-{
-    type Rejection = (StatusCode, String);
-
-    async fn from_request_parts(req: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
-        let sv = SessionValue::from_request_parts(req, state).await.map_err(|e| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Failed to construct SessionValue from_request_parts: {:?}", e),
-            )
-        })?;
-
-        Ok(sv.data.peer_id)
     }
 }
