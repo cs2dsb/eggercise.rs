@@ -20,8 +20,9 @@ use wasm_bindgen_futures::JsFuture;
 use web_sys::{
     js_sys::{ArrayBuffer, JsString, Reflect, Uint8Array},
     ErrorEvent, Event, MessageEvent, RtcConfiguration, RtcDataChannel, RtcDataChannelEvent,
-    RtcDataChannelInit, RtcDataChannelState, RtcDataChannelType, RtcPeerConnection,
-    RtcPeerConnectionIceEvent, RtcSdpType, RtcSessionDescriptionInit, RtcSignalingState,
+    RtcDataChannelInit, RtcDataChannelState, RtcDataChannelType, RtcIceConnectionState,
+    RtcPeerConnection, RtcPeerConnectionIceEvent, RtcPeerConnectionState, RtcSdpType,
+    RtcSessionDescriptionInit, RtcSignalingState,
 };
 
 /// The role this peer is taking
@@ -56,6 +57,7 @@ struct Peer {
     their_peer_id: PeerId,
     role: PerfectRole,
     queued_candidates: Vec<IceCandidate>,
+    peer_update_sender: UnboundedSender<(PeerId, PeerUpdate)>,
 
     // Hang on to them for de-registering
     closures: Closures,
@@ -105,13 +107,26 @@ macro_rules! replace_handler {
     }};
 }
 
+#[derive(Debug)]
+enum PeerUpdate {
+    DataChannel(RtcDataChannel),
+    DataChannelClosed,
+    Destroy,
+}
+
+impl From<RtcDataChannel> for PeerUpdate {
+    fn from(value: RtcDataChannel) -> Self {
+        Self::DataChannel(value)
+    }
+}
+
 impl Peer {
     fn new(
         waker: Rc<RefCell<Option<Waker>>>,
         signaling_sender: SocketSink<ClientMessage>,
         our_peer_id: PeerId,
         their_peer_id: PeerId,
-        channel_sender: UnboundedSender<(PeerId, RtcDataChannel)>,
+        peer_update_sender: UnboundedSender<(PeerId, PeerUpdate)>,
     ) -> Result<Self, FrontendError<Nothing>> {
         // Since both parties know the peer IDs this will result in them picking the correct roles
         let role =
@@ -166,8 +181,19 @@ impl Peer {
 
         let peer_iceconnectionstatechange_callback: Closure<dyn FnMut(_)> = {
             let waker = Rc::clone(&waker);
+            let target_key = JsValue::from_str("target");
             Closure::wrap(Box::new(move |event: Event| {
-                debug!("peer_iceconnectionstatechange callback: {event:?}");
+                let peer: RtcPeerConnection =
+                    Reflect::get(&event, &target_key).expect("event.target").into();
+                let state = peer.ice_connection_state();
+                debug!("peer_iceconnectionstatechange callback: {state:?}");
+                match state {
+                    // TODO: do an ice restart
+                    RtcIceConnectionState::Failed => {},
+                    // cancel ice restart? Some browser differences apparently
+                    RtcIceConnectionState::Disconnected => {},
+                    _ => {},
+                }
                 if let Some(waker) = waker.borrow_mut().take() {
                     waker.wake();
                 }
@@ -178,10 +204,27 @@ impl Peer {
             peer_iceconnectionstatechange_callback.as_ref().unchecked_ref(),
         )?;
 
+        let peer_update_sender_ = peer_update_sender.clone();
+        let their_peer_id_ = their_peer_id.clone();
         let peer_connectionstatechange_callback: Closure<dyn FnMut(_)> = {
             let waker = Rc::clone(&waker);
+            let target_key = JsValue::from_str("target");
             Closure::wrap(Box::new(move |event: Event| {
-                debug!("peer_connectionstatechange callback: {event:?}");
+                let peer: RtcPeerConnection =
+                    Reflect::get(&event, &target_key).expect("event.target").into();
+                let state = peer.connection_state();
+                debug!("peer_connectionstatechange callback: {:?}", state);
+                match state {
+                    RtcPeerConnectionState::Closed
+                    // TODO: maybe wait if we try an ICE restart?
+                    | RtcPeerConnectionState::Failed
+                    | RtcPeerConnectionState::Disconnected => {
+                        peer_update_sender_
+                            .unbounded_send((their_peer_id_.clone(), PeerUpdate::Destroy))
+                            .expect("peer_connectionstatechange_callback unbounded_send");
+                    },
+                    _ => {},
+                }
                 if let Some(waker) = waker.borrow_mut().take() {
                     waker.wake();
                 }
@@ -210,6 +253,7 @@ impl Peer {
             peer_icegatheringstatechange_callback.as_ref().unchecked_ref(),
         )?;
 
+        let peer_update_sender_ = peer_update_sender.clone();
         let their_peer_id_ = their_peer_id.clone();
         let peer_datachannel_callback: Closure<dyn FnMut(_)> = {
             let waker = Rc::clone(&waker);
@@ -217,8 +261,8 @@ impl Peer {
                 let channel = event.channel();
                 debug!("peer_datachannel callback: {:?}", channel);
 
-                channel_sender
-                    .unbounded_send((their_peer_id_.clone(), channel))
+                peer_update_sender_
+                    .unbounded_send((their_peer_id_.clone(), channel.into()))
                     .expect("peer_datachannel_callback unbounded_send");
 
                 if let Some(waker) = waker.borrow_mut().take() {
@@ -292,6 +336,7 @@ impl Peer {
             role,
             signaling_sender,
             queued_candidates,
+            peer_update_sender,
         })
     }
 
@@ -300,6 +345,18 @@ impl Peer {
         channel: RtcDataChannel,
     ) -> Result<(), FrontendError<Nothing>> {
         self.create_channel(Some(channel)).await?;
+        Ok(())
+    }
+
+    fn close_datachannel(&mut self) -> Result<(), FrontendError<Nothing>> {
+        if let Some(channel) = self.channel.take() {
+            channel.close();
+            remove_handler!(&channel, "error", &mut self.closures.channel_error,);
+            remove_handler!(&channel, "message", &mut self.closures.channel_message,);
+            remove_handler!(&channel, "open", &mut self.closures.channel_open,);
+            remove_handler!(&channel, "close", &mut self.closures.channel_close,);
+        }
+
         Ok(())
     }
 
@@ -381,13 +438,17 @@ impl Peer {
         };
         replace_handler!(&channel, "open", channel_open_callback, &mut self.closures.channel_open);
 
+        let peer_update_sender = self.peer_update_sender.clone();
+        let their_peer_id = self.their_peer_id.clone();
         let channel_close_callback: Closure<dyn FnMut(_)> = {
             let waker = Rc::clone(&waker);
-            let target_key = JsValue::from_str("target");
-            Closure::wrap(Box::new(move |event: Event| {
-                let channel: RtcDataChannel =
-                    Reflect::get(&event, &target_key).expect("event.target").into();
-                debug!("channel_close callback: Channel id: {:?}", channel.id());
+            Closure::wrap(Box::new(move |_event: Event| {
+                debug!("channel_close callback");
+
+                peer_update_sender
+                    .unbounded_send((their_peer_id.clone(), PeerUpdate::DataChannelClosed))
+                    .expect("channel_close_callback unbounded_send");
+
                 if let Some(waker) = waker.borrow_mut().take() {
                     waker.wake();
                 }
@@ -667,13 +728,10 @@ impl Peer {
         Ok(())
     }
 
-    #[allow(unused)]
     fn close(mut self) -> Result<(), FrontendError<Nothing>> {
-        if let Some(channel) = self.channel.take() {
-            channel.close();
-        }
+        self.close_datachannel()?;
 
-        remove_handler!(&self.peer, "icecandidate", &mut self.closures.peer_icecandidate);
+        remove_handler!(&self.peer, "icecandidate", &mut self.closures.peer_icecandidate,);
         remove_handler!(
             &self.peer,
             "iceconnectionstatechange",
@@ -689,8 +747,8 @@ impl Peer {
             "icegatheringstatechange",
             &mut self.closures.peer_icegatheringstatechange
         );
-        remove_handler!(&self.peer, "datachannel", &mut self.closures.peer_datachannel);
-        remove_handler!(&self.peer, "negotiationneeded", &mut self.closures.peer_negotiationneeded);
+        remove_handler!(&self.peer, "datachannel", &mut self.closures.peer_datachannel,);
+        remove_handler!(&self.peer, "negotiationneeded", &mut self.closures.peer_negotiationneeded,);
         remove_handler!(
             &self.peer,
             "signalingstatechange",
@@ -745,7 +803,7 @@ impl RtcInner {
             our_peer_id: &Option<PeerId>,
             their_peer_id: &PeerId,
             peers: &'a mut HashMap<PeerId, Peer>,
-            channel_sender: &UnboundedSender<(PeerId, RtcDataChannel)>,
+            peer_sender: &UnboundedSender<(PeerId, PeerUpdate)>,
         ) -> Result<(&'a mut Peer, bool), FrontendError<Nothing>> {
             let our_peer_id = our_peer_id.as_ref().ok_or(FrontendError::Other {
                 message: format!("Got peer signaling messages before our_peer_id was set"),
@@ -758,7 +816,7 @@ impl RtcInner {
                     sender.clone(),
                     our_peer_id.clone(),
                     their_peer_id.clone(),
-                    channel_sender.clone(),
+                    peer_sender.clone(),
                 )?;
                 peers.insert(their_peer_id.clone(), peer);
                 true
@@ -797,7 +855,15 @@ impl RtcInner {
                                 // We currently never close the sender
                                 unreachable!();
                             },
-                            Some((their_peer_id, channel)) => {
+                            Some((their_peer_id, PeerUpdate::Destroy)) => {
+                                debug!("Got destroy for peer: {their_peer_id}");
+                                if let Some(peer) = peers.remove(&their_peer_id) {
+                                    peer.close()?;
+                                } else {
+                                    unreachable!("Can't get PeerUpdate from non-existent peer");
+                                }
+                            },
+                            Some((their_peer_id, update)) => {
                                 let (peer, new) = ensure_peer(
                                     &waker_,
                                     &sender,
@@ -806,10 +872,23 @@ impl RtcInner {
                                     &mut peers,
                                     &channel_sender,
                                 )?;
-                                assert!(!new, "Can't get datachannel from non-existent peer");
+                                assert!(!new, "Can't get PeerUpdate from non-existent peer");
 
-                                debug!("Got datachannel for peer: {their_peer_id}");
-                                peer.handle_datachannel(channel).await?;
+                                match update {
+                                    PeerUpdate::DataChannel(channel) => {
+                                        debug!("Got datachannel for peer: {their_peer_id}");
+                                        peer.handle_datachannel(channel).await?;
+                                    },
+
+                                    PeerUpdate::DataChannelClosed => {
+                                        debug!("Got datachannel close for peer: {their_peer_id}");
+                                        peer.close_datachannel()?;
+                                    },
+
+                                    // Handled above
+                                    PeerUpdate::Destroy => unreachable!(),
+                                }
+
                             },
                         },
 
