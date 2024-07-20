@@ -98,12 +98,8 @@ async fn handle_socket_inner(
                                 user_exit_room(&mut ws_sender, &rtc_room_state, &peer_id, &user).await?;
                             }
                         },
-                        ClientControlMessage::RtcOffer { offer, peer } => {
-                            let message: ServerMessage = ServerRtc::PeerOffer { offer, peer }.into();
-                            ws_sender.send(message.try_into()?).await?;
-                        },
-                        ClientControlMessage::RtcAnswer { answer, peer } => {
-                            let message: ServerMessage = ServerRtc::PeerAnswer { answer, peer }.into();
+                        ClientControlMessage::RtcStp { sdp, peer } => {
+                            let message: ServerMessage = ServerRtc::PeerSdp { sdp, peer }.into();
                             ws_sender.send(message.try_into()?).await?;
                         },
                         ClientControlMessage::RtcIceCandidate { candidate, peer } => {
@@ -146,6 +142,11 @@ async fn handle_socket_inner(
                 },
             },
         }
+    }
+
+    if let Some(user) = user_state.as_ref() {
+        // Remove the user from the room
+        user_exit_room(&mut ws_sender, &rtc_room_state, &peer_id, user).await?;
     }
 
     clients.remove(&peer_id);
@@ -192,25 +193,14 @@ async fn handle_client_message(
     clients: &Clients,
 ) -> Result<(), anyhow::Error> {
     match message {
-        ClientMessage::Rtc(ClientRtc::Offer { offer, peer }) => {
+        ClientMessage::Rtc(ClientRtc::Sdp { sdp, peer }) => {
             if let Some(peer_client) = clients.get(&peer) {
-                debug!("Forwarding offer from {peer_id} to {peer}");
+                debug!("Forwarding sdp (type: {:?}) from {peer_id} to {peer}", sdp.type_);
                 peer_client
-                    .send(ClientControlMessage::RtcOffer { offer, peer: peer_id.clone() })
+                    .send(ClientControlMessage::RtcStp { sdp, peer: peer_id.clone() })
                     .await?;
             } else {
                 error!("Failed to find client matching offer peer_id {peer}");
-                // TODO: send error back to client
-            }
-        },
-        ClientMessage::Rtc(ClientRtc::Answer { answer, peer }) => {
-            if let Some(peer_client) = clients.get(&peer) {
-                debug!("Forwarding answer from {peer_id} to {peer}");
-                peer_client
-                    .send(ClientControlMessage::RtcAnswer { answer, peer: peer_id.clone() })
-                    .await?;
-            } else {
-                error!("Failed to find client matching answer peer_id {peer}");
                 // TODO: send error back to client
             }
         },
@@ -232,39 +222,3 @@ async fn handle_client_message(
 
     Ok(())
 }
-
-// /// helper to print contents of messages to stdout. Has special treatment for
-// /// Close.
-// fn process_message(msg: WSMessage, who: SocketAddr) -> ControlFlow<(), ()> {
-//     match msg {
-//         WSMessage::Text(t) => {
-//             println!(">>> {who} sent str: {t:?}");
-//         }
-//         WSMessage::Binary(d) => {
-//             println!(">>> {} sent {} bytes: {:?}", who, d.len(), d);
-//         }
-//         WSMessage::Close(c) => {
-//             if let Some(cf) = c {
-//                 println!(
-//                     ">>> {} sent close with code {} and reason `{}`",
-//                     who, cf.code, cf.reason
-//                 );
-//             } else {
-//                 println!(">>> {who} somehow sent close message without
-// CloseFrame");             }
-//             return ControlFlow::Break(());
-//         }
-
-//         WSMessage::Pong(v) => {
-//             println!(">>> {who} sent pong with {v:?}");
-//         }
-//         // You should never need to manually handle WSMessage::Ping, as
-// axum's websocket library         // will do so for you automagically by
-// replying with Pong and copying the v according to         // spec. But if you
-// need the contents of the pings you can see them here.
-//         WSMessage::Ping(v) => {
-//             println!(">>> {who} sent ping with {v:?}");
-//         }
-//     }
-//     ControlFlow::Continue(())
-// }

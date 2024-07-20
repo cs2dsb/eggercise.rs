@@ -9,7 +9,7 @@ use dashmap::DashMap;
 use loole::Sender;
 use shared::types::{
     rtc::PeerId,
-    websocket::{IceCandidate, Offer},
+    websocket::{IceCandidate, Sdp},
 };
 
 use crate::{AppState, PeerIdState, UserState};
@@ -18,8 +18,7 @@ use crate::{AppState, PeerIdState, UserState};
 pub enum ClientControlMessage {
     Login(UserState),
     Logout,
-    RtcOffer { offer: Offer, peer: PeerId },
-    RtcAnswer { answer: Offer, peer: PeerId },
+    RtcStp { sdp: Sdp, peer: PeerId },
     RtcIceCandidate { candidate: IceCandidate, peer: PeerId },
 }
 

@@ -5,15 +5,13 @@ use serde::{Deserialize, Serialize};
 use super::ClientMessage;
 use crate::types::{
     rtc::PeerId,
-    websocket::{IceCandidate, Offer},
+    websocket::{IceCandidate, Sdp},
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ClientRtc {
-    /// Offer to connect to a peer
-    Offer { offer: Offer, peer: PeerId },
-    /// Answer to an offer
-    Answer { answer: Offer, peer: PeerId },
+    /// Offer or answer to connect to a peer
+    Sdp { sdp: Sdp, peer: PeerId },
     /// An ice candidate
     IceCandidate { candidate: IceCandidate, peer: PeerId },
 }

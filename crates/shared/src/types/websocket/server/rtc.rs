@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use super::ServerMessage;
 use crate::types::{
     rtc::PeerId,
-    websocket::{IceCandidate, Offer},
+    websocket::{IceCandidate, Sdp},
 };
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ServerRtc {
@@ -11,10 +11,8 @@ pub enum ServerRtc {
     PeerId(PeerId),
     /// Room peers
     RoomPeers(Vec<PeerId>),
-    /// An offer relayed from a peer
-    PeerOffer { offer: Offer, peer: PeerId },
-    /// An answer relayed from a peer
-    PeerAnswer { answer: Offer, peer: PeerId },
+    /// An offer or answer relayed from a peer
+    PeerSdp { sdp: Sdp, peer: PeerId },
     /// An ice candidate
     IceCandidate { candidate: IceCandidate, peer: PeerId },
 }
