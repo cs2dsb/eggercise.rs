@@ -13,9 +13,15 @@ pub enum ClientRtc {
     /// Peer informing server of it's id
     Announce { peer_id: PeerId },
     /// Offer or answer to connect to a peer
-    Sdp { sdp: Sdp, peer: PeerId },
+    Sdp {
+        sdp: Sdp,
+        /// The peer_id of the peer the offer/answer is FOR
+        peer_id: PeerId,
+        /// The petname of the peer the offer/answer if FROM
+        petname: String,
+    },
     /// An ice candidate
-    IceCandidate { candidate: IceCandidate, peer: PeerId },
+    IceCandidate { candidate: IceCandidate, peer_id: PeerId },
 }
 
 impl From<ClientRtc> for ClientMessage {

@@ -3875,9 +3875,9 @@ dependencies = [
 
 [[package]]
 name = "reconnecting-websocket"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "11bfcff4406aef0b5ff4b3a94ba2c4abb2e9812b4c2776b9af63d0ec335e487d"
+checksum = "ff77f47fd3a7c9fa49f13677517f6df6532826a1782a1a88412a6430ee5cee55"
 dependencies = [
  "cfg-if",
  "exponential-backoff",

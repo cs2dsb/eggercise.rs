@@ -11,7 +11,7 @@ use shared::{
     api::error::{FrontendError, Nothing, ResultContext},
     types::{
         rtc::PeerId,
-        websocket::{ClientMessage, ClientRtc, IceCandidate, Sdp, SdpType, ServerRtc},
+        websocket::{ClientMessage, ClientRtc, IceCandidate, RoomPeer, Sdp, SdpType, ServerRtc},
     },
 };
 use tracing::{debug, error, info, warn};
@@ -58,7 +58,8 @@ struct Peer {
     role: PerfectRole,
     queued_candidates: Vec<IceCandidate>,
     peer_update_sender: UnboundedSender<(PeerId, PeerUpdate)>,
-    petname: String,
+    our_petname: String,
+    their_petname: String,
 
     // Hang on to them for de-registering
     closures: Closures,
@@ -128,8 +129,11 @@ impl Peer {
         our_peer_id: PeerId,
         their_peer_id: PeerId,
         peer_update_sender: UnboundedSender<(PeerId, PeerUpdate)>,
-        petname: &str,
+        our_petname: &str,
+        their_petname: String,
     ) -> Result<Self, FrontendError<Nothing>> {
+        let compound_petname = format!("{our_petname} [{their_petname}]");
+
         // Since both parties know the peer IDs this will result in them picking the correct roles
         let role =
             if our_peer_id > their_peer_id { PerfectRole::Polite } else { PerfectRole::Impolite };
@@ -145,7 +149,7 @@ impl Peer {
 
         let signaling_sender_ = signaling_sender.clone();
         let their_peer_id_ = their_peer_id.clone();
-        let petname_ = petname.to_string();
+        let petname_ = compound_petname.clone();
         let peer_icecandidate_callback: Closure<dyn FnMut(_)> = {
             let waker = Rc::clone(&waker);
             Closure::wrap(Box::new(move |event: RtcPeerConnectionIceEvent| {
@@ -161,7 +165,7 @@ impl Peer {
                             .send(
                                 ClientRtc::IceCandidate {
                                     candidate: candidate.into(),
-                                    peer: their_peer_id_.clone(),
+                                    peer_id: their_peer_id_.clone(),
                                 }
                                 .into(),
                             )
@@ -186,7 +190,7 @@ impl Peer {
             peer_icecandidate_callback.as_ref().unchecked_ref(),
         )?;
 
-        let petname_ = petname.to_string();
+        let petname_ = compound_petname.clone();
         let peer_iceconnectionstatechange_callback: Closure<dyn FnMut(_)> = {
             let waker = Rc::clone(&waker);
             let target_key = JsValue::from_str("target");
@@ -214,7 +218,7 @@ impl Peer {
 
         let peer_update_sender_ = peer_update_sender.clone();
         let their_peer_id_ = their_peer_id.clone();
-        let petname_ = petname.to_string();
+        let petname_ = compound_petname.clone();
         let peer_connectionstatechange_callback: Closure<dyn FnMut(_)> = {
             let waker = Rc::clone(&waker);
             let target_key = JsValue::from_str("target");
@@ -244,7 +248,7 @@ impl Peer {
             peer_connectionstatechange_callback.as_ref().unchecked_ref(),
         )?;
 
-        let petname_ = petname.to_string();
+        let petname_ = compound_petname.clone();
         let peer_icegatheringstatechange_callback: Closure<dyn FnMut(_)> = {
             let waker = Rc::clone(&waker);
             let target_key = JsValue::from_str("target");
@@ -268,7 +272,7 @@ impl Peer {
 
         let peer_update_sender_ = peer_update_sender.clone();
         let their_peer_id_ = their_peer_id.clone();
-        let petname_ = petname.to_string();
+        let petname_ = compound_petname.clone();
         let peer_datachannel_callback: Closure<dyn FnMut(_)> = {
             let waker = Rc::clone(&waker);
             Closure::wrap(Box::new(move |event: RtcDataChannelEvent| {
@@ -289,7 +293,7 @@ impl Peer {
             peer_datachannel_callback.as_ref().unchecked_ref(),
         )?;
 
-        let petname_ = petname.to_string();
+        let petname_ = compound_petname.clone();
         let peer_negotiationneeded_callback: Closure<dyn FnMut(_)> = {
             let waker = Rc::clone(&waker);
             Closure::wrap(Box::new(move |event: Event| {
@@ -305,7 +309,7 @@ impl Peer {
             peer_negotiationneeded_callback.as_ref().unchecked_ref(),
         )?;
 
-        let petname_ = petname.to_string();
+        let petname_ = compound_petname.clone();
         let peer_signalingstatechange_callback: Closure<dyn FnMut(_)> = {
             let waker = Rc::clone(&waker);
             let target_key = JsValue::from_str("target");
@@ -330,7 +334,7 @@ impl Peer {
 
         let channel = None;
         let queued_candidates = Vec::new();
-        let petname = petname.to_string();
+        let our_petname = our_petname.to_string();
 
         let closures = Closures {
             channel_error: None,
@@ -357,8 +361,13 @@ impl Peer {
             signaling_sender,
             queued_candidates,
             peer_update_sender,
-            petname,
+            our_petname,
+            their_petname,
         })
+    }
+
+    fn compound_petname(&self) -> String {
+        format!("{} [{}]", self.our_petname, self.their_petname)
     }
 
     async fn handle_datachannel(
@@ -385,8 +394,10 @@ impl Peer {
         &mut self,
         channel: Option<RtcDataChannel>,
     ) -> Result<(), FrontendError<Nothing>> {
+        let compound_petname = self.compound_petname();
+
         if let Some(channel) = self.channel.take() {
-            debug!("{}: Closing data channel", &self.petname);
+            debug!("{compound_petname}: Closing data channel");
             channel.close();
         }
 
@@ -394,7 +405,7 @@ impl Peer {
             let mut config = RtcDataChannelInit::new();
             config.ordered(true);
 
-            debug!("{}: creating channel", &self.petname);
+            debug!("{compound_petname}: creating channel");
             self.peer.create_data_channel_with_data_channel_dict("client data", &config)
         });
 
@@ -402,7 +413,7 @@ impl Peer {
 
         let waker = &self.waker;
 
-        let petname_ = self.petname.clone();
+        let petname_ = compound_petname.clone();
         let channel_error_callback: Closure<dyn FnMut(_)> = {
             let waker = Rc::clone(&waker);
             // TODO: Not sure this is the right event type
@@ -420,7 +431,7 @@ impl Peer {
             &mut self.closures.channel_error
         );
 
-        let petname_ = self.petname.clone();
+        let petname_ = compound_petname.clone();
         let channel_message_callback: Closure<dyn FnMut(_)> = {
             let waker = Rc::clone(&waker);
             Closure::wrap(Box::new(move |event: MessageEvent| {
@@ -450,7 +461,7 @@ impl Peer {
             &mut self.closures.channel_message
         );
 
-        let petname_ = self.petname.clone();
+        let petname_ = compound_petname.clone();
         let channel_open_callback: Closure<dyn FnMut(_)> = {
             let waker = Rc::clone(&waker);
             Closure::wrap(Box::new(move |event: RtcDataChannelEvent| {
@@ -462,7 +473,7 @@ impl Peer {
         };
         replace_handler!(&channel, "open", channel_open_callback, &mut self.closures.channel_open);
 
-        let petname_ = self.petname.clone();
+        let petname_ = compound_petname.clone();
         let peer_update_sender = self.peer_update_sender.clone();
         let their_peer_id = self.their_peer_id.clone();
         let channel_close_callback: Closure<dyn FnMut(_)> = {
@@ -500,6 +511,8 @@ impl Peer {
         use RtcSignalingState::*;
         use SdpType::{Answer as AnswerT, Offer as OfferT};
 
+        let compound_petname = self.compound_petname();
+
         // Could calculate just_established from the others but this is more explicit
         let (set_remote, response, just_established) = match (
             offer.as_ref().map(|o| o.type_),
@@ -511,9 +524,9 @@ impl Peer {
             // Unexpected offer or answer on an established connection
             (Some(_), true, true, Stable, _) => {
                 warn!(
-                    "{}: got offer when remote desc is set and signaling_state is stable. \
-                     Ignoring. (their_peer_id: {})",
-                    self.petname, self.their_peer_id
+                    "{compound_petname}: got offer when remote desc is set and signaling_state is \
+                     stable. Ignoring. (their_peer_id: {})",
+                    self.their_peer_id
                 );
 
                 // Don't set or send anything
@@ -523,9 +536,9 @@ impl Peer {
             // Unexpected call without offer or answer
             (None, true, true, Stable, _) => {
                 debug!(
-                    "{}: perform_signaling called with no offer on established connection. \
-                     Ignoring. (their_peer_id: {})",
-                    self.petname, self.their_peer_id
+                    "{compound_petname}: perform_signaling called with no offer on established \
+                     connection. Ignoring. (their_peer_id: {})",
+                    self.their_peer_id
                 );
 
                 // Don't set or send anything
@@ -535,15 +548,15 @@ impl Peer {
             // Conflict/glare offer on unestablished when we are polite
             (Some(OfferT), false, true, HaveLocalOffer, Polite) => {
                 warn!(
-                    "{}: glare (polite): got offer when we have local desc. Rolling back. \
-                     (their_peer_id: {})",
-                    self.petname, self.their_peer_id
+                    "{compound_petname}: glare (polite): got offer when we have local desc. \
+                     Rolling back. (their_peer_id: {})",
+                    self.their_peer_id
                 );
 
                 // We will have created a channel as part of our offer which will be replaced when
                 // accepting their offer Close channel
                 if let Some(channel) = self.channel.take() {
-                    debug!("{}: Closing data channel", self.petname);
+                    debug!("{}: Closing data channel", self.our_petname);
                     channel.close();
                 }
 
@@ -554,8 +567,9 @@ impl Peer {
                     .map_err(FrontendError::from)
                     .with_context(|| {
                         format!(
-                            "{}: set_local_description(rollback). (their_peer_id: {})",
-                            self.petname, self.their_peer_id
+                            "{compound_petname}: set_local_description(rollback). (their_peer_id: \
+                             {})",
+                            self.their_peer_id
                         )
                     })?;
 
@@ -566,9 +580,9 @@ impl Peer {
             // Conflict/glare offer on unestablished when we are impolite
             (Some(OfferT), false, true, HaveLocalOffer, Impolite) => {
                 warn!(
-                    "{}: glare (impolite): got offer when we have local desc. Ignoring. \
-                     (their_peer_id: {})",
-                    self.petname, self.their_peer_id
+                    "{compound_petname}: glare (impolite): got offer when we have local desc. \
+                     Ignoring. (their_peer_id: {})",
+                    self.their_peer_id
                 );
 
                 // Don't set or send anything
@@ -578,8 +592,8 @@ impl Peer {
             // Answer to our offer
             (Some(AnswerT), false, true, HaveLocalOffer, _) => {
                 debug!(
-                    "{}: got answer to our offer. Accepting. (their_peer_id: {})",
-                    self.petname, self.their_peer_id
+                    "{compound_petname}: got answer to our offer. Accepting. (their_peer_id: {})",
+                    self.their_peer_id
                 );
 
                 // Set remote but send nothing
@@ -589,9 +603,9 @@ impl Peer {
             // Offer to open on unestablished
             (Some(OfferT), false, false, Stable, _) => {
                 debug!(
-                    "{}: got offer, remote desc == none, local desc == none, Stable. Answering. \
-                     (their_peer_id: {})",
-                    self.petname, self.their_peer_id
+                    "{compound_petname}: got offer, remote desc == none, local desc == none, \
+                     Stable. Answering. (their_peer_id: {})",
+                    self.their_peer_id
                 );
 
                 // Set remote and send back an answer
@@ -601,9 +615,9 @@ impl Peer {
             // We're initiating
             (None, false, false, Stable, _) => {
                 debug!(
-                    "{}: initiating offer, remote desc == none, local desc == none, Stable. \
-                     Sending offer. (their_peer_id: {})",
-                    self.petname, self.their_peer_id
+                    "{compound_petname}: initiating offer, remote desc == none, local desc == \
+                     none, Stable. Sending offer. (their_peer_id: {})",
+                    self.their_peer_id
                 );
 
                 // Since we are offering, create the channel
@@ -616,9 +630,9 @@ impl Peer {
             // Should be impossible
             (o, r, l, s, p) => {
                 error!(
-                    "{}: unexpected situatuion - offer: {o:?}, remote desc: {r:?}, local desc: \
-                     {l:?}, state: {s:?}, {p:?}. (their_peer_id: {})",
-                    self.petname, self.their_peer_id
+                    "{compound_petname}: unexpected situatuion - offer: {o:?}, remote desc: \
+                     {r:?}, local desc: {l:?}, state: {s:?}, {p:?}. (their_peer_id: {})",
+                    self.their_peer_id
                 );
                 unreachable!();
             },
@@ -626,8 +640,8 @@ impl Peer {
 
         if set_remote {
             let offer = offer.expect(&format!(
-                "{}: set_remote but offer was None. (their_peer_id: {})",
-                self.petname, self.their_peer_id
+                "{compound_petname}: set_remote but offer was None. (their_peer_id: {})",
+                self.their_peer_id
             ));
 
             let remote_desc = {
@@ -642,23 +656,24 @@ impl Peer {
                 .map_err(FrontendError::from)
                 .with_context(|| {
                     format!(
-                        "{}: set_remote_description. our_peer_id: {}, their_peer_id: {}, sdp: {:?}",
-                        self.petname, self.our_peer_id, self.their_peer_id, offer.sdp
+                        "{compound_petname}: set_remote_description. our_peer_id: {}, \
+                         their_peer_id: {}, sdp: {:?}",
+                        self.our_peer_id, self.their_peer_id, offer.sdp
                     )
                 })?;
         }
 
         let local_desc: Option<RtcSessionDescriptionInit> = match response {
             Some(AnswerT) => {
-                debug!("{}: creating answer", self.petname);
+                debug!("{}: creating answer", self.our_petname);
                 // Create answer
                 let desc = JsFuture::from(self.peer.create_answer())
                     .await
                     .map_err(FrontendError::from)
                     .with_context(|| {
                         format!(
-                            "{}: create_answer. our_peer_id: {}, their_peer_id: {}",
-                            self.petname, self.our_peer_id, self.their_peer_id
+                            "{compound_petname}: create_answer. our_peer_id: {}, their_peer_id: {}",
+                            self.our_peer_id, self.their_peer_id
                         )
                     })?
                     .into();
@@ -673,8 +688,8 @@ impl Peer {
                     .map_err(FrontendError::from)
                     .with_context(|| {
                         format!(
-                            "{}: create_offer. our_peer_id: {}, their_peer_id: {}",
-                            self.petname, self.our_peer_id, self.their_peer_id
+                            "{compound_petname}: create_offer. our_peer_id: {}, their_peer_id: {}",
+                            self.our_peer_id, self.their_peer_id
                         )
                     })?
                     .into();
@@ -685,28 +700,33 @@ impl Peer {
         };
 
         if let Some(local_desc) = local_desc {
-            debug!("{}: setting local desc", self.petname);
+            debug!("{}: setting local desc", self.our_petname);
             // Set local description
             JsFuture::from(self.peer.set_local_description(&local_desc))
                 .await
                 .map_err(FrontendError::from)
                 .with_context(|| {
                     format!(
-                        "{}: set_local_description(answer). our_peer_id: {}, their_peer_id: {}",
-                        self.petname, self.our_peer_id, self.their_peer_id
+                        "{compound_petname}: set_local_description(answer). our_peer_id: {}, \
+                         their_peer_id: {}",
+                        self.our_peer_id, self.their_peer_id
                     )
                 })?;
 
             let local_desc = self.peer.local_description().ok_or(FrontendError::Client {
-                message: format!("{}: Local description missing after it was set", self.petname),
+                message: format!(
+                    "{}: Local description missing after it was set",
+                    self.our_petname
+                ),
             })?;
 
             let type_ = local_desc.type_().into();
             let sdp = Sdp { type_, sdp: local_desc.sdp() };
-            let peer = self.their_peer_id.clone();
-            let message = ClientRtc::Sdp { sdp, peer };
+            let peer_id = self.their_peer_id.clone();
+            let petname = self.our_petname.clone();
+            let message = ClientRtc::Sdp { sdp, peer_id, petname };
 
-            debug!("{}: sending signaling {:?}", self.petname, type_);
+            debug!("{compound_petname}: sending signaling {:?}", type_);
 
             sender.send(message.into()).await?;
         }
@@ -716,9 +736,8 @@ impl Peer {
             let ris = self.peer.remote_description().is_some();
             assert!(
                 state == RtcSignalingState::Stable && ris,
-                "{}: If just_established == true, State should be Stable (actually {state:?}) and \
-                 remote desc must be some (actually {ris}",
-                self.petname,
+                "{compound_petname}: If just_established == true, State should be Stable \
+                 (actually {state:?}) and remote desc must be some (actually {ris}",
             );
         }
 
@@ -740,7 +759,10 @@ impl Peer {
         if self.peer.signaling_state() != RtcSignalingState::Stable
             || self.peer.remote_description().is_none()
         {
-            warn!("{}: got ice candidate before connected and stable. queuing", self.petname);
+            warn!(
+                "{}: got ice candidate before connected and stable. queuing",
+                self.compound_petname()
+            );
             self.queued_candidates.push(candidate);
             return Ok(());
         }
@@ -789,12 +811,13 @@ impl Peer {
         data: T,
     ) -> Result<(), FrontendError<Nothing>> {
         if let Some(channel) = self.channel.as_ref() {
+            let compound_petname = self.compound_petname();
             let ready_state = channel.ready_state();
             if ready_state == RtcDataChannelState::Open {
-                debug!("{}: Sending: {data:?}", self.petname);
+                debug!("{compound_petname}: Sending: {data:?}");
                 channel.send_with_u8_array(data.as_ref())?;
             } else {
-                warn!("{}: Attempted to send on {ready_state:?} channel", self.petname);
+                warn!("{compound_petname}: Attempted to send on {ready_state:?} channel");
             }
         }
         Ok(())
@@ -823,6 +846,13 @@ impl RtcInner {
     ) -> Self {
         let waker_ = Rc::clone(&waker);
 
+        fn get_peer<'a>(
+            their_peer_id: &PeerId,
+            peers: &'a mut HashMap<PeerId, Peer>,
+        ) -> Option<&'a mut Peer> {
+            peers.get_mut(their_peer_id)
+        }
+
         fn ensure_peer<'a>(
             waker: &Rc<RefCell<Option<Waker>>>,
             sender: &SocketSink<ClientMessage>,
@@ -830,7 +860,8 @@ impl RtcInner {
             their_peer_id: &PeerId,
             peers: &'a mut HashMap<PeerId, Peer>,
             peer_sender: &UnboundedSender<(PeerId, PeerUpdate)>,
-            petname: &str,
+            our_petname: &str,
+            their_petname: String,
         ) -> Result<(&'a mut Peer, bool), FrontendError<Nothing>> {
             let new = if !peers.contains_key(their_peer_id) {
                 let waker = Rc::clone(&waker);
@@ -840,7 +871,8 @@ impl RtcInner {
                     our_peer_id.clone(),
                     their_peer_id.clone(),
                     peer_sender.clone(),
-                    petname,
+                    our_petname,
+                    their_petname,
                 )?;
                 peers.insert(their_peer_id.clone(), peer);
                 true
@@ -874,7 +906,7 @@ impl RtcInner {
                     select! {
                         _ = keepalive_interval.next() => {
                             for peer in peers.values_mut() {
-                                peer.send(format!("{petname}: {boop}")).await?;
+                                peer.send(format!("{boop}")).await?;
                                 boop += 1;
                             }
                         },
@@ -885,40 +917,32 @@ impl RtcInner {
                                 unreachable!();
                             },
                             Some((their_peer_id, PeerUpdate::Destroy)) => {
-                                debug!("{petname}: Got destroy for peer: {their_peer_id}");
                                 if let Some(peer) = peers.remove(&their_peer_id) {
+                                    debug!("{}: Got destroy for peer: {their_peer_id}", peer.compound_petname());
                                     peer.close()?;
                                 } else {
                                     unreachable!("{petname}: Can't get PeerUpdate from non-existent peer");
                                 }
                             },
                             Some((their_peer_id, update)) => {
-                                let (peer, new) = ensure_peer(
-                                    &waker_,
-                                    &signaling_sender,
-                                    &our_peer_id,
-                                    &their_peer_id,
-                                    &mut peers,
-                                    &channel_sender,
-                                    &petname,
-                                )?;
-                                assert!(!new, "{petname}: Can't get PeerUpdate from non-existent peer");
+                                if let Some(peer) = get_peer(&their_peer_id, &mut peers) {
+                                    match update {
+                                        PeerUpdate::DataChannel(channel) => {
+                                            debug!("{}: Got datachannel for peer: {their_peer_id}", peer.compound_petname());
+                                            peer.handle_datachannel(channel).await?;
+                                        },
 
-                                match update {
-                                    PeerUpdate::DataChannel(channel) => {
-                                        debug!("{petname}: Got datachannel for peer: {their_peer_id}");
-                                        peer.handle_datachannel(channel).await?;
-                                    },
+                                        PeerUpdate::DataChannelClosed => {
+                                            debug!("{}: Got datachannel close for peer: {their_peer_id}", peer.compound_petname());
+                                            peer.close_datachannel()?;
+                                        },
 
-                                    PeerUpdate::DataChannelClosed => {
-                                        debug!("{petname}: Got datachannel close for peer: {their_peer_id}");
-                                        peer.close_datachannel()?;
-                                    },
-
-                                    // Handled above
-                                    PeerUpdate::Destroy => unreachable!(),
+                                        // Handled above
+                                        PeerUpdate::Destroy => unreachable!(),
+                                    }
+                                } else {
+                                    error!("{petname}: got PeerUpdate for a peer that doesn't exist!");
                                 }
-
                             },
                         },
 
@@ -932,7 +956,7 @@ impl RtcInner {
                                     ServerRtc::RoomPeers(room_peers) => {
                                         debug!("{petname}: RoomPeers: {room_peers:?}");
 
-                                        for their_peer_id in room_peers {
+                                        for RoomPeer { peer_id: their_peer_id, petname: their_petname } in room_peers {
                                             let (peer, new) = ensure_peer(
                                                 &waker_,
                                                 &signaling_sender,
@@ -941,13 +965,14 @@ impl RtcInner {
                                                 &mut peers,
                                                 &channel_sender,
                                                 &petname,
+                                                their_petname,
                                             )?;
-                                            debug!(new, "{petname}: RoomPeers got peer: {their_peer_id}");
+                                            debug!(new, "{}: RoomPeers got peer: {their_peer_id}", peer.compound_petname());
                                             peer.perform_signaling(&mut signaling_sender, None).await?;
                                         }
                                     },
 
-                                    ServerRtc::PeerSdp { sdp, peer: their_peer_id } => {
+                                    ServerRtc::PeerSdp { sdp, peer_id: their_peer_id, petname: their_petname } => {
                                         let (peer, new) = ensure_peer(
                                             &waker_,
                                             &signaling_sender,
@@ -956,23 +981,19 @@ impl RtcInner {
                                             &mut peers,
                                             &channel_sender,
                                             &petname,
+                                            their_petname,
                                         )?;
-                                        debug!(new, "{petname}: PeerSdp (type: {:?}) from: {their_peer_id}", sdp.type_);
+                                        debug!(new, "{}: PeerSdp (type: {:?}) from: {their_peer_id}", peer.compound_petname(), sdp.type_);
                                         peer.perform_signaling(&mut signaling_sender, Some(sdp)).await?;
                                     },
 
-                                    ServerRtc::IceCandidate { candidate, peer: their_peer_id } => {
-                                        let (peer, new) = ensure_peer(
-                                            &waker_,
-                                            &signaling_sender,
-                                            &our_peer_id,
-                                            &their_peer_id,
-                                            &mut peers,
-                                            &channel_sender,
-                                            &petname,
-                                        )?;
-                                        debug!(new, "{petname}: IceCandidate from: {their_peer_id}");
-                                        peer.handle_ice_candidate(&mut signaling_sender, candidate).await?;
+                                    ServerRtc::IceCandidate { candidate, peer_id: their_peer_id } => {
+                                        if let Some(peer) = get_peer(&their_peer_id,&mut peers) {
+                                            debug!("{}: IceCandidate from: {their_peer_id}", peer.compound_petname());
+                                            peer.handle_ice_candidate(&mut signaling_sender, candidate).await?;
+                                        } else {
+                                            error!("{petname}: Got ice candidate from non-existent peer ({their_peer_id})");
+                                        }
                                     },
                                 }
                             },

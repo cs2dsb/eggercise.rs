@@ -6,6 +6,9 @@
 		},
 		{
 			"path": "../just-webrtc"
+		},
+		{
+			"path": "../reconnecting-websocket"
 		}
 	],
 	"settings": {

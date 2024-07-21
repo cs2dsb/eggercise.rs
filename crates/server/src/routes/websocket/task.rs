@@ -10,7 +10,7 @@ use loole::{Receiver, RecvError};
 use petname::petname;
 use shared::types::{
     rtc::{PeerId, RoomId},
-    websocket::{ClientMessage, ClientRtc, ServerMessage, ServerRtc, ServerUser},
+    websocket::{ClientMessage, ClientRtc, RoomPeer, ServerMessage, ServerRtc, ServerUser},
 };
 use tokio::time;
 use tokio_tungstenite::tungstenite::Message;
@@ -89,7 +89,7 @@ async fn handle_socket_inner(
                             // If they've given us their peer id
                             if let Some(peer_id) = peer_id.as_ref() {
                                 // Join the user to the room
-                                user_join_room(&mut ws_sender, &rtc_room_state, peer_id, user_state.as_ref().unwrap()).await?;
+                                user_join_room(&mut ws_sender, &rtc_room_state, peer_id, &petname, user_state.as_ref().unwrap()).await?;
                             }
                         },
                         ClientControlMessage::Logout => {
@@ -105,12 +105,12 @@ async fn handle_socket_inner(
                                 user_exit_room(&mut ws_sender, &rtc_room_state, peer_id, &user, &petname).await?;
                             }
                         },
-                        ClientControlMessage::RtcStp { sdp, peer } => {
-                            let message: ServerMessage = ServerRtc::PeerSdp { sdp, peer }.into();
+                        ClientControlMessage::RtcStp { sdp, peer_id, petname } => {
+                            let message: ServerMessage = ServerRtc::PeerSdp { sdp, peer_id, petname }.into();
                             ws_sender.send(message.try_into()?).await?;
                         },
-                        ClientControlMessage::RtcIceCandidate { candidate, peer } => {
-                            let message: ServerMessage = ServerRtc::IceCandidate { candidate, peer }.into();
+                        ClientControlMessage::RtcIceCandidate { candidate, peer_id } => {
+                            let message: ServerMessage = ServerRtc::IceCandidate { candidate, peer_id }.into();
                             ws_sender.send(message.try_into()?).await?;
                         }
                     }
@@ -145,7 +145,7 @@ async fn handle_socket_inner(
 
                                     // Join the user room if logged in
                                     if let Some(user) = user_state.as_ref() {
-                                        user_join_room(&mut ws_sender, &rtc_room_state, &peer_id_, user).await?;
+                                        user_join_room(&mut ws_sender, &rtc_room_state, &peer_id_, &petname, user).await?;
                                     }
                                 },
                                 other => {
@@ -195,10 +195,13 @@ async fn user_join_room(
     ws_sender: &mut SplitSink<WebSocket, WSMessage>,
     rtc_room_state: &RtcRoomState,
     peer_id: &PeerId,
+    petname: &str,
     user: &UserState,
 ) -> Result<(), anyhow::Error> {
+    let room_peer = RoomPeer { peer_id: peer_id.to_owned(), petname: petname.to_string() };
+
     let room_id = RoomId::from(**user.id);
-    rtc_room_state.add(room_id.clone(), peer_id.clone());
+    rtc_room_state.add(room_id.clone(), room_peer);
 
     let peers = rtc_room_state.room_peers(&room_id, peer_id);
     if peers.len() > 0 {
@@ -231,27 +234,27 @@ async fn handle_client_message(
     petname: &str,
 ) -> Result<(), anyhow::Error> {
     match message {
-        ClientMessage::Rtc(ClientRtc::Sdp { sdp, peer: target_peer_id }) => {
+        ClientMessage::Rtc(ClientRtc::Sdp { sdp, peer_id: target_peer_id, petname }) => {
             if let Some(peer_client) = clients.get(&target_peer_id) {
                 debug!(
                     "{petname}: Forwarding sdp (type: {:?}) from {peer_id} to {target_peer_id}",
                     sdp.type_
                 );
                 peer_client
-                    .send(ClientControlMessage::RtcStp { sdp, peer: peer_id.clone() })
+                    .send(ClientControlMessage::RtcStp { sdp, peer_id: peer_id.clone(), petname })
                     .await?;
             } else {
                 error!("{petname}: Failed to find client matching offer peer_id {target_peer_id}");
                 // TODO: send error back to client
             }
         },
-        ClientMessage::Rtc(ClientRtc::IceCandidate { candidate, peer: target_peer_id }) => {
+        ClientMessage::Rtc(ClientRtc::IceCandidate { candidate, peer_id: target_peer_id }) => {
             if let Some(peer_client) = clients.get(&target_peer_id) {
                 debug!("{petname}: Forwarding ice candidate from {peer_id} to {target_peer_id}");
                 peer_client
                     .send(ClientControlMessage::RtcIceCandidate {
                         candidate,
-                        peer: peer_id.clone(),
+                        peer_id: peer_id.clone(),
                     })
                     .await?;
             } else {

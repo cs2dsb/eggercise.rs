@@ -18,8 +18,8 @@ use crate::{AppState, SessionId, UserState};
 pub enum ClientControlMessage {
     Login(UserState),
     Logout,
-    RtcStp { sdp: Sdp, peer: PeerId },
-    RtcIceCandidate { candidate: IceCandidate, peer: PeerId },
+    RtcStp { sdp: Sdp, peer_id: PeerId, petname: String },
+    RtcIceCandidate { candidate: IceCandidate, peer_id: PeerId },
 }
 
 type ClientKey = PeerId;
